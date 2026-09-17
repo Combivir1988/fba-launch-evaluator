@@ -35,8 +35,13 @@ export async function* analyzeStream(body, cfg, { signal } = {}) {
   const t0 = Date.now();
   if (cfg.mock) {
     yield { event: "meta", data: { model: "mock", requestId: "mock-" + t0 } };
-    for (const text of ["Проверяю гейты… ", "Сверяю Критерий 1 с потолком правил… ", "Формирую рекомендации…"]) { await sleep(100); yield { event: "thinking", data: { text } }; }
+    for (const text of ["Проверяю гейты… ", "Сверяю Критерий 1 с потолком правил… ", "Формирую рекомендации…"]) {
+      await sleep(100);
+      if (signal?.aborted) { yield { event: "error", data: { code: "aborted", message: "Запрос отменён (mock)", retryable: false } }; return; }
+      yield { event: "thinking", data: { text } };
+    }
     await sleep(100);
+    if (signal?.aborted) { yield { event: "error", data: { code: "aborted", message: "Запрос отменён (mock)", retryable: false } }; return; }
     const verdict = mockVerdict(payload);
     const v = validateVerdict(verdict, VERDICT_SCHEMA);
     if (!v.ok) { yield { event: "error", data: { code: "parse", message: v.errors.join("; "), retryable: false } }; return; }

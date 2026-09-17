@@ -37,7 +37,8 @@ export function createApp(cfg = configFromEnv()) {
     const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
     const ping = setInterval(() => { if (!res.writableEnded) res.write(": ping\n\n"); }, 15000);
     const ac = new AbortController();
-    req.on("close", () => { ac.abort(); });
+    // ВАЖНО: слушать close на ответе, не на запросе — req.close срабатывает сразу после чтения тела
+    res.on("close", () => { if (!res.writableFinished) ac.abort(); });
     const t0 = Date.now();
     log("info", "analyze start", { ip: req.ip, niche: String(body.niche || "").slice(0, 60), payloadChars: JSON.stringify(body.payload).length, model: cfg.mock ? "mock" : cfg.model });
     try {

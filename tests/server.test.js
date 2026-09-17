@@ -58,6 +58,7 @@ test("analyze (MOCK): SSE с meta/thinking/done, вердикт валиден �
   const events = [...text.matchAll(/event: (\w+)\ndata: (.*)\n/g)].map((m) => [m[1], JSON.parse(m[2])]);
   const names = events.map((e) => e[0]);
   assert.ok(names.includes("meta") && names.includes("thinking") && names.includes("done"), names.join(","));
+  assert.ok(!names.includes("error"), "сигнал отмены не должен срабатывать, пока клиент подключён: " + JSON.stringify(events.find((e) => e[0] === "error")?.[1]));
   const done = events.find((e) => e[0] === "done")[1];
   assert.equal(done.verdict.verdict, a.results.verdict.ceiling);
   assert.ok(done.verdict.nextSteps.length >= 1 && done.verdict.nextSteps.length <= 3);
