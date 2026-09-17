@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FBA Launch Evaluator</title>
+<meta name="description" content="Оценка ниши/товара для запуска на Amazon FBA: Критерий 1, гейты экономики, критерии 3–8, scorecard, AI-вердикт.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="login" class="overlay hidden">
+  <form class="panel login" id="login-form">
+    <h1>FBA Launch Evaluator</h1>
+    <p class="muted">Введите пароль доступа (APP_PASSWORD на сервере). Он хранится только в этом браузере.</p>
+    <div class="field"><label for="login-pass">Пароль</label><input id="login-pass" type="password" autocomplete="current-password" required></div>
+    <div class="row"><button class="primary" type="submit">Войти</button><button type="button" id="login-skip">Без AI (только расчёты)</button></div>
+    <p id="login-msg" class="muted"></p>
+  </form>
+</div>
+
+<header class="topbar">
+  <div class="brand">📦 FBA Launch Evaluator</div>
+  <nav aria-label="Разделы">
+    <button data-tab="analysis" class="active">Анализ</button>
+    <button data-tab="history">История <span id="hist-count" class="muted"></span></button>
+    <button data-tab="thresholds">Пороги</button>
+    <button data-tab="help">Справка</button>
+  </nav>
+  <button id="theme-toggle" title="Тема" aria-label="Переключить тему">◐</button>
+</header>
+
+<main id="tab-analysis" class="layout">
+  <aside class="panel side" id="side">
+    <details open>
+      <summary>1. Ниша</summary>
+      <div class="body">
+        <div class="field"><label for="f-niche">Название ниши / кодовое имя</label><input id="f-niche" data-field="niche" placeholder="urinal screen deodorizer"></div>
+        <div class="field"><label for="f-core">Главный ключ (core keyword)</label><input id="f-core" data-field="coreKeyword" placeholder="как в Cerebro"></div>
+        <div class="grid2">
+          <div class="field"><label for="f-mybrand">Мой бренд (если уже продаю)</label><input id="f-mybrand" data-input="myBrand" placeholder="—"></div>
+          <div class="field"><label for="f-myasins">Мои ASIN (через запятую)</label><input id="f-myasins" data-input="myAsins" placeholder="B0…"></div>
+        </div>
+        <label class="row" style="align-items:center"><input type="checkbox" data-input="evaluateAsNewEntrant" checked> Оценивать как новый вход (мой бренд = инкумбент)</label>
+      </div>
+    </details>
+    <details open>
+      <summary>2. Файлы</summary>
+      <div class="body">
+        <div class="drop" id="drop">Перетащите сюда Xray CSV, Cerebro CSV, POE JSON, SQP CSV<br><small>или</small><br>
+          <input type="file" id="file-input" multiple accept=".csv,.json,text/csv,application/json" class="hidden">
+          <button type="button" id="file-btn">Выбрать файлы</button>
+        </div>
+        <div class="filelist" id="filelist"></div>
+        <p class="muted" style="font-size:.8rem">Файлы разбираются в браузере и не отправляются на сервер. Тип определяется по заголовкам.</p>
+      </div>
+    </details>
+    <details id="det-cluster" class="hidden">
+      <summary>3. Ключи кластера <span id="cluster-count" class="muted"></span></summary>
+      <div class="body">
+        <div class="row"><input id="kw-filter" placeholder="фильтр…"><button type="button" id="kw-auto">Автовыбор</button><button type="button" id="kw-none">Снять все</button></div>
+        <div class="kwlist" id="kwlist"></div>
+        <p class="muted" style="font-size:.8rem">Adj. SV = SV core + 0.4 × Σ остальных. Отбор — по смысловой близости, не топ-N слепо; ASIN-строки и брендовые запросы скрыты по умолчанию (<label style="display:inline"><input type="checkbox" id="kw-showall"> показать все</label>).</p>
+      </div>
+    </details>
+    <details id="det-brands" class="hidden">
+      <summary>4. Исключить бренды (contamination)</summary>
+      <div class="body"><div class="chips" id="brandchips"></div><p class="muted" style="font-size:.8rem">Отметьте бренды из смежной категории — они исключаются из выручки/долей. Кандидаты (нет в POE) подсвечены.</p></div>
+    </details>
+    <details open>
+      <summary>5. Экономика и бюджет</summary>
+      <div class="body">
+        <div class="grid2">
+          <div class="field"><label for="f-price">Цена продажи, $</label><input id="f-price" type="number" step="0.01" min="0" data-input="price" placeholder="медиана 1b"></div>
+          <div class="field"><label for="f-cogs">COGS (производство), $</label><input id="f-cogs" type="number" step="0.01" min="0" data-input="cogs" placeholder="от поставщика"></div>
+          <div class="field"><label for="f-ship">Доставка на юнит, $</label><input id="f-ship" type="number" step="0.01" min="0" data-input="shippingPerUnit"></div>
+          <div class="field"><label for="f-fba">FBA-сбор, $</label><input id="f-fba" type="number" step="0.01" min="0" data-input="fbaFee"></div>
+          <div class="field"><label for="f-ref">Referral, %</label><input id="f-ref" type="number" step="0.5" min="0" max="45" data-input="referralPct" data-scale="100"></div>
+          <div class="field"><label for="f-cpc">CPC, $</label><input id="f-cpc" type="number" step="0.01" min="0" data-input="cpc" placeholder="bid core (Cerebro)"></div>
+        </div>
+        <label class="row"><input type="checkbox" data-input="cogsConfirmed"> COGS подтверждён котировкой поставщика</label>
+        <div class="slider"><label for="s-cvr">CVR (конверсия), % <small>8–15 % реалистично для нового листинга</small></label><input id="s-cvr" type="range" min="3" max="30" step="0.5" data-input="cvr" data-scale="100"><output for="s-cvr"></output></div>
+        <div class="slider"><label for="s-ppc">Доля продаж через PPC, %</label><input id="s-ppc" type="range" min="0" max="100" step="5" data-input="ppcShare" data-scale="100"><output for="s-ppc"></output></div>
+        <div class="slider"><label for="s-units">Продаж в день, шт</label><input id="s-units" type="range" min="1" max="100" step="1" data-input="unitsPerDay"><output for="s-units"></output></div>
+        <div class="grid2">
+          <div class="field"><label for="f-prod">Производство, дн</label><input id="f-prod" type="number" min="0" data-input="productionDays"></div>
+          <div class="field"><label for="f-shipd">Доставка, дн</label><input id="f-shipd" type="number" min="0" data-input="shippingDays"></div>
+          <div class="field"><label for="f-recv">Приёмка Amazon, дн</label><input id="f-recv" type="number" min="0" data-input="receivingDays"></div>
+          <div class="field"><label for="f-ads">Резерв на рекламу, $</label><input id="f-ads" type="number" min="0" data-input="adsReserve"></div>
+          <div class="field"><label for="f-budget">Мой бюджет, $</label><input id="f-budget" type="number" min="0" data-input="budget" placeholder="—"></div>
+          <div class="field"><label for="f-diff">Могу отстроиться от конкурентов?</label><select id="f-diff" data-input="canDifferentiate"><option value="unknown">не знаю</option><option value="yes">да</option><option value="no">нет</option></select></div>
+        </div>
+      </div>
+    </details>
+    <details>
+      <summary>6. Риски и compliance</summary>
+      <div class="body">
+        <label class="row"><input type="checkbox" data-check="gatedCategory"> Закрытая категория (нужно одобрение)</label>
+        <label class="row"><input type="checkbox" data-check="dangerousGoods"> Опасные товары (Dangerous Goods)</label>
+        <label class="row"><input type="checkbox" data-check="amazonSells"> Amazon продаёт сам в этой нише</label>
+        <label class="row"><input type="checkbox" data-check="reviewMergingSuspected"> Подозрение на склейку отзывов у конкурентов (урок 14)</label>
+        <div class="grid2">
+          <div class="field"><label for="c-cert">Сертификаты</label><select id="c-cert" data-check="certificates"><option value="none">не нужны / не проверял</option><option value="CPC">CPC (детские)</option><option value="FDA">FDA</option><option value="Prop65">Prop 65</option><option value="other">другие</option></select></div>
+          <div class="field"><label for="c-pat">Патенты / FTO (крит. 8)</label><select id="c-pat" data-check="patentSearch"><option value="none">не проверял</option><option value="clear">не найдено</option><option value="design_around">есть design-around</option><option value="unsure">есть похожие — нужен юрист</option><option value="conflict">прямое совпадение</option></select></div>
+          <div class="field"><label for="c-tm">Торговая марка</label><select id="c-tm" data-check="trademarkSearch"><option value="none">не проверял</option><option value="free">свободна</option><option value="conflict">занята</option></select></div>
+          <div class="field"><label for="c-coup">Купоны/дилы в выдаче</label><select id="c-coup" data-check="couponsDealsSaturation"><option value="unknown">—</option><option value="low">мало</option><option value="mid">умеренно</option><option value="high">массово</option></select></div>
+          <div class="field"><label for="c-test">Тест дизайна (PickFu), %</label><input id="c-test" type="number" min="0" max="100" data-check="designTestScore" placeholder="—"></div>
+          <div class="field"><label for="c-life">Жизненный цикл, мес</label><input id="c-life" type="number" min="0" data-check="lifecycleMonths" placeholder="—"></div>
+          <div class="field"><label for="c-list">Листингов в выдаче</label><input id="c-list" type="number" min="0" data-check="listingsInSearch" placeholder="—"></div>
+        </div>
+        <h4>Критерии 3–8 (ручные статусы)</h4>
+        <div id="challenger-user"></div>
+        <div class="slider"><label for="s-bf">Brand-fit (ось scorecard), 0–10</label><input id="s-bf" type="range" min="0" max="10" step="1" data-axis="brandFit"><output for="s-bf"></output></div>
+        <div class="slider"><label for="s-op">Operational risk (10 = низкий) <label style="display:inline;margin-left:.5rem"><input type="checkbox" id="op-auto" checked> авто из чеклиста</label></label><input id="s-op" type="range" min="0" max="10" step="1" data-axis="opRisk"><output for="s-op"></output></div>
+        <p class="muted" style="font-size:.8rem">Ссылки: <a href="https://sellercentral.amazon.com/ckp/" target="_blank" rel="noopener">Compliance Reference</a> · <a href="https://www.uspto.gov/trademarks/search" target="_blank" rel="noopener">USPTO</a> · <a href="https://patents.google.com" target="_blank" rel="noopener">Google Patents</a> · <a href="https://branddb.wipo.int/" target="_blank" rel="noopener">WIPO</a> · <a href="https://www.junglescout.com/estimator/" target="_blank" rel="noopener">Sales Estimator</a></p>
+      </div>
+    </details>
+    <details>
+      <summary>7. Ручные метрики Критерия 1</summary>
+      <div class="body" id="overrides"></div>
+    </details>
+    <div class="actions">
+      <button class="primary" id="btn-ai">✨ AI-анализ</button>
+      <button id="btn-save">💾 Сохранить</button>
+      <button id="btn-html">⬇ HTML</button>
+      <button id="btn-json">⬇ JSON</button>
+      <button id="btn-new">＋ Новый</button>
+    </div>
+  </aside>
+  <section class="main" id="dashboard" aria-live="polite"></section>
+</main>
+
+<section id="tab-history" class="layout hidden" style="grid-template-columns:1fr">
+  <div class="panel section">
+    <div class="row"><h2 style="flex:1">История анализов</h2><input id="hist-search" placeholder="поиск по нише…" style="max-width:260px"><button id="hist-export">⬇ Экспорт всей истории</button><button id="hist-import">⬆ Импорт</button><input type="file" id="hist-import-file" accept=".json,application/json" class="hidden"></div>
+    <div class="hist" id="histlist"></div>
+  </div>
+</section>
+
+<section id="tab-thresholds" class="layout hidden" style="grid-template-columns:1fr">
+  <div class="panel section">
+    <h2>Пороги методологии</h2>
+    <p class="muted">Значения по умолчанию — из скилла fba-launch-evaluator. Изменения сохраняются в текущем анализе и применяются мгновенно. Доли — в долях единицы (0.25 = 25 %).</p>
+    <div id="thr" class="thr-grid"></div>
+    <div class="row" style="margin-top:.8rem"><button id="thr-reset">Сбросить к умолчаниям</button></div>
+  </div>
+</section>
+
+<section id="tab-help" class="layout hidden" style="grid-template-columns:1fr">
+  <div class="panel section" id="help">
+    <h2>Как пользоваться</h2>
+    <ol>
+      <li><b>Ниша</b> — введите название и главный ключ (тот, что даёт релевантную выдачу на первой странице Amazon).</li>
+      <li><b>Файлы</b> — загрузите Helium 10 <b>Xray</b> CSV (выручка, цены, отзывы) и <b>Cerebro</b> CSV (объёмы поиска). Опционально <b>POE JSON</b> (экспорт Product Opportunity Explorer через расширение POE Analyzer — сезонность, структура ниши, отзывы, запросы) и <b>SQP</b> CSV. Всё разбирается в браузере.</li>
+      <li><b>Ключи кластера</b> — приложение предложит релевантные запросы; уберите нерелевантные. Adj. SV = SV core + 0.4 × Σ остальных.</li>
+      <li><b>Экономика</b> — введите цену, COGS, сборы, CPC; двигайте ползунки CVR / доля PPC / шт в день — Gate 1/2, ROI, бюджет и scorecard пересчитываются мгновенно. Критерий 2 остаётся пустым, пока не введён COGS (правило: экономику заполняет менеджер, не AI).</li>
+      <li><b>AI-анализ</b> — Claude получает только агрегаты (не файлы) и возвращает вердикт, обоснование по гейтам, гипотезы дифференциации и шаги. Вердикт AI не может быть мягче правил: при конфликте он понижается с пометкой.</li>
+      <li><b>История</b> — анализы сохраняются в браузере (IndexedDB); экспортируйте JSON, чтобы перенести на другое устройство. <b>⬇ HTML</b> — автономный дашборд (открывается офлайн).</li>
+    </ol>
+    <h3>Логика вердикта</h3>
+    <p><b>Gate 0</b> данные → <b>Gate 1</b> маржа &gt; 30 % и (профит &gt; $15 или маржа &gt; 40 % при цене &lt; $25) → <b>Gate 2</b> Net after ads &gt; 0 при CVR ≤ 12 % → <b>Gate 3</b> Критерий 1 (≥ 6 из 8) + критерии 3–8 при доминирующем бренде (&gt; 25 %), критерии 6 и 8 обязательны → <b>Gate 4</b> патенты/FTO. Плюс стоп-вопросы урока 07 (бюджет, ROI ≥ 150 %, выручка ≥ $500k/мес, дифференциация).</p>
+    <p class="muted">Методология: скилл fba-launch-evaluator + курс «Выбор товара на Amazon» (уроки 03–14). Версия порогов: <span id="help-ver"></span>.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<script src="vendor/chart.umd.js"></script>
+<script src="vendor/papaparse.min.js"></script>
+<script src="js/render.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

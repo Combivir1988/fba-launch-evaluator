@@ -1,0 +1,26 @@
+{
+  "name": "fba-launch-evaluator",
+  "version": "0.1.0",
+  "description": "Оценка ниши/товара для запуска на Amazon FBA (Go / No-Go) — веб-версия скилла fba-launch-evaluator",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "MOCK_AI=1 APP_PASSWORD=dev node --watch server/index.js",
+    "test": "node --test \"tests/*.test.js\"",
+    "vendor": "node scripts/vendor.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0",
+    "chart.js": "^4.5.1",
+    "express": "^5.2.1",
+    "papaparse": "^5.7.0"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.0"
+  }
+}

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: fba-launch-evaluator
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-opus-5
+      - key: CLAUDE_EFFORT
+        value: high
+      - key: NODE_ENV
+        value: production

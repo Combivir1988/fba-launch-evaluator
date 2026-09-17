@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIVerdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict", "decisiveGate", "criterion1Summary", "gates", "differentiation",
+    "recommendations", "risks", "pricingPackComment", "nextSteps", "summary"
+  ],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["go", "go_conditional", "rework", "no_go"] },
+    "decisiveGate": { "type": "string", "description": "Какой гейт/критерий стал решающим и почему (1-2 предложения, русский)" },
+    "summary": { "type": "string", "description": "3-5 предложений: итог для менеджера" },
+    "criterion1Summary": { "type": "string", "description": "Критерий 1: X из 8, какие пункты красные и что это значит" },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate", "status", "reasoning"],
+        "properties": {
+          "gate": { "type": "string", "enum": ["gate0", "gate1", "gate2", "gate3", "gate4", "criterion1", "traffic", "budget", "scorecard"] },
+          "status": { "type": "string", "enum": ["pass", "rework", "fail", "insufficient_data", "not_applicable"] },
+          "reasoning": { "type": "string" }
+        }
+      }
+    },
+    "differentiation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["hypothesis", "evidence", "specRequirement"],
+        "properties": {
+          "hypothesis": { "type": "string" },
+          "evidence": { "type": "string", "description": "Ссылка на тему отзывов / метрику дашборда" },
+          "specRequirement": { "type": "string", "description": "Измеримое требование для ТЗ" }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["priority", "title", "text"],
+        "properties": {
+          "priority": { "type": "string", "enum": ["high", "med", "low"] },
+          "title": { "type": "string" },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "pricingPackComment": { "type": "string", "description": "Комментарий по цене/комплектации: медиана проверенных конкурентов, концентрация внутри сегмента" },
+    "nextSteps": { "type": "array", "minItems": 1, "maxItems": 3, "items": { "type": "string" } }
+  }
+}
