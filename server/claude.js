@@ -108,6 +108,7 @@ async function* pump(stream, cfg, t0) {
 function toError(err) {
   if (err instanceof Anthropic.AuthenticationError) return { code: "auth", message: "Неверный ANTHROPIC_API_KEY", retryable: false };
   if (err instanceof Anthropic.RateLimitError) return { code: "rate_limited", message: "Лимит запросов Claude API — повторите позже", retryable: true };
+  if (err instanceof Anthropic.BadRequestError && /credit balance/i.test(err.message || "")) return { code: "billing", message: "На балансе Anthropic API нет средств — пополните кредиты: console.anthropic.com → Plans & Billing. Ключ и сервер настроены верно.", retryable: false };
   if (err instanceof Anthropic.BadRequestError) return { code: "bad_request", message: err.message, retryable: false };
   if (err instanceof Anthropic.APIConnectionTimeoutError) return { code: "upstream", message: "Таймаут Claude API", retryable: true };
   if (err instanceof Anthropic.APIError) return { code: "upstream", message: `Claude API ${err.status}: ${err.message}`, retryable: (err.status ?? 500) >= 500 };
