@@ -145,6 +145,13 @@ const autosave = debounce(async () => {
   if (!hasContent()) return;
   try { await history.put(S.a); localStorage.setItem("fba_last", S.a.id); updateHistCount(); } catch (e) { console.warn("autosave", e); }
 }, 1500);
+/** Результат дорогой серверной задачи (AI-вердикт, патентный скан) сохраняем сразу и всегда — иначе после F5 или повторного
+ *  «Открыть» из истории он терялся: для анализа из истории автосохранение выключено (защита от молчаливой перезаписи правок). */
+async function persistJobResult(label) {
+  S.a.updatedAt = new Date().toISOString();
+  try { await history.put(S.a); localStorage.setItem("fba_last", S.a.id); S.dirty = false; S.fromHistory = true; $("#btn-save").textContent = "💾 Сохранить"; updateHistCount(); }
+  catch (e) { console.warn("persist", e); toast(`${label}: результат получен, но не сохранился в историю — нажмите «Сохранить»`, 7000); }
+}
 const hasContent = () => Boolean(S.a.niche || Object.values(S.a.aggregates || {}).some(Boolean) || S.a.inputs.cogs !== null);
 
 // ---------- files ----------
@@ -249,7 +256,7 @@ async function startAi(resumeJobId = null) {
       onReconnect: (n) => { if (status) status.textContent = `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`; } });
     S.a.ai = ai; S.a.status = "ai_done"; S.dirty = true;
     R().update(dash, S.a, renderOpts(), ["hero", "ai"]);
-    if (!S.fromHistory) { await history.put({ ...S.a, updatedAt: new Date().toISOString() }); updateHistCount(); }
+    await persistJobResult("AI");
     toast(ai.adjustedByRules ? "AI-вердикт получен и скорректирован правилами" : "AI-вердикт получен");
   } catch (err) {
     console.error(err);
@@ -273,7 +280,8 @@ async function startPatentScan(resumeJobId = null) {
     const chosen = modelPatents();
     const scan = await runPatentScan(S.a, { niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} },
       { token: S.token, resumeJobId, onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
-    S.a.patents = scan; markDirty(); renderAll();
+    S.a.patents = scan; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.staleSince = new Date().toISOString(); // AI-вердикт считался без этих данных
+    renderAll(); await persistJobResult("Патентный скан");
     setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[scan.status] || scan.status}`);
     toast("Патентный скан завершён — критерий 8 получил статус «допущение»");
     document.getElementById("sec-patents")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -323,7 +331,11 @@ async function renderHistory() {
   $("#histlist").innerHTML = list.map((h) => `<div class="histrow"><div><div class="t">${esc(h.niche || "Без названия")} ${h.verdict ? `<span class="status ${h.verdict}">${V[h.verdict]}</span>` : ""}${h.aiDone ? ' <span class="chip">AI</span>' : ""}</div>
     <div class="m">${new Date(h.updatedAt).toLocaleString("ru-RU")} · ключ: ${esc(h.coreKeyword || "—")} · Критерий 1: ${h.c1 ?? "—"}/8 · scorecard ${h.score != null ? Math.round(h.score) + " %" : "—"} · ${h.sources.join(", ") || "без файлов"}</div></div>
     <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-json="${h.id}">JSON</button><button data-del="${h.id}" class="danger">Удалить</button></div></div>`).join("") || '<div class="empty">История пуста. Сохранённые анализы появятся здесь.</div>';
-  $$("[data-open]").forEach((b) => b.addEventListener("click", async () => loadAnalysis(await history.get(b.dataset.open), true)));
+  $$("[data-open]").forEach((b) => b.addEventListener("click", async () => {
+    if (b.dataset.open === S.a.id) { showTab("analysis"); if (S.dirty) toast("Показан текущий анализ с несохранёнными правками — нажмите «Сохранить», чтобы записать их"); return; }
+    if (S.dirty && !confirm("Открыть другой анализ? Несохранённые изменения текущего будут потеряны.")) return;
+    loadAnalysis(await history.get(b.dataset.open), true);
+  }));
   $$("[data-json]").forEach((b) => b.addEventListener("click", async () => exportAnalysisJson(await history.get(b.dataset.json))));
   $$("[data-del]").forEach((b) => b.addEventListener("click", async () => { if (confirm("Удалить анализ из истории?")) { await history.delete(b.dataset.del); if (S.a.id === b.dataset.del) S.fromHistory = false; renderHistory(); updateHistCount(); } }));
 }
