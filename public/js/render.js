@@ -31,14 +31,29 @@
     C.defaults.animation = matchMedia("(prefers-reduced-motion: reduce)").matches ? false : { duration: 250 };
     C.defaults.maintainAspectRatio = false;
   }
+  function chartFail(canvas, msg) {
+    const box = canvas.closest(".chartbox") || canvas.parentElement;
+    if (box) box.innerHTML = `<div class="notice fail" style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center">${esc(msg)}</div>`;
+  }
   function mkChart(container, id, cfg) {
     const canvas = container.querySelector(`#${id}`);
-    if (!canvas || !window.Chart) return null;
+    if (!canvas) return null;
+    if (!window.Chart) { chartFail(canvas, "Chart.js не загрузился (vendor/chart.umd.js) — проверьте блокировщик скриптов и консоль браузера (F12)"); return null; }
     container.__charts = container.__charts || {};
     if (container.__charts[id]) { try { container.__charts[id].destroy(); } catch {} }
-    const ch = new window.Chart(canvas.getContext("2d"), cfg);
-    container.__charts[id] = ch;
-    return ch;
+    try {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { chartFail(canvas, "Браузер не даёт 2D-контекст canvas (расширение приватности / аппаратное ускорение)"); return null; }
+      const ch = new window.Chart(ctx, cfg);
+      container.__charts[id] = ch;
+      // страховка: если контейнер ещё не имел размера на момент создания — перерисовать
+      requestAnimationFrame(() => { try { if (!ch.width || !ch.height) ch.resize(); } catch {} });
+      return ch;
+    } catch (e) {
+      console.error("chart", id, e);
+      chartFail(canvas, "График не отрисован: " + (e?.message || e));
+      return null;
+    }
   }
   const grid = { color: cssVar("--grid") };
   const tooltipMoney = (d) => (ctx) => `${ctx.dataset.label ? ctx.dataset.label + ": " : ""}${fmtMoney(ctx.parsed.y ?? ctx.parsed.x, d)}`;
