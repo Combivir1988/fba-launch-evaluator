@@ -3,7 +3,7 @@
 import { brandLoyalty } from "./traffic.js";
 
 export function challenger(p) {
-  const { inputs, thresholds: th, competition: comp, criterion1: c1, economics: eco, cerebro, poe, traffic: tr, xray } = p;
+  const { inputs, thresholds: th, competition: comp, criterion1: c1, economics: eco, cerebro, poe, traffic: tr, xray, patents } = p;
   const t = th.challenger;
   const user = inputs.challenger || {};
   const active = Boolean(comp?.dominant);
@@ -63,16 +63,23 @@ export function challenger(p) {
   {
     const ps = inputs.checklist?.patentSearch || "none";
     const map = { clear: ["ok", "патентов не найдено (USPTO/Google Patents)"], design_around: ["ok", "есть явный design-around"], conflict: ["fail", "прямое совпадение с живым патентом"], unsure: ["warn", "есть похожие патенты — нужна оценка юриста"], none: ["na", "поиск не проводился — Gate 4 не обсуждён"] };
-    const [status, note] = map[ps] || map.none;
-    items["8"] = applyUser({ title: "Patent / FTO риск", mandatory: true, status, kind: status === "na" ? "unknown" : "confirmed", value: null, note }, user["8"]);
+    let [status, note] = map[ps] || map.none;
+    let kind = status === "na" ? "unknown" : "confirmed";
+    if (ps === "none" && patents?.status) {
+      // AI-скан — только 🟡 допущение: подтверждение (🟢) ставит человек/поверенный через поле «Патенты / FTO»
+      const hi = (patents.items || []).filter((x) => x.risk === "high").length, med = (patents.items || []).filter((x) => x.risk === "med").length;
+      status = patents.status === "conflict" ? "fail" : patents.status === "unsure" ? "warn" : "ok"; kind = "assumed";
+      note = `AI-скан Google Patents (${new Date(patents.createdAt).toLocaleDateString("ru-RU")}): ${patents.status === "conflict" ? `есть ${hi} патент(ов) с высоким риском` : patents.status === "unsure" ? `${med} патент(ов) с частичным пересечением — нужна проверка поверенным` : "явных пересечений по независимым claims не найдено"}; подтвердите статус вручную`;
+    }
+    items["8"] = applyUser({ title: "Patent / FTO риск", mandatory: true, status, kind, value: null, note }, user["8"]);
   }
 
   const greenCount = Object.values(items).filter((i) => i.status === "ok" && i.kind === "confirmed").length;
-  const mandatoryOk = items["6"].status === "ok" && items["8"].status === "ok";
+  const mandatoryOk = items["6"].status === "ok" && items["8"].status === "ok" && items["8"].kind === "confirmed";
   const pending = Object.values(items).some((i) => i.status === "pending");
   return { active, items, greenCount, total: 8, passCount: t.passCount, mandatoryOk, pending,
     pass: active ? greenCount >= t.passCount && mandatoryOk : null,
-    gate4Discussed: items["8"].status !== "na",
+    gate4Discussed: items["8"].status !== "na", patentScanOnly: items["8"].kind === "assumed",
     note: active ? `Top Brand ${(comp.topBrandShare * 100).toFixed(0)} % > 25 % — доминирующий игрок, критерии 3–8 обязательны` : "доминирующего бренда нет (Top Brand ≤ 25 %) — критерии 3–8 справочно" };
 }
 

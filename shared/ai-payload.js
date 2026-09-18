@@ -33,6 +33,7 @@ export function buildAiPayload(analysis) {
     rulesVerdict: R.verdict,
     reconciliation: R.reconciliation.map((x) => ({ metric: x.metric, a: { ...x.a, value: r2(x.a.value) }, b: { ...x.b, value: r2(x.b.value) }, deltaPct: r3(x.deltaPct), level: x.level })),
     checklist: inp.checklist, challengerUser: inp.challenger, canDifferentiate: inp.canDifferentiate,
+    patentScan: analysis.patents ? { status: analysis.patents.status, summary: analysis.patents.summary, feature: analysis.patents.feature, top: (analysis.patents.items || []).slice(0, 6).map((x) => ({ number: x.number, risk: x.risk, expired: x.expired, claimed: x.claimed, overlap: x.overlap, designAround: x.designAround })) } : null,
     poe: agg.poe ? {
       summary: agg.poe.nicheSummary, launchPotential: pick(agg.poe.launchPotential, ["productCount", "brandCount", "sellingPartnerCount", "newProductsLaunchedT360", "successfulLaunchesT360", "avgReviewCount", "avgReviewRating", "sponsoredProductsPercentage", "top5BrandsClickShareT360", "top20ProductsClickShareT360", "avgProductPrice", "avgOOSRate"]),
       terms: agg.poe.searchTermMetrics.slice(0, 20).map((t) => ({ term: t.term, svT360: t.svT360, growthYoy: r3(t.growthT360Yoy), conv: r3(t.convT360), clickShare: r3(t.clickShareT360), topClicked: t.topClicked.map((x) => x.asin) })),

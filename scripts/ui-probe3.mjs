@@ -1,0 +1,26 @@
+// Патентный скан в MOCK-режиме через UI: кнопка → SSE → секция «Патенты / FTO» → критерий 8 = 🟡
+import { chromium } from "playwright";
+import { spawn } from "node:child_process";
+import path from "node:path";
+const root = process.cwd(); const OUT = "C:/Users/User/AppData/Local/Temp/claude/f--Claude-Code-Allegro/c3aa2767-d354-43da-bb93-da6326ff096b/scratchpad/";
+const srv = spawn(process.execPath, ["server/index.js"], { env: { ...process.env, PORT: "3997", APP_PASSWORD: "dev", MOCK_AI: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+await new Promise((r) => setTimeout(r, 1500));
+const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+const logs = []; page.on("console", (m) => { if (["error"].includes(m.type())) logs.push(m.text()); }); page.on("pageerror", (e) => logs.push("pageerror: " + e.message));
+await page.addInitScript(() => { localStorage.setItem("fba_token", "dev"); localStorage.clear(); localStorage.setItem("fba_token", "dev"); });
+await page.goto("http://127.0.0.1:3997/", { waitUntil: "networkidle" });
+await page.fill("#f-core", "urinal screen deodorizer");
+await page.setInputFiles("#file-input", [path.join(root, "tests/fixtures/POE_urinal_screen_deodorizer_2026-09-15.json")]);
+await page.waitForFunction(() => document.querySelectorAll(".filecard").length >= 1);
+await page.click('details:has(#f-pfeature) summary').catch(() => {});
+await page.fill("#f-pfeature", "enzyme odor neutralizer with anti-splash mesh");
+await page.waitForTimeout(600);
+console.log("feature in state placeholder ok:", await page.inputValue("#f-pfeature"));
+await page.click("#btn-patents");
+await page.waitForFunction(() => document.querySelector("#sec-patents")?.textContent.includes("AI-скан"), null, { timeout: 30000 });
+await page.waitForTimeout(800);
+const info = await page.evaluate(() => ({ chip: document.querySelector("#sec-patents h2 .chip")?.textContent, rows: document.querySelectorAll("#sec-patents tbody tr").length, crit8: document.querySelector("#sec-challenger tbody tr:nth-child(8)")?.textContent.slice(0, 160), hero: document.querySelector("#sec-hero .verdict .big")?.textContent, side: document.querySelector("#patents-side-status")?.textContent }));
+console.log(JSON.stringify(info));
+await page.locator("#sec-patents").screenshot({ path: OUT + "patents.png" });
+console.log("console:", logs.join("\n") || "(чисто)");
+await browser.close(); srv.kill();

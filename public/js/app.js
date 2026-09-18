@@ -63,6 +63,7 @@ function syncForm() {
     const k = el.dataset.input; let v = inp[k];
     if (el.type === "checkbox") { el.checked = Boolean(v); return; }
     if (k === "myAsins") { el.value = (v || []).join(", "); return; }
+    if (k === "myBrand" || k === "patentFeature" || k === "canDifferentiate") { el.value = v ?? ""; return; }
     const scale = Number(el.dataset.scale || 1);
     el.value = v === null || v === undefined ? "" : el.type === "range" ? v * scale : Math.round(v * scale * 1000) / 1000;
     if (el.type === "range") setOutput(el);
@@ -111,7 +112,7 @@ function applyInput(el) {
   const k = el.dataset.input;
   if (el.type === "checkbox") { S.a.inputs[k] = el.checked; return; }
   if (k === "myAsins") { S.a.inputs.myAsins = el.value.split(/[\s,;]+/).map((s) => s.trim().toUpperCase()).filter(Boolean); return; }
-  if (k === "myBrand") { S.a.inputs.myBrand = el.value.trim(); return; }
+  if (k === "myBrand" || k === "patentFeature" || k === "canDifferentiate") { S.a.inputs[k] = el.value.trim(); return; }
   const scale = Number(el.dataset.scale || 1); const v = numOrNull(el.value); S.a.inputs[k] = v === null ? null : v / scale;
 }
 function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.staleSince = new Date().toISOString(); $("#btn-save").textContent = S.fromHistory ? "💾 Сохранить ●" : "💾 Сохранить"; }
@@ -212,7 +213,8 @@ function renderChallengerUser() {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // ---------- AI ----------
-dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); });
+dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); });
+$("#btn-patents").addEventListener("click", startPatentScan);
 $("#btn-ai").addEventListener("click", startAi);
 async function startAi() {
   if (S.aiBusy) return;
@@ -237,6 +239,33 @@ async function startAi() {
     if (err.code === "auth") { S.token = ""; localStorage.removeItem("fba_token"); $("#login").classList.remove("hidden"); }
     if (status) status.textContent = "ошибка: " + err.message; toast("AI: " + err.message, 6000);
   } finally { S.aiBusy = false; $("#btn-ai").disabled = false; }
+}
+
+async function startPatentScan() {
+  if (S.patBusy) return;
+  if (!S.token) { $("#login").classList.remove("hidden"); toast("Для патентного скана нужен пароль доступа"); return; }
+  if (!S.a.coreKeyword && !S.a.niche) return toast("Укажите нишу / главный ключ");
+  if (!S.a.results) renderAll();
+  S.patBusy = true; $("#btn-patents").disabled = true;
+  const setStatus = (t) => { for (const el of [$("#patents-status"), $("#patents-side-status")]) if (el) el.textContent = t; };
+  setStatus("запуск…");
+  try {
+    const brands = (S.a.results?.competition?.brands || []).slice(0, 6).map((b) => b.brand);
+    const hypotheses = (S.a.ai?.differentiation || []).map((d) => d.hypothesis);
+    const chosen = $("#ai-model")?.value || S.model;
+    const res = await fetch("/api/patents/scan", { method: "POST", headers: { "content-type": "application/json", "x-app-token": S.token }, body: JSON.stringify({ niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} }) });
+    if (res.status === 401) { S.token = ""; localStorage.removeItem("fba_token"); $("#login").classList.remove("hidden"); throw new Error("Неверный пароль доступа"); }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.message || `HTTP ${res.status}`); }
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "", done = null, err = null;
+    while (true) { const { value, done: end } = await reader.read(); if (end) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf("\n\n")) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); const m = chunk.match(/^event: (\w+)\ndata: ([\s\S]*)$/m); if (!m) continue; let d = {}; try { d = JSON.parse(m[2]); } catch {} if (m[1] === "stage") setStatus(d.text || d.stage); else if (m[1] === "done") done = d; else if (m[1] === "error") err = d; } }
+    if (err) throw new Error(err.message || "Ошибка скана");
+    if (!done?.scan) throw new Error("Соединение прервано без результата");
+    S.a.patents = done.scan; markDirty(); renderAll();
+    setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[done.scan.status] || done.scan.status}`);
+    toast("Патентный скан завершён — критерий 8 получил статус 🟡 допущение");
+    document.getElementById("sec-patents")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { console.error(e); setStatus("ошибка: " + e.message); toast("Патентный скан: " + e.message, 7000); }
+  finally { S.patBusy = false; $("#btn-patents").disabled = false; }
 }
 
 // ---------- save / export / new ----------

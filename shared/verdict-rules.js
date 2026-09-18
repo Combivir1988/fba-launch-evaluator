@@ -23,7 +23,7 @@ export function verdictCeiling(r) {
   if (eco?.gate1?.status === "no_go") { v = "no_go"; decisive ??= "Gate 1"; reasons.push("Gate 1 провален: маржа и профит/юнит ниже порогов"); }
   if (eco?.gate2?.status === "no_go") { v = "no_go"; decisive ??= "Gate 2"; reasons.push("Gate 2 провален: Net after ads < 0 даже при CVR 15 %"); }
   if (ch?.active && ch.items["6"]?.status === "fail") { v = "no_go"; decisive ??= "Критерий 6"; reasons.push("Критерий 6 (запас экономики) красный — обязательный"); }
-  if (ch?.items["8"]?.status === "fail") { v = "no_go"; decisive ??= "Критерий 8"; reasons.push("Критерий 8 (патент/FTO) красный — обязательный"); }
+  if (ch?.items["8"]?.status === "fail") { v = "no_go"; decisive ??= "Критерий 8"; reasons.push(ch.items["8"].kind === "assumed" ? "Критерий 8: AI-скан нашёл патент с высоким риском пересечения — до проверки поверенным входить нельзя" : "Критерий 8 (патент/FTO) красный — обязательный"); }
   if (r.budget?.quickScreenStatus === "fail") { v = lower(v, "no_go"); decisive ??= "Стоп-вопросы (урок 07)"; reasons.push("Один из четырёх стоп-вопросов урока 07 — «нет»"); }
 
   if (r.gate0?.level === "none") { v = lower(v, "rework"); decisive ??= "Gate 0"; reasons.push("Gate 0: данных нет"); }
@@ -33,6 +33,7 @@ export function verdictCeiling(r) {
   if (ch?.active && ch.pass === false && !ch.pending) { v = lower(v, "rework"); decisive ??= "Критерии 3–8"; reasons.push(`Gate 3: ${ch.greenCount} из 8 зелёных или обязательные 6/8 не зелёные`); }
   if (eco?.gate1?.status === "rework" || eco?.gate2?.status === "rework") { v = lower(v, "go_conditional"); decisive ??= eco.gate2.status === "rework" ? "Gate 2" : "Gate 1"; reasons.push("Экономика на грани (ДОРАБОТКА по Gate 1/2) — только «Go, условно» с планом закрытия"); }
   if (ch && !ch.gate4Discussed) { v = lower(v, "go_conditional"); decisive ??= "Gate 4"; reasons.push("Gate 4 (патенты/FTO) не обсуждён"); }
+  else if (ch?.patentScanOnly && ch.items["8"].status !== "fail") { v = lower(v, "go_conditional"); decisive ??= "Gate 4"; reasons.push("Gate 4: есть только AI-скан патентов (допущение) — подтвердите статус вручную/поверенным"); }
   if (r.scorecard?.band === "no_go") { v = lower(v, "rework"); reasons.push("Scorecard < 40 %"); }
   else if (r.scorecard?.band === "rework") { v = lower(v, "go_conditional"); reasons.push("Scorecard 40–59 % — слабая ось"); }
 

@@ -120,3 +120,40 @@ function classify(status, txt) {
   if (status === 400 || status === 404 || status === 422) return { code: "bad_request", message: `OpenRouter ${status}: ${msg}`, retryable: false };
   return { code: "upstream", message: `OpenRouter ${status}: ${msg}`, retryable: status >= 500 };
 }
+
+/**
+ * Non-streaming JSON-вызов OpenRouter с тем же каскадом (json_schema → json_object → text+extractJson) и валидацией.
+ * Возвращает объект или бросает Error с code (auth|billing|rate_limited|bad_request|parse|upstream).
+ */
+export async function openrouterJson({ cfg, model, system, user, schema, signal, fetchImpl = fetch, maxTokens = 4000, temperature = 0.2 }) {
+  if (!cfg.openrouterKey) throw Object.assign(new Error("На сервере не задан OPENROUTER_API_KEY"), { code: "auth" });
+  const headers = { Authorization: `Bearer ${cfg.openrouterKey}`, "Content-Type": "application/json", "HTTP-Referer": cfg.publicUrl || "https://github.com/Combivir1988/fba-launch-evaluator", "X-Title": "FBA Launch Evaluator" };
+  const strictSchema = apiSchema(schema);
+  const NL = String.fromCharCode(10);
+  const hint = (extra) => system + NL + NL + "Отвечай СТРОГО одним JSON по схеме" + extra + ":" + NL + JSON.stringify(strictSchema);
+  const modes = [
+    { name: "json_schema", response_format: { type: "json_schema", json_schema: { name: "Result", strict: true, schema: strictSchema } }, sys: system },
+    { name: "json_object", response_format: { type: "json_object" }, sys: hint("") },
+    { name: "text", response_format: undefined, sys: hint(", без markdown") },
+  ];
+  let last = null;
+  for (const mode of modes) {
+    const req = { model: model || cfg.openrouterModel, messages: [{ role: "system", content: mode.sys }, { role: "user", content: user }], temperature, max_tokens: maxTokens };
+    if (mode.response_format) req.response_format = mode.response_format;
+    const res = await fetchImpl(OPENROUTER_URL, { method: "POST", headers, body: JSON.stringify(req), signal });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      const err = classify(res.status, txt);
+      if ((res.status === 400 || res.status === 404) && /response_format|json_schema|structured|schema|provider/i.test(txt) && mode.name !== "text") { last = err; continue; }
+      throw Object.assign(new Error(err.message), { code: err.code });
+    }
+    const j = await res.json().catch(() => null);
+    const text = j?.choices?.[0]?.message?.content ?? "";
+    const obj = extractJson(typeof text === "string" ? text : JSON.stringify(text));
+    if (!obj) { last = { code: "parse", message: `Модель не вернула JSON (${mode.name})` }; continue; }
+    const v = validateVerdict(obj, schema);
+    if (!v.ok) { last = { code: "parse", message: "Ответ не по схеме: " + v.errors.slice(0, 4).join("; ") }; if (mode.name === "text") break; continue; }
+    return obj;
+  }
+  throw Object.assign(new Error(last?.message || "OpenRouter: нет ответа"), { code: last?.code || "upstream" });
+}

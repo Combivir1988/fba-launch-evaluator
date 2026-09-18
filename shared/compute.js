@@ -14,7 +14,7 @@ export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
   const inputs = { ...analysis.inputs, coreKeyword: analysis.coreKeyword };
   const agg = analysis.aggregates || {};
-  const p = { xray: agg.xray || null, cerebro: agg.cerebro || null, poe: agg.poe || null, sqp: agg.sqp || null, inputs, thresholds: th };
+  const p = { xray: agg.xray || null, cerebro: agg.cerebro || null, poe: agg.poe || null, sqp: agg.sqp || null, inputs, thresholds: th, patents: analysis.patents || null };
 
   p.competition = competition(p);
   p.traffic = traffic(p);

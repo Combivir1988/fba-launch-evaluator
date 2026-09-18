@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { authMiddleware, rateLimiter } from "./auth.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
+import { patentScanStream } from "./patents.js";
 import { log } from "./log.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -52,6 +53,22 @@ export function createApp(cfg = configFromEnv()) {
       log("info", "analyze end", { durationMs: Date.now() - t0 });
       res.end();
     }
+  });
+
+  app.post("/api/patents/scan", limiter, async (req, res) => {
+    const body = req.body || {};
+    if (!body.coreKeyword && !body.niche) return res.status(400).json({ error: "bad_request", message: "niche/coreKeyword обязателен" });
+    if (!cfg.mock && cfg.provider !== "openrouter") return res.status(400).json({ error: "bad_request", message: "Патентный скан требует AI_PROVIDER=openrouter" });
+    res.status(200).set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+    res.flushHeaders?.();
+    const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    const ping = setInterval(() => { if (!res.writableEnded) res.write(": ping\n\n"); }, 15000);
+    const ac = new AbortController();
+    res.on("close", () => { if (!res.writableFinished) ac.abort(); });
+    log("info", "patent scan start", { ip: req.ip, niche: String(body.niche || body.coreKeyword || "").slice(0, 60) });
+    try { for await (const ev of patentScanStream(body, cfg, { signal: ac.signal })) send(ev.event, ev.data); }
+    catch (err) { log("error", "patent scan failed", { message: err?.message }); send("error", { code: "upstream", message: err?.message || "Ошибка сервера", retryable: true }); }
+    finally { clearInterval(ping); res.end(); }
   });
 
   app.use("/shared", express.static(join(root, "shared"), { extensions: ["js"], maxAge: "1h" }));

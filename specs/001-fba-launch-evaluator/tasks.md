@@ -81,3 +81,9 @@ Setup → Foundational → US1 (T010–T012 ∥, затем T013–T015, зат�
 ## Implementation Strategy
 
 MVP = Phase 1–3 (US1) + T021–T023 (US2, ползунки — явное требование хозяина). Затем US3 (история/экспорт), US4, polish. Коммит после каждой фазы.
+
+## Дополнения после релиза (2026-09-18)
+
+- OpenRouter как основной AI-провайдер (`server/openrouter.js`), выбор модели в UI, стоимость запроса.
+- Правила Cerebro: multi-ASIN (Ranking Competitors ≥ N), порог SV, Keyword Sales, сортировки.
+- **Патентный скан** (`server/patents.js`, `POST /api/patents/scan`): AI-запросы → Google Patents XHR (поиск GRANT/APPLICATION/DESIGN, карточки с abstract/claims/датами/статусом) → AI-оценка пересечения по независимым claims → секция «Патенты / FTO»; критерий 8 получает 🟡 «допущение» (никогда 🟢 автоматически), `mandatoryOk` требует подтверждения человеком; conflict → потолок No-Go. Тесты: `tests/patents.test.js` (парсер на реальной карточке US9309657B2, mock-скан, интеграция с критерием 8). PatentsView API из среды недоступен (DNS), поэтому источник — Google Patents.

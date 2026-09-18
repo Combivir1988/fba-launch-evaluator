@@ -315,6 +315,23 @@
       <div class="tablewrap"><table><thead><tr><th>#</th><th>Критерий</th><th>Статус</th><th>Основание</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
+  const RISK = { high: ["fail", "высокий"], med: ["warn", "средний"], low: ["ok", "низкий"], none: ["na", "нет"] };
+  function secPatents(A, R, o) {
+    const P = A.patents;
+    const btn = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0"><button data-action="patents" style="flex:0 0 auto">${P ? "🔄 Повторить патентный скан" : "🔎 Патентный скан (AI + Google Patents)"}</button><span class="muted" id="patents-status"></span></div>`;
+    if (!P) return `<h2>Патенты / FTO (критерий 8, Gate 4) <span class="chip na">не проверено</span></h2>${btn}<p class="muted">AI формирует запросы к Google Patents по типу товара и вашей ключевой фиче, читает независимые claims найденных патентов и оценивает пересечение с ТЗ. Результат — предварительный скрининг (🟡 допущение), не юридическое заключение. Укажите фичу для проверки в панели «Риски и compliance» → «Ключевая фича для патентного скана».</p>`;
+    const cls = P.status === "conflict" ? "fail" : P.status === "unsure" ? "warn" : "ok";
+    const label = { conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[P.status] || P.status;
+    const rows = (P.items || []).map((x) => `<tr class="${x.risk === "high" ? "leader" : ""}"><td><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.number)}</a>${x.pending ? ' <span class="chip warn" title="заявка, ещё не выдана">заявка</span>' : ""}${x.expired ? ' <span class="chip na">истёк</span>' : ""}<br><small class="muted">${esc(x.title || "")}${x.assignee ? " · " + esc(x.assignee) : ""}</small></td><td>${st(RISK[x.risk]?.[0] || "na")} <small>${esc(RISK[x.risk]?.[1] || x.risk)}</small><br><small class="muted">релев. ${fmtPct(x.relevance)}</small></td><td>${esc(x.claimed)}</td><td>${esc(x.overlap)}</td><td>${esc(x.designAround)}</td><td class="num"><small>${esc(x.priorityDate || "—")}<br>до ${esc(x.expiryEstimate || "—")}</small></td></tr>`).join("");
+    return `<h2>Патенты / FTO (критерий 8, Gate 4) <span class="chip ${cls}">🟡 AI-скан: ${label}</span></h2>${btn}
+      <div class="verdict ${cls === "fail" ? "no_go" : cls === "warn" ? "go_conditional" : "go"}"><div><b>${esc(P.summary)}</b></div>
+        <div class="muted" style="margin-top:.3rem">Проверялась фича: ${esc(P.feature || "тип товара")} · кандидатов найдено ${fmtN(P.candidatesTotal)}, оценено ${(P.items || []).length} · ${esc(P.model || "")} · ${fmtDate(P.createdAt)}</div></div>
+      <div class="tablewrap" style="margin-top:.7rem"><table><thead><tr><th>Патент</th><th>Риск</th><th>Что защищает независимый claim</th><th>Пересечение с нашим ТЗ</th><th>Design-around</th><th class="num">Приоритет / срок</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">кандидатов не найдено</td></tr>'}</tbody></table></div>
+      <div class="two" style="margin-top:.7rem"><div><h4>Запросы (проверить вручную в Google Patents)</h4><div class="chips">${(P.queries || []).map((q) => `<a class="chip" href="${esc(q.url)}" target="_blank" rel="noopener" title="${esc(q.purpose)}">${esc(q.q)}</a>`).join("")}</div>${P.concepts?.length ? `<p class="muted" style="font-size:.85rem">Патентуемые признаки ТЗ: ${P.concepts.map(esc).join("; ")}</p>` : ""}</div>
+      <div><h4>Следующие шаги</h4><ol>${(P.nextSteps || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ol><p class="muted" style="font-size:.85rem"><b>Design patents:</b> ${esc(P.designPatentNote || "")}${P.designHits?.length ? ` Найдено по названию: ${P.designHits.slice(0, 5).map((d) => `<a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.number)}</a>`).join(", ")}.` : ""}</p></div></div>
+      <div class="notice" style="margin-top:.6rem">${esc(P.disclaimer)} Подтвердить статус: панель «Риски и compliance» → «Патенты / FTO».</div>`;
+  }
+
   function secScorecard(A, R) {
     const sc = R.scorecard;
     const rows = Object.entries(sc.axes).map(([k, a]) => `<tr><td>${axisName(k)} <small class="muted">${Math.round(sc.weights[k] * 100)} %</small></td><td class="num"><b>${isNum(a.score) ? a.score.toFixed(1) : "—"}</b></td><td class="muted">${esc(a.note)}</td></tr>`).join("");
@@ -376,7 +393,7 @@
     ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget],
     ["traffic", secTraffic, drawTraffic], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
     ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)],
-    ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["checklist", secChecklist], ["conclusion", secConclusion], ["ai", secAi],
+    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["checklist", secChecklist], ["conclusion", secConclusion], ["ai", secAi],
   ];
   const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "challenger", "scorecard", "conclusion", "ai"];
 

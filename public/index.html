@@ -111,6 +111,8 @@
           <div class="field"><label for="c-life">Жизненный цикл, мес</label><input id="c-life" type="number" min="0" data-check="lifecycleMonths" placeholder="—"></div>
           <div class="field"><label for="c-list">Листингов в выдаче</label><input id="c-list" type="number" min="0" data-check="listingsInSearch" placeholder="—"></div>
         </div>
+        <div class="field"><label for="f-pfeature">Ключевая фича / дифференциатор для патентного скана</label><textarea id="f-pfeature" data-input="patentFeature" placeholder="например: urinal screen with enzyme odor neutralizer and anti-splash mesh"></textarea></div>
+        <div class="row"><button type="button" id="btn-patents">🔎 Патентный скан (AI + Google Patents)</button><span class="muted" id="patents-side-status" style="font-size:.8rem"></span></div>
         <h4>Критерии 3–8 (ручные статусы)</h4>
         <div id="challenger-user"></div>
         <div class="slider"><label for="s-bf">Brand-fit (ось scorecard), 0–10</label><input id="s-bf" type="range" min="0" max="10" step="1" data-axis="brandFit"><output for="s-bf"></output></div>
@@ -157,6 +159,7 @@
       <li><b>Файлы</b> — загрузите Helium 10 <b>Xray</b> CSV (выручка, цены, отзывы) и <b>Cerebro</b> CSV (объёмы поиска). Опционально <b>POE JSON</b> (экспорт Product Opportunity Explorer через расширение POE Analyzer — сезонность, структура ниши, отзывы, запросы) и <b>SQP</b> CSV. Всё разбирается в браузере.</li>
       <li><b>Ключи кластера</b> — приложение предложит релевантные запросы; уберите нерелевантные. Adj. SV = SV core + 0.4 × Σ остальных. Правила Cerebro: главный ключ — фраза с ≥ 80 % релевантных товаров на первой странице (не самый объёмный); ASIN-строки и брендовые запросы исключаются автоматически; порог SV задаётся ползунком (урок 09: ≥ 30 ключей со значимым объёмом, ≥ 3 группы, топ-2 ключа не должны давать &gt; 80 % трафика). Если Cerebro снят по нескольким ASIN (есть колонка Ranking Competitors), релевантными считаются фразы, по которым ранжируются ≥ 3 конкурентов — это надёжнее совпадения слов. Продают ключи, а не объём (урок 15): смотрите колонку «Продаж/мес» (Keyword Sales).</li>
       <li><b>Экономика</b> — введите цену, COGS, сборы, CPC; двигайте ползунки CVR / доля PPC / шт в день — Gate 1/2, ROI, бюджет и scorecard пересчитываются мгновенно. Критерий 2 остаётся пустым, пока не введён COGS (правило: экономику заполняет менеджер, не AI).</li>
+      <li><b>Патентный скан</b> (панель «Риски» или секция «Патенты / FTO») — AI формирует запросы к Google Patents по типу товара и вашей ключевой фиче, читает независимые claims найденных US-патентов и заявок, оценивает пересечение с ТЗ и предлагает design-around. Это предварительный скрининг: критерий 8 получает статус 🟡 «допущение», а 🟢 ставите вы (поле «Патенты / FTO») после проверки поверенным. Design patents (внешний вид) ищутся только по названию — смотрите картинки лидеров вручную.</li>
       <li><b>AI-анализ</b> — Claude получает только агрегаты (не файлы) и возвращает вердикт, обоснование по гейтам, гипотезы дифференциации и шаги. Вердикт AI не может быть мягче правил: при конфликте он понижается с пометкой.</li>
       <li><b>История</b> — анализы сохраняются в браузере (IndexedDB); экспортируйте JSON, чтобы перенести на другое устройство. <b>⬇ HTML</b> — автономный дашборд (открывается офлайн).</li>
     </ol>
