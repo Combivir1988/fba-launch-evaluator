@@ -142,7 +142,7 @@ async function handleFiles(list) {
       if (r.kind === "poe") { if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; }
       if (r.kind === "xray") reannotateCerebro();
       if (r.kind === "cerebro") { reannotateCerebro(); if (!S.a.inputs.clusterKeywords.length) autoCluster(); }
-      toast(`${r.kind.toUpperCase()}: ${r.meta.rows} строк из ${f.name}`);
+      toast(`${r.kind.toUpperCase()}: ${r.meta.rows} ${r.kind === "xray" || r.kind === "poe" ? "ASIN" : "строк"} из ${f.name}${r.meta.duplicatesDropped ? ` (дублей удалено: ${r.meta.duplicatesDropped})` : ""}`);
     } catch (err) { console.error(err); toast("Ошибка: " + err.message, 6000); }
   }
   markDirty(); renderAll();
@@ -159,7 +159,7 @@ function removeSource(kind) { delete S.a.aggregates[kind]; S.a.sources[kind] = n
 
 function renderFileList() {
   const el = $("#filelist"); const labels = { xray: "Xray", cerebro: "Cerebro", poe: "POE", sqp: "SQP" };
-  el.innerHTML = Object.entries(S.a.sources || {}).filter(([, v]) => v).map(([k, v]) => `<div class="filecard"><span class="tag">${labels[k]}</span><span class="muted">${esc(v.fileName || "")} · ${v.rows ?? ""} строк${v.nicheTitle ? " · " + esc(v.nicheTitle) : ""}</span><button class="x" data-rm="${k}" title="Убрать">✕</button></div>`).join("") || '<div class="muted" style="font-size:.85rem">Ничего не загружено</div>';
+  el.innerHTML = Object.entries(S.a.sources || {}).filter(([, v]) => v).map(([k, v]) => `<div class="filecard"><span class="tag">${labels[k]}</span><span class="muted">${esc(v.fileName || "")} · ${v.rows ?? ""} ${k === "xray" ? "ASIN" : k === "cerebro" ? "ключей" : k === "poe" ? "ASIN" : "строк"}${v.duplicatesDropped ? ` · <b title="одинаковые ASIN учтены один раз">дублей удалено: ${v.duplicatesDropped}</b>` : ""}${v.nicheTitle ? " · " + esc(v.nicheTitle) : ""}</span><button class="x" data-rm="${k}" title="Убрать">✕</button></div>`).join("") || '<div class="muted" style="font-size:.85rem">Ничего не загружено</div>';
   $$("[data-rm]", el).forEach((b) => b.addEventListener("click", () => removeSource(b.dataset.rm)));
 }
 function renderCluster() {

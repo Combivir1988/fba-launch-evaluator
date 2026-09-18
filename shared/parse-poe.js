@@ -53,7 +53,8 @@ export function parsePoe(obj) {
   const launchPotential = {};
   for (const [k, v] of Object.entries(lp)) if (k !== "__typename") launchPotential[k] = stats(v);
 
-  const asinMetrics = (niche.asinMetrics || []).map((a) => ({
+  const seenAsin = new Set();
+  const asinMetrics = (niche.asinMetrics || []).filter((a) => { const id = String(a.asin || "").toUpperCase(); if (!id || seenAsin.has(id)) return false; seenAsin.add(id); return true; }).map((a) => ({
     asin: a.asin, brand: a.brand || "(без бренда)", title: a.asinTitle || "", imageUrl: a.asinImageUrl || null,
     price: n(a.avgPriceT360 ?? a.avgPrice), clickShareT360: n(a.clickShareT360), clickShareT90: n(a.clickShareT90),
     clickCountT360: n(a.clickCountT360), rating: n(a.customerRating), reviews: n(a.totalReviews),

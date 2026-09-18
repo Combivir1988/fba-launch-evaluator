@@ -46,7 +46,7 @@
   // ---------- sections ----------
   function secHero(A, R, o) {
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;
-    const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => `<span class="chip">${SRC_LABEL[k]} · ${esc(A.sources[k].fileName || "")}</span>`).join(" ");
+    const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(m.fileName || "")}">${SRC_LABEL[k]} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
     return `<div class="hero">
       <div><h1>${esc(A.niche || "Без названия")}</h1>
         <div class="meta">Ключ: <b>${esc(A.coreKeyword || "—")}</b> · ${esc(A.marketplace || "US")} · расчёт ${fmtDate(R.computedAt)} · методология ${esc(R.methodologyVersion || "")}</div>

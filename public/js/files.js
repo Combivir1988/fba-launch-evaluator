@@ -31,7 +31,7 @@ export async function detectAndParse(file, ctx = {}) {
   let rows = csv(body);
   if (!rows.length) throw new Error(`${file.name}: пустой CSV`);
   const headers = Object.keys(rows[0]);
-  if (isXrayHeaders(headers)) { const data = parseXray(rows); return { kind: "xray", data, meta: { fileName: file.name, rows: data.asins.length, loadedAt: new Date().toISOString() } }; }
+  if (isXrayHeaders(headers)) { const data = parseXray(rows); return { kind: "xray", data, meta: { fileName: file.name, rows: data.asins.length, rowsTotal: data.flags.rowsTotal, duplicatesDropped: data.flags.duplicatesDropped, loadedAt: new Date().toISOString() } }; }
   if (isCerebroHeaders(headers)) { const data = parseCerebro(rows, { coreKeyword: ctx.coreKeyword, brands: ctx.brands }); return { kind: "cerebro", data, meta: { fileName: file.name, rows: data.keywords.length, loadedAt: new Date().toISOString() }, rawRows: rows }; }
   if (isSqpHeaders(headers)) { const data = parseSqp(rows); return { kind: "sqp", data, meta: { fileName: file.name, rows: data.rows.length, loadedAt: new Date().toISOString() } }; }
   throw new Error(`${file.name}: не похоже на Xray / Cerebro / SQP (заголовки: ${headers.slice(0, 5).join(", ")}…)`);

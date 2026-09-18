@@ -38,3 +38,10 @@ test("POE: прокси выручки", () => {
 test("htmlToText", () => {
   assert.equal(htmlToText("<h2>A</h2><p>B &amp; C</p>"), "A\nB & C");
 });
+
+test("POE: дубли ASIN в asinMetrics учитываются один раз", () => {
+  const dup = JSON.parse(JSON.stringify(raw));
+  dup.data.niche.asinMetrics = [...dup.data.niche.asinMetrics, dup.data.niche.asinMetrics[0], dup.data.niche.asinMetrics[1]];
+  const p = parsePoe(dup);
+  assert.equal(p.asinMetrics.length, 67);
+});
