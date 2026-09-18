@@ -19,12 +19,24 @@ export function budget(inputs, th, ctx = {}) {
   }
   // Стоп-вопросы урока 07
   const roi = ctx.roi ?? null;
+  const $ = (v) => (typeof v === "number" ? "$" + Math.round(v).toLocaleString("ru-RU") : "—");
+  const pct = (v) => (typeof v === "number" ? Math.round(v * 100) + " %" : "—");
+  const bStatus = out.status === "ok" ? "ok" : out.status === "fail" ? "fail" : out.status === "warn" ? "warn" : "na";
+  const bDetail = out.pending ? "введите COGS — нужна себестоимость партии"
+    : bud === null ? `нужно ${$(out.need)} на две партии + рекламу — укажите свой бюджет`
+    : out.gap >= 0 ? `нужно ${$(out.need)}, бюджет ${$(bud)} — запас ${$(out.gap)}`
+    : `нужно ${$(out.need)}, бюджет ${$(bud)} — дефицит ${$(-out.gap)} (${Math.round((-out.gap / out.need) * 100)} % от потребности${out.status === "warn" ? ", в пределах допуска 15 %" : ", допуск 15 %"})`;
+  const rStatus = roi === null ? "na" : roi >= th.economics.roiOk ? "ok" : roi >= th.economics.roiLoss ? "warn" : "fail";
+  const rDetail = roi === null ? "введите цену и COGS" : `ROI ${pct(roi)} ${roi >= th.economics.roiOk ? "≥" : "<"} ${pct(th.economics.roiOk)}${roi < th.economics.roiLoss ? " — убыток (< 100 %)" : roi < th.economics.roiOk ? " — прибыль есть, но ниже порога" : ""}`;
+  const vStatus = ctx.revenueStatus === "fail" && ctx.revenueSource === "proxy" ? "warn" : (ctx.revenueStatus ?? "na");
+  const vDetail = ctx.revenueMonthly == null ? "нет данных о выручке — загрузите Xray" : `${$(ctx.revenueMonthly)}/мес ${ctx.revenueMonthly >= th.criterion1.nicheRevenueMonthly ? "≥" : "<"} ${$(th.criterion1.nicheRevenueMonthly)}${ctx.revenueSource === "proxy" ? " — по прокси POE (систематически занижена, сверить по Xray)" : ""}`;
+  const dStatus = inputs.canDifferentiate === "yes" ? "ok" : inputs.canDifferentiate === "no" ? "fail" : "na";
+  const dDetail = inputs.canDifferentiate === "yes" ? "да — есть измеримое отличие" : inputs.canDifferentiate === "no" ? "нет — без отстройки не заходим" : "ответьте в панели «Экономика и бюджет» → «Могу отстроиться?»";
   out.quickScreen = {
-    budgetFit: { status: out.status === "ok" ? "ok" : out.status === "fail" ? "fail" : out.status === "warn" ? "warn" : "na", text: "Продукт подходит под бюджет (две партии + реклама)" },
-    roi150: { status: roi === null ? "na" : roi >= th.economics.roiOk ? "ok" : roi >= th.economics.roiLoss ? "warn" : "fail", text: "ROI ≥ 150 % при средней цене продажи", value: roi },
-    revenue500k: { status: ctx.revenueStatus === "fail" && ctx.revenueSource === "proxy" ? "warn" : (ctx.revenueStatus ?? "na"),
-      text: ctx.revenueSource === "proxy" ? "Выручка первой страницы ≥ $500 000/мес (по прокси POE — систематически занижена, сверить по Xray)" : "Выручка первой страницы ≥ $500 000/мес", value: ctx.revenueMonthly ?? null },
-    differentiation: { status: inputs.canDifferentiate === "yes" ? "ok" : inputs.canDifferentiate === "no" ? "fail" : "na", text: "Есть чем отстроиться от конкурентов" },
+    budgetFit: { status: bStatus, text: "Хватает ли бюджета на две партии + рекламу?", detail: bDetail, value: out.gap },
+    roi150: { status: rStatus, text: "ROI ≥ 150 % при средней цене продажи?", detail: rDetail, value: roi },
+    revenue500k: { status: vStatus, text: "Выручка первой страницы ≥ $500 000/мес?", detail: vDetail, value: ctx.revenueMonthly ?? null },
+    differentiation: { status: dStatus, text: "Есть чем отстроиться от конкурентов?", detail: dDetail },
   };
   const q = Object.values(out.quickScreen);
   out.quickScreenStatus = q.some((x) => x.status === "fail") ? "fail" : q.some((x) => x.status === "na") ? "incomplete" : q.some((x) => x.status === "warn") ? "warn" : "ok";

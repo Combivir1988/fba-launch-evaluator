@@ -157,14 +157,15 @@
 
   function secBudget(A, R) {
     const b = R.budget, q = b.quickScreen;
-    const qs = Object.values(q).map((x) => `<div class="card ${esc(x.status)}"><div>${st(x.status)}</div><div style="margin-top:.3rem">${esc(x.text)}</div>${isNum(x.value) ? `<div class="muted">${x.text.includes("ROI") ? fmtPct(x.value) : fmtK(x.value) + "/мес"}</div>` : ""}</div>`).join("");
+    const ans = { ok: "Да", warn: "Почти", fail: "Нет", na: "Нет данных" };
+    const qs = Object.values(q).map((x) => `<div class="card ${esc(x.status)}"><div>${st(x.status)} <b>${ans[x.status] || ""}</b></div><div style="margin-top:.3rem">${esc(x.text)}</div>${x.detail ? `<div class="muted" style="font-size:.85rem">${esc(x.detail)}</div>` : ""}</div>`).join("");
     return `<h2>Бюджет первой закупки и стоп-вопросы <span class="chip ${b.status === "ok" ? "ok" : b.status === "fail" ? "fail" : b.status === "warn" ? "warn" : "na"}">${b.status === "pending" ? "нужен COGS" : b.status === "unknown" ? "укажите бюджет" : STATUS_LABEL[b.status]}</span></h2>
       ${b.pending ? '<div class="notice info">Введите COGS — бюджет двух партий посчитается автоматически (урок 08).</div>' : `<div class="cards">
         <div class="card"><h4>Партия</h4><div class="big">${fmtMoney(b.batchCost)}</div><div class="muted">${fmtMoney(b.landed, 2)} × ${fmtN(b.batchUnits)} шт (${b.leadDays} дн: производство + доставка + приёмка)</div></div>
         <div class="card"><h4>Нужно всего</h4><div class="big">${fmtMoney(b.need)}</div><div class="muted">${b.batches} партии ${fmtMoney(b.twoBatches)} + реклама ${fmtMoney(b.adsReserve)}</div></div>
         <div class="card ${b.status === "ok" ? "ok" : b.status === "fail" ? "fail" : b.status === "warn" ? "warn" : "na"}"><h4>Бюджет</h4><div class="big">${fmtMoney(b.budget)}</div><div class="muted">${isNum(b.gap) ? (b.gap >= 0 ? "запас " : "дефицит ") + fmtMoney(Math.abs(b.gap)) : "не указан"}</div></div>
         <div class="card"><h4>Наценка</h4><div class="big">${isNum(b.markup) ? b.markup.toFixed(1) + "×" : "—"}</div><div class="muted">дешёвый товар — 5×, дорогой — 3.3× (урок 08)</div></div></div>`}
-      <h3 style="margin-top:.9rem">Четыре стоп-вопроса (урок 07)</h3><div class="cards">${qs}</div>`;
+      <h3 style="margin-top:.9rem">Четыре стоп-вопроса (урок 07)</h3><p class="muted" style="font-size:.85rem">Любой ответ «Нет» — дальше можно не анализировать (урок 07). Красная карточка = «Нет», жёлтая = на грани, серая = не хватает данных.</p><div class="cards">${qs}</div>`;
   }
 
   function secTraffic(A, R) {
