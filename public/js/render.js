@@ -320,7 +320,8 @@
 
   function secAi(A, R, o) {
     const ai = A.ai;
-    const btns = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0"><button class="primary" data-action="ai">${ai ? "🔄 Повторить AI-анализ" : "✨ Запустить AI-анализ"}</button><span class="muted" id="ai-status"></span></div><div id="ai-progress" class="ai-progress hidden"></div>`;
+    const models = o.models || []; const sel = models.length > 1 ? `<select id="ai-model" aria-label="Модель" style="max-width:260px">${models.map((m) => `<option value="${esc(m)}" ${m === (o.selectedModel || models[0]) ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>` : (models[0] ? `<span class="chip">${esc(models[0])}</span>` : "");
+    const btns = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0"><button class="primary" data-action="ai" style="flex:0 0 auto">${ai ? "🔄 Повторить AI-анализ" : "✨ Запустить AI-анализ"}</button>${sel}<span class="muted" id="ai-status"></span></div><div id="ai-progress" class="ai-progress hidden"></div>`;
     if (!ai) return `<h2>AI-вердикт и рекомендации</h2>${btns}<div class="empty">AI получает только агрегаты дашборда (не файлы) и возвращает вердикт, обоснование по гейтам, гипотезы дифференциации и шаги. Вердикт не может быть мягче правил.</div>`;
     const gates = (ai.gates || []).map((g) => `<tr><td><b>${esc(GATE_NAMES[g.gate] || g.gate)}</b></td><td>${st(g.status === "pass" ? "ok" : g.status === "fail" ? "fail" : g.status === "rework" ? "warn" : "na")}</td><td>${esc(g.reasoning)}</td></tr>`).join("");
     const diff = (ai.differentiation || []).map((d) => `<div class="card"><h4>${esc(d.hypothesis)}</h4><div class="muted" style="font-size:.85rem">Основание: ${esc(d.evidence)}</div><div style="margin-top:.3rem"><b>ТЗ:</b> ${esc(d.specRequirement)}</div></div>`).join("");
@@ -331,7 +332,7 @@
       <div><h4>Следующие шаги</h4><ol>${(ai.nextSteps || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ol>${ai.pricingPackComment ? `<h4>Цена / комплектация</h4><p>${esc(ai.pricingPackComment)}</p>` : ""}${ai.risks?.length ? `<h4>Риски</h4><ul>${ai.risks.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}</div></div>
       ${diff ? `<h4 style="margin-top:.8rem">Гипотезы дифференциации</h4><div class="cards">${diff}</div>` : ""}
       ${recs ? `<h4 style="margin-top:.8rem">Рекомендации</h4>${recs}` : ""}
-      <p class="muted" style="font-size:.75rem">${fmtDate(ai.createdAt)} · токены: вход ${fmtN(ai.usage?.input)} (кэш ${fmtN(ai.usage?.cacheRead)}), выход ${fmtN(ai.usage?.output)} · ${isNum(ai.durationMs) ? Math.round(ai.durationMs / 1000) + " с" : ""}${ai.staleSince ? " · ⚠ входные данные менялись после анализа" : ""}</p>`;
+      <p class="muted" style="font-size:.75rem">${fmtDate(ai.createdAt)} · ${esc(ai.provider || "")} ${esc(ai.model || "")} · токены: вход ${fmtN(ai.usage?.input)} (кэш ${fmtN(ai.usage?.cacheRead)}), выход ${fmtN(ai.usage?.output)}${isNum(ai.usage?.cost) ? " · стоимость $" + ai.usage.cost.toFixed(4) : ""} · ${isNum(ai.durationMs) ? Math.round(ai.durationMs / 1000) + " с" : ""}${ai.staleSince ? " · ⚠ входные данные менялись после анализа" : ""}</p>`;
   }
   const GATE_NAMES = { gate0: "Gate 0 — данные", gate1: "Gate 1 — экономика", gate2: "Gate 2 — реклама", gate3: "Gate 3 — конкуренция", gate4: "Gate 4 — патенты", criterion1: "Критерий 1", traffic: "Трафик", budget: "Бюджет", scorecard: "Scorecard" };
 

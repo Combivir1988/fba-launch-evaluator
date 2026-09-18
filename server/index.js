@@ -22,7 +22,8 @@ export function createApp(cfg = configFromEnv()) {
     next();
   });
 
-  app.get("/api/health", (req, res) => res.json({ ok: true, model: cfg.mock ? "mock" : cfg.model, mock: cfg.mock, uptime: Math.round(process.uptime()) }));
+  app.get("/api/health", (req, res) => res.json({ ok: true, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model,
+    models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()) }));
 
   app.use("/api", authMiddleware(cfg));
   app.use("/api", express.json({ limit: "1mb" }));
@@ -40,7 +41,7 @@ export function createApp(cfg = configFromEnv()) {
     // ВАЖНО: слушать close на ответе, не на запросе — req.close срабатывает сразу после чтения тела
     res.on("close", () => { if (!res.writableFinished) ac.abort(); });
     const t0 = Date.now();
-    log("info", "analyze start", { ip: req.ip, niche: String(body.niche || "").slice(0, 60), payloadChars: JSON.stringify(body.payload).length, model: cfg.mock ? "mock" : cfg.model });
+    log("info", "analyze start", { ip: req.ip, niche: String(body.niche || "").slice(0, 60), payloadChars: JSON.stringify(body.payload).length, provider: cfg.mock ? "mock" : cfg.provider, model: body.options?.model || (cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model) });
     try {
       for await (const ev of analyzeStream(body, cfg, { signal: ac.signal })) send(ev.event, ev.data);
     } catch (err) {
@@ -63,6 +64,7 @@ const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.arg
 if (isMain) {
   const cfg = configFromEnv();
   if (!cfg.appPassword) log("warn", "APP_PASSWORD не задан — /api/* будет отвечать 503");
-  if (!cfg.apiKey && !cfg.mock) log("warn", "ANTHROPIC_API_KEY не задан — AI-анализ недоступен (используйте MOCK_AI=1 для демо)");
-  createApp(cfg).listen(cfg.port, () => log("info", "listening", { port: cfg.port, model: cfg.mock ? "mock" : cfg.model, effort: cfg.effort, fallbacks: cfg.fallbacks }));
+  if (!cfg.mock && cfg.provider === "anthropic" && !cfg.apiKey) log("warn", "ANTHROPIC_API_KEY не задан — AI-анализ недоступен (MOCK_AI=1 для демо или AI_PROVIDER=openrouter)");
+  if (!cfg.mock && cfg.provider === "openrouter" && !cfg.openrouterKey) log("warn", "OPENROUTER_API_KEY не задан — AI-анализ недоступен");
+  createApp(cfg).listen(cfg.port, () => log("info", "listening", { port: cfg.port, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model, effort: cfg.effort }));
 }

@@ -8,6 +8,7 @@ import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
 import { mockVerdict } from "./mock-verdict.js";
 import { validateVerdict, apiSchema } from "../shared/validate-verdict.js";
 import { log } from "./log.js";
+import { openrouterStream, DEFAULT_OPENROUTER_MODEL, parseModelList } from "./openrouter.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const VERDICT_SCHEMA = JSON.parse(readFileSync(join(here, "..", "shared", "ai-verdict.schema.json"), "utf8"));
@@ -15,7 +16,16 @@ const API_SCHEMA = apiSchema(VERDICT_SCHEMA);
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 export function configFromEnv(env = process.env) {
+  const openrouterKey = env.OPENROUTER_API_KEY || "";
+  const provider = ["anthropic", "openrouter"].includes(env.AI_PROVIDER) ? env.AI_PROVIDER : (openrouterKey && !env.ANTHROPIC_API_KEY ? "openrouter" : "anthropic");
+  const openrouterModels = parseModelList(env.OPENROUTER_MODELS);
+  const openrouterModel = env.OPENROUTER_MODEL || openrouterModels[0] || DEFAULT_OPENROUTER_MODEL;
+  if (!openrouterModels.includes(openrouterModel)) openrouterModels.unshift(openrouterModel);
   return {
+    provider, openrouterKey, openrouterModel, openrouterModels,
+    openrouterReasoning: env.OPENROUTER_REASONING === "1",
+    publicUrl: env.PUBLIC_URL || (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : ""),
+    schema: VERDICT_SCHEMA,
     apiKey: env.ANTHROPIC_API_KEY || "",
     model: env.CLAUDE_MODEL || "claude-opus-5",
     effort: env.CLAUDE_EFFORT || "high",
@@ -48,6 +58,7 @@ export async function* analyzeStream(body, cfg, { signal } = {}) {
     yield { event: "done", data: { verdict, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, durationMs: Date.now() - t0, model: "mock" } };
     return;
   }
+  if (cfg.provider === "openrouter") { yield* openrouterStream(body, cfg, { signal }); return; }
   if (!cfg.apiKey) { yield { event: "error", data: { code: "auth", message: "На сервере не задан ANTHROPIC_API_KEY", retryable: false } }; return; }
 
   const client = new Anthropic({ apiKey: cfg.apiKey, timeout: cfg.upstreamTimeoutMs, maxRetries: 2 });
@@ -102,7 +113,7 @@ async function* pump(stream, cfg, t0) {
   const u = msg.usage || {};
   const usage = { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0 };
   log("info", "analyze done", { model: msg.model, ...usage, durationMs: Date.now() - t0, stop: msg.stop_reason });
-  yield { event: "done", data: { verdict, usage, durationMs: Date.now() - t0, model: msg.model } };
+  yield { event: "done", data: { verdict, usage, durationMs: Date.now() - t0, model: msg.model, provider: "anthropic" } };
 }
 
 function toError(err) {

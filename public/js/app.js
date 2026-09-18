@@ -11,7 +11,8 @@ import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./e
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const R = () => window.FBARender;
-const S = { a: newAnalysis(), token: localStorage.getItem("fba_token") || "", fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false };
+const S = { a: newAnalysis(), token: localStorage.getItem("fba_token") || "", fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: localStorage.getItem("fba_model") || "" };
+const renderOpts = () => ({ static: false, models: S.models, selectedModel: S.models.includes(S.model) ? S.model : S.models[0] });
 const dash = $("#dashboard");
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const toast = (msg, ms = 3200) => { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), ms); };
@@ -112,8 +113,8 @@ function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.
 
 // ---------- compute / render ----------
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
-function renderAll() { recompute(); R().render(dash, S.a, { static: false }); syncForm(); autosave(); }
-function renderEcon() { recompute(); R().update(dash, S.a, { static: false }); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
+function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); autosave(); }
+function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
 const scheduleFull = debounce(renderAll, 250);
 let rafId = 0; function scheduleEcon() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(renderEcon); }
 
@@ -205,12 +206,13 @@ async function startAi() {
   if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = "запрос…";
   const ac = new AbortController(); S.aiAbort = ac;
   try {
-    const ai = await runAi(S.a, { token: S.token, signal: ac.signal,
+    const chosen = $("#ai-model")?.value || S.model; if (chosen) { S.model = chosen; localStorage.setItem("fba_model", chosen); }
+    const ai = await runAi(S.a, { token: S.token, signal: ac.signal, model: chosen || undefined,
       onMeta: (m) => { if (status) status.textContent = `модель ${m.model}…`; },
       onThinking: (t) => { if (prog) { prog.textContent += t; prog.scrollTop = prog.scrollHeight; } },
       onProgress: (n) => { if (status) status.textContent = `формирую ответ… ${n} симв.`; } });
     S.a.ai = ai; S.a.status = "ai_done"; S.dirty = true;
-    R().update(dash, S.a, { static: false }, ["hero", "ai"]);
+    R().update(dash, S.a, renderOpts(), ["hero", "ai"]);
     if (!S.fromHistory) { await history.put({ ...S.a, updatedAt: new Date().toISOString() }); updateHistCount(); }
     toast(ai.adjustedByRules ? "AI-вердикт получен и скорректирован правилами" : "AI-вердикт получен");
   } catch (err) {
@@ -282,6 +284,7 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
 // ---------- init ----------
 (async function init() {
   $("#help-ver").textContent = METHODOLOGY_VERSION;
+  try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; } catch {}
   await initLogin();
   updateHistCount();
   const last = localStorage.getItem("fba_last");

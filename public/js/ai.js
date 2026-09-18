@@ -2,11 +2,11 @@
 import { buildAiPayload } from "/shared/ai-payload.js";
 import { reconcile } from "/shared/verdict-rules.js";
 
-export async function runAi(analysis, { token, onThinking, onProgress, onMeta, signal, effort } = {}) {
+export async function runAi(analysis, { token, onThinking, onProgress, onMeta, signal, effort, model } = {}) {
   const payload = buildAiPayload(analysis);
   const res = await fetch("/api/analyze", { method: "POST", signal,
     headers: { "content-type": "application/json", "x-app-token": token },
-    body: JSON.stringify({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, locale: "ru", payload, options: effort ? { effort } : {} }) });
+    body: JSON.stringify({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, locale: "ru", payload, options: { ...(effort ? { effort } : {}), ...(model ? { model } : {}) } }) });
   if (res.status === 401) throw Object.assign(new Error("Неверный пароль доступа"), { code: "auth" });
   if (res.status === 429) { const j = await res.json().catch(() => ({})); throw Object.assign(new Error(`Лимит запросов: повторите через ${j.retryAfter || 60} с`), { code: "rate_limited" }); }
   if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.message || j.error || `HTTP ${res.status}`); }
@@ -31,5 +31,5 @@ export async function runAi(analysis, { token, onThinking, onProgress, onMeta, s
   if (err) throw Object.assign(new Error(err.message || "Ошибка AI"), { code: err.code, retryable: err.retryable });
   if (!done) throw new Error("Соединение прервано без результата");
   const ai = reconcile(done.verdict, analysis.results.verdict);
-  return { ...ai, model: done.model, usage: done.usage, durationMs: done.durationMs, createdAt: new Date().toISOString(), staleSince: null };
+  return { ...ai, model: done.model, provider: done.provider || null, usage: done.usage, durationMs: done.durationMs, createdAt: new Date().toISOString(), staleSince: null };
 }

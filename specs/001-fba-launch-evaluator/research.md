@@ -23,6 +23,12 @@
 - **Rationale**: Structured outputs убирают парсинг «JSON из текста»; стриминг снимает риск таймаута; кэширование системного промпта (~4 k токенов) экономит ~90 % на повторных вызовах.
 - **Alternatives**: `messages.parse()` (без стриминга — UI 60 с без прогресса), tool-use с `tool_choice` (не нужен: нет действий, только формат).
 
+## R3a. Провайдер OpenRouter (добавлено 2026-09-18 по решению хозяина)
+
+- **Decision**: основной провайдер — **OpenRouter** (OpenAI-совместимый `/api/v1/chat/completions`, SSE-стрим, `response_format: json_schema strict`), `AI_PROVIDER=openrouter` по умолчанию при наличии `OPENROUTER_API_KEY`; Claude API напрямую остаётся как `AI_PROVIDER=anthropic`. Модель выбирается в UI из списка `OPENROUTER_MODELS`; сервер принимает только модели из списка (защита от дорогих подстановок). Каскад надёжности: json_schema → json_object + схема в промпте → без response_format + извлечение JSON; всегда валидация по `shared/ai-verdict.schema.json` и согласование с правилами (`verdict-rules.js`). `usage.cost` OpenRouter показывается в UI.
+- **Rationale**: один ключ на все модели, есть бесплатные `:free` модели для старта, прозрачная цена за запрос; прямой Claude API упёрся в отдельный биллинг Anthropic.
+- **Alternatives**: OpenAI SDK как клиент (лишняя зависимость — хватает `fetch`), Vercel AI SDK (сборка не нужна).
+
 ## R4. Фронтенд без сборки
 
 - **Decision**: Vanilla JS, ES-модули (`public/js/*.js`), CSS-переменные для тем, **Chart.js 4 (UMD)** и **PapaParse** вендорятся в `public/vendor/` (копируются из `node_modules` скриптом `npm run vendor`, коммитятся). Расчётное ядро — `shared/*.js` (ESM), одно и то же для браузера (статика `/shared/`) и `node --test`.
