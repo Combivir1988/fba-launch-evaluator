@@ -27,6 +27,17 @@ $("#theme-toggle").addEventListener("click", () => {
   const next = cur === "dark" ? "light" : "dark"; localStorage.setItem("fba_theme", next); applyTheme(next); renderAll();
 });
 
+// ---------- сворачиваемая панель ввода ----------
+function setSide(collapsed) {
+  $("#tab-analysis").classList.toggle("side-collapsed", collapsed);
+  $("#side-open").classList.toggle("hidden", !collapsed);
+  localStorage.setItem("fba_side", collapsed ? "collapsed" : "open");
+  setTimeout(() => { for (const c of Object.values(dash.__charts || {})) { try { c.resize(); } catch {} } }, 230); // графики под новую ширину
+}
+$("#side-toggle").addEventListener("click", () => setSide(true));
+$("#side-open").addEventListener("click", () => setSide(false));
+if (localStorage.getItem("fba_side") === "collapsed") setSide(true);
+
 // ---------- tabs ----------
 $$(".topbar nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 function showTab(name) {
