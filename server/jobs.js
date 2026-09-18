@@ -39,9 +39,10 @@ export function cancelJob(id) { const j = jobs.get(id); if (!j || j.status !== "
 /** Активных задач (для graceful shutdown). */
 export const runningCount = () => [...jobs.values()].filter((j) => j.status === "running").length;
 
-/** Подписка SSE: replay всех событий, затем live. Возвращает функцию отписки. */
+/** Подписка SSE: replay всех событий, затем live. Событие ошибки отдаём как job_error —
+ *  имя "error" у EventSource зарезервировано под обрыв соединения. Возвращает функцию отписки. */
 export function subscribe(job, res, fromSeq = 0) {
-  const send = (ev) => { if (!res.writableEnded) res.write(`id: ${ev.seq}\nevent: ${ev.event}\ndata: ${JSON.stringify(ev.data)}\n\n`); };
+  const send = (ev) => { if (!res.writableEnded) res.write(`id: ${ev.seq}\nevent: ${ev.event === "error" ? "job_error" : ev.event}\ndata: ${JSON.stringify(ev.data)}\n\n`); };
   for (const ev of job.events) if (ev.seq >= fromSeq) send(ev);
   if (job.status !== "running") { return () => {}; }
   const fn = (ev) => send(ev);

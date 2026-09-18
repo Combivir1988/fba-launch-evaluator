@@ -61,7 +61,7 @@ test("analyze (MOCK) как задача: 202 jobId → SSE replay meta/thinking
   const events = [...text.matchAll(/event: (\w+)\ndata: (.*)\n/g)].map((m) => [m[1], JSON.parse(m[2])]);
   const names = events.map((e) => e[0]);
   assert.ok(names.includes("meta") && names.includes("thinking") && names.includes("done") && names.at(-1) === "end", names.join(","));
-  assert.ok(!names.includes("error"));
+  assert.ok(!names.includes("error") && !names.includes("job_error"));
   const done = events.find((e) => e[0] === "done")[1];
   assert.equal(done.verdict.verdict, a.results.verdict.ceiling);
   // replay после завершения — те же события (сценарий перезагрузки страницы)

@@ -33,7 +33,7 @@ export function waitJob(jobId, token, handlers = {}) {
     on("delta", (d) => handlers.onProgress?.(d.chars || 0));
     on("stage", (d) => handlers.onStage?.(d));
     on("done", (d) => finish(() => resolve(d)));
-    on("error", (d) => finish(() => reject(Object.assign(new Error(d.message || "Ошибка задачи"), { code: d.code, retryable: d.retryable }))));
+    on("job_error", (d) => finish(() => reject(Object.assign(new Error(d.message || "Ошибка задачи"), { code: d.code, retryable: d.retryable })))); // не "error": это встроенное событие EventSource (обрыв соединения)
     on("end", async () => {
       // поток закрыт без done/error → проверим состояние задачи
       if (finished) return;
