@@ -6,6 +6,7 @@ import { log } from "./log.js";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
 const GP = "https://patents.google.com";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const STOP = new Set(["the", "and", "for", "with", "holder", "holders", "set", "pack", "new", "best", "kit"]);
 const strip = (html) => String(html || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&hellip;/g, "…").replace(/\s+/g, " ").trim();
 
 /** Поиск в Google Patents (недокументированный XHR, тот же, что использует сайт). */
@@ -72,7 +73,7 @@ export const ASSESS_SCHEMA = { type: "object", additionalProperties: false, requ
     overlap: { type: "string", description: "Пересечение с нашим ТЗ / фичей" }, designAround: { type: "string", description: "Как обойти (или «не требуется»)" } } } },
   nextSteps: { type: "array", items: { type: "string" } } } };
 
-const SYS_QUERIES = `Ты патентный аналитик. По описанию товара для Amazon FBA и его дифференциатора составь 5–7 поисковых запросов для Google Patents (английский, 3–8 слов: конструкция, механизм, материал, применение; синонимы и отраслевые термины), покрывающих: сам тип товара, нашу ключевую фичу/дифференциатор, конструкции лидеров ниши. Плюс перечисли технические признаки нашего ТЗ, которые в принципе патентуемы. Только JSON.`;
+const SYS_QUERIES = `Ты патентный аналитик. По описанию товара для Amazon FBA и его дифференциатора составь 5–7 поисковых запросов для Google Patents (английский, 3–8 слов: конструкция, механизм, материал, применение; синонимы и отраслевые термины), покрывающих: сам тип товара, нашу ключевую фичу/дифференциатор, конструкции лидеров ниши. ОБЯЗАТЕЛЬНО: каждый запрос содержит тип товара (например «candle holder», «urinal screen») — иначе поиск вернёт патенты из чужих областей. Плюс перечисли технические признаки нашего ТЗ, которые в принципе патентуемы. Только JSON.`;
 const SYS_ASSESS = `Ты патентный аналитик, делаешь ПРЕДВАРИТЕЛЬНЫЙ скрининг FTO (freedom-to-operate) для товара Amazon FBA. Это не юридическое заключение: цель — найти явные красные флаги и подсказать design-around, чтобы менеджер знал, с чем идти к патентному поверенному.
 Правила: 1) Оценивай пересечение по НЕЗАВИСИМЫМ claims, а не по названию/абстракту. 2) Истёкшие патенты (expired=true) — риск none, но отметь как prior art. 3) risk=high только если наш дифференциатор/конструкция прямо читается на независимый claim действующего патента; med — частичное совпадение или неясная формулировка; low — далёкая аналогия. 4) overall: conflict — есть хотя бы один high; unsure — есть med или данных мало; clear — только none/low. 5) Не выдумывай патенты — оценивай только переданные. 6) Русский язык, кратко, без markdown. Только JSON.`;
 
@@ -108,8 +109,14 @@ export async function* patentScanStream(body, cfg, { signal, fetchImpl = fetch, 
     // design patents — по типу товара (текстовый поиск слабый, но флаг для ручной проверки)
     let designHits = [];
     if (!cfg.mock && queries[0]) { try { designHits = (await searchGooglePatents(queries[0].q, { fetchImpl, signal, num: 10, status: "GRANT", type: "DESIGN" })).items.map((d) => ({ ...d, type: "DESIGN" })); } catch {} }
-    // C. кандидаты: чаще встречаются в запросах, свежее
-    const cands = [...found.values()].sort((a, b) => b.hits - a.hits || String(b.priorityDate || "").localeCompare(String(a.priorityDate || ""))).slice(0, 12);
+    // C. кандидаты: релевантность (слова типа товара в названии/аннотации) важнее частоты попадания в запросы
+    const coreToks = [...new Set(String(coreKeyword || niche || "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w)))];
+    const overlap = (c) => { const t = `${c.title || ""} ${c.snippet || ""}`.toLowerCase(); return coreToks.filter((w) => t.includes(w.replace(/s$/, ""))).length; };
+    for (const c of found.values()) c.relevanceScore = overlap(c) * 3 + Math.min(c.hits, 3);
+    const all = [...found.values()].sort((a, b) => b.relevanceScore - a.relevanceScore || String(b.priorityDate || "").localeCompare(String(a.priorityDate || "")));
+    const withOverlap = all.filter((c) => overlap(c) > 0);
+    const cands = (withOverlap.length >= 6 ? withOverlap : all).slice(0, 12);
+    const droppedIrrelevant = found.size - (withOverlap.length >= 6 ? withOverlap.length : found.size);
     for (const [i, c] of cands.entries()) {
       yield { event: "stage", data: { stage: "details", text: `Читаю claims ${i + 1}/${cands.length}: ${c.number}` } };
       if (cfg.mock) { Object.assign(c, { abstract: "mock abstract", independentClaims: ["1. A mock device comprising a housing."], totalClaims: 5, legalStatus: "Active" }); continue; }
@@ -126,7 +133,7 @@ export async function* patentScanStream(body, cfg, { signal, fetchImpl = fetch, 
     const items = (assess.patents || []).map((a) => { const c = byNum[a.number] || {}; return { ...a, title: c.title || null, assignee: c.assignee || null, priorityDate: c.priorityDate || null, expiryEstimate: c.expiryEstimate || null, expired: Boolean(c.expired), pending: Boolean(c.pending), legalStatus: c.legalStatus || null, url: c.url || `${GP}/patent/${a.number}/en`, hits: c.hits || 0 }; })
       .sort((a, b) => ({ high: 3, med: 2, low: 1, none: 0 }[b.risk] - { high: 3, med: 2, low: 1, none: 0 }[a.risk]) || b.relevance - a.relevance);
     const scan = { createdAt: new Date().toISOString(), status: assess.overall, summary: assess.summary, designPatentNote: assess.designPatentNote, nextSteps: assess.nextSteps || [], items,
-      queries: queries.map((q) => ({ ...q, url: `${GP}/?q=${encodeURIComponent(q.q)}&country=US&status=GRANT&type=PATENT` })), concepts: plan.concepts || [], candidatesTotal: found.size, designHits: designHits.slice(0, 10).map((d) => ({ number: d.number, title: d.title, assignee: d.assignee, url: d.url, grantDate: d.grantDate })),
+      queries: queries.map((q) => ({ ...q, url: `${GP}/?q=${encodeURIComponent(q.q)}&country=US&status=GRANT&type=PATENT` })), concepts: plan.concepts || [], candidatesTotal: found.size, droppedIrrelevant, designHits: designHits.slice(0, 10).map((d) => ({ number: d.number, title: d.title, assignee: d.assignee, url: d.url, grantDate: d.grantDate })),
       feature, model: cfg.mock ? "mock" : model, source: "Google Patents (US, utility grants + applications; design — только по названию)", durationMs: Date.now() - t0,
       disclaimer: "Предварительный AI-скрининг по независимым claims. Не является юридическим заключением (FTO opinion). Заявки до публикации (18 мес.) и design patents по изображениям не покрыты. Решение по критерию 8 — за менеджером/патентным поверенным." };
     log("info", "patent scan done", { queries: queries.length, candidates: found.size, assessed: items.length, status: scan.status, durationMs: scan.durationMs, model: scan.model });
