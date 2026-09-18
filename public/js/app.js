@@ -114,6 +114,7 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("change", (e) => {
   const el = e.target;
+  if (el.id === "ai-model") { S.model = el.value; localStorage.setItem("fba_model", el.value); return; } // выбор модели сохраняем сразу, иначе перерисовка секции его сбросит
   if (el.dataset.kw) { const set = new Set(S.a.inputs.clusterKeywords); el.checked ? set.add(el.dataset.kw) : set.delete(el.dataset.kw); S.a.inputs.clusterKeywords = [...set]; $("#cluster-count").textContent = `(${set.size})`; markDirty(); scheduleFull(); }
   if (el.dataset.brand) { const set = new Set(S.a.inputs.excludedBrands); el.checked ? set.add(el.dataset.brand) : set.delete(el.dataset.brand); S.a.inputs.excludedBrands = [...set]; reannotateCerebro(); markDirty(); scheduleFull(); }
   if (el.dataset.ov) { const [k, f] = el.dataset.ov.split(":"); const o = (S.a.inputs.manualOverrides[k] ||= { value: null, note: "" }); if (f === "value") o.value = numOrNull(el.value); else o.note = el.value; if (o.value === null && !o.note) delete S.a.inputs.manualOverrides[k]; markDirty(); scheduleFull(); }
@@ -232,11 +233,11 @@ async function startAi(resumeJobId = null) {
   if (!S.token) { $("#login").classList.remove("hidden"); toast("Для AI нужен пароль доступа"); return; }
   if (!S.a.results) renderAll();
   S.aiBusy = true; $("#btn-ai").disabled = true;
+  const chosen = $("#ai-model")?.value || S.model; if (chosen) { S.model = chosen; localStorage.setItem("fba_model", chosen); } // читаем выбор ДО перерисовки
   if (S.a.ai) R().update(dash, S.a, renderOpts(), ["ai"]); // прежний результат затемняем, пока идёт новый
   const prog = $("#ai-progress"), status = $("#ai-status");
-  if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = resumeJobId ? "продолжаю задачу после перезагрузки…" : "запрос…";
+  if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = resumeJobId ? "продолжаю задачу после перезагрузки…" : `запрос… (${chosen || "модель по умолчанию"})`;
   try {
-    const chosen = $("#ai-model")?.value || S.model; if (chosen) { S.model = chosen; localStorage.setItem("fba_model", chosen); }
     const ai = await runAi(S.a, { token: S.token, model: chosen || undefined, resumeJobId,
       onMeta: (m) => { if (status) status.textContent = `модель ${m.model}…`; },
       onThinking: (t) => { if (prog) { prog.textContent += t; prog.scrollTop = prog.scrollHeight; } },
