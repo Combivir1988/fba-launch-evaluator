@@ -24,7 +24,7 @@ export function compute(analysis) {
   const cpcFromCerebro = inputs.cpc === null || inputs.cpc === undefined || inputs.cpc === "";
   const cpc = cpcFromCerebro ? p.traffic.cpcCore : inputs.cpc;
   p.economics = economics({ ...inputs, price, cpc }, th, { priceMedian: p.criterion1.items["1b"].value, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null });
-  p.budget = budget({ ...inputs, price }, th, { roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value });
+  p.budget = budget({ ...inputs, price }, th, { roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value, revenueSource: p.criterion1.items["1a"].source });
   p.challenger = challenger(p);
   p.scorecard = scorecard(p);
   const g0 = gate0(p);

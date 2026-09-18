@@ -20,16 +20,16 @@
 
 ```bash
 npm install
-cp .env.example .env      # ANTHROPIC_API_KEY, APP_PASSWORD
-npm test                  # 42 теста на реальных фикстурах
+cp .env.example .env      # OPENROUTER_API_KEY (или ANTHROPIC_API_KEY), APP_PASSWORD
+npm test                  # ~50 тестов на реальных фикстурах
 npm start                 # http://localhost:3000
 ```
 
-Без ключа Claude: `MOCK_AI=1 APP_PASSWORD=dev npm start` (или `npm run dev`) — AI вернёт демонстрационный вердикт.
+Без ключа AI: `MOCK_AI=1 APP_PASSWORD=dev npm start` (или `npm run dev`) — AI вернёт демонстрационный вердикт.
 
 ## Деплой (бесплатно)
 
-**Render Free** (рекомендуется): New → Blueprint → этот репозиторий (`render.yaml`), задать `ANTHROPIC_API_KEY` и `APP_PASSWORD`. Сервер засыпает после 15 мин простоя — первый запрос до ~60 с.
+**Render Free** (рекомендуется): New → Blueprint → этот репозиторий (`render.yaml`), задать `OPENROUTER_API_KEY` и `APP_PASSWORD`. Сервер засыпает после 15 мин простоя — первый запрос до ~60 с.
 
 **Railway**: Deploy from GitHub — подхватит `Dockerfile` / `railway.json` (после пробного кредита тариф платный).
 
@@ -57,11 +57,11 @@ npm start                 # http://localhost:3000
 ## Структура
 
 - `shared/` — расчётное ядро (ESM, общий код для браузера и тестов): парсеры, критерий 1, экономика, бюджет, трафик, конкуренция, критерии 3–8, scorecard, правила вердикта, сборка AI-payload.
-- `server/` — Express: статика, авторизация, rate-limit, `POST /api/analyze` (SSE-стрим Claude, structured outputs).
+- `server/` — Express: статика, авторизация, rate-limit, `POST /api/analyze` (SSE-стрим OpenRouter/Claude, structured outputs).
 - `public/` — SPA без сборки: `js/app.js` (состояние), `js/render.js` (дашборд, инлайнится в экспорт), `js/history.js` (IndexedDB), `vendor/` (Chart.js, PapaParse).
 - `tests/` — `node --test` на фикстурах (`tests/fixtures/`).
 - `specs/001-fba-launch-evaluator/` — spec / plan / research / data-model / contracts / tasks.
 
 ## Безопасность
 
-Ключ Claude никогда не попадает в браузер. Все `/api/*` кроме `/api/health` требуют заголовок `X-App-Token` = `APP_PASSWORD` (сравнение в постоянное время), лимит 20 запросов/час на IP, тело ≤ 1 МБ, CSP без inline-скриптов, логи без содержимого запросов.
+Ключи AI-провайдеров никогда не попадают в браузер. Все `/api/*` кроме `/api/health` требуют заголовок `X-App-Token` = `APP_PASSWORD` (сравнение в постоянное время), лимит 20 запросов/час на IP, тело ≤ 1 МБ, CSP без inline-скриптов, логи без содержимого запросов.

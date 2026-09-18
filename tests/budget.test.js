@@ -26,3 +26,11 @@ test("Стоп-вопросы урока 07", () => {
   assert.equal(b2.quickScreenStatus, "fail");
   assert.equal(b2.quickScreen.roi150.status, "fail");
 });
+
+test("Стоп-вопрос «выручка ≥ $500k» по прокси POE — погранично, не жёсткий No-Go (прокси занижает)", () => {
+  const b = budget({ cogs: 5, unitsPerDay: 10, budget: 20000, canDifferentiate: "yes" }, TH, { roi: 1.8, revenueStatus: "fail", revenueSource: "proxy", revenueMonthly: 145000 });
+  assert.equal(b.quickScreen.revenue500k.status, "warn");
+  assert.notEqual(b.quickScreenStatus, "fail");
+  const x = budget({ cogs: 5, unitsPerDay: 10, budget: 20000, canDifferentiate: "yes" }, TH, { roi: 1.8, revenueStatus: "fail", revenueSource: "xray", revenueMonthly: 145000 });
+  assert.equal(x.quickScreen.revenue500k.status, "fail", "по Xray — реальный стоп");
+});

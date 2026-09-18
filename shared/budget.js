@@ -22,7 +22,8 @@ export function budget(inputs, th, ctx = {}) {
   out.quickScreen = {
     budgetFit: { status: out.status === "ok" ? "ok" : out.status === "fail" ? "fail" : out.status === "warn" ? "warn" : "na", text: "Продукт подходит под бюджет (две партии + реклама)" },
     roi150: { status: roi === null ? "na" : roi >= th.economics.roiOk ? "ok" : roi >= th.economics.roiLoss ? "warn" : "fail", text: "ROI ≥ 150 % при средней цене продажи", value: roi },
-    revenue500k: { status: ctx.revenueStatus ?? "na", text: "Выручка первой страницы ≥ $500 000/мес", value: ctx.revenueMonthly ?? null },
+    revenue500k: { status: ctx.revenueStatus === "fail" && ctx.revenueSource === "proxy" ? "warn" : (ctx.revenueStatus ?? "na"),
+      text: ctx.revenueSource === "proxy" ? "Выручка первой страницы ≥ $500 000/мес (по прокси POE — систематически занижена, сверить по Xray)" : "Выручка первой страницы ≥ $500 000/мес", value: ctx.revenueMonthly ?? null },
     differentiation: { status: inputs.canDifferentiate === "yes" ? "ok" : inputs.canDifferentiate === "no" ? "fail" : "na", text: "Есть чем отстроиться от конкурентов" },
   };
   const q = Object.values(out.quickScreen);
