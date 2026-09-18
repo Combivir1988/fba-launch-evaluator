@@ -13,7 +13,7 @@ export function defaultInputs() {
     price: null, cogs: null, cogsConfirmed: false, shippingPerUnit: 0, referralPct: 0.15, fbaFee: 0, cpc: null,
     cvr: 0.10, ppcShare: 0.70, targetAcos: 0.30, unitsPerDay: 10, productionDays: 30, shippingDays: 30, receivingDays: 15,
     adsReserve: 0, budget: null, canDifferentiate: "unknown", myAsins: [], myBrand: "", evaluateAsNewEntrant: true,
-    excludedBrands: [], clusterKeywords: [], manualOverrides: {}, challenger: {},
+    excludedBrands: [], clusterKeywords: [], clusterMinSv: null, clusterMinCompetitors: null, manualOverrides: {}, challenger: {},
     checklist: { gatedCategory: false, dangerousGoods: false, certificates: "none", patentSearch: "none", trademarkSearch: "none",
       reviewMergingSuspected: false, amazonSells: false, couponsDealsSaturation: "unknown", designTestScore: null, lifecycleMonths: null, listingsInSearch: null },
     axisManual: { brandFit: null, opRisk: null },

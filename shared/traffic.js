@@ -22,12 +22,15 @@ export function traffic(p) {
       out.clusterCount = cluster.length;
       const sorted = [...cluster].sort((a, b) => b.sv - a.sv);
       out.top2Share = safeDiv(sum(sorted.slice(0, 2).map((k) => k.sv)), out.clusterSv);
-      out.relevantCount = cluster.filter((k) => k.sv >= th.traffic.minSv).length;
+      const minSv = inputs.clusterMinSv ?? th.traffic.minSv;
+      out.minSv = minSv; out.multiAsin = cerebro.flags?.multiAsin ?? false;
+      out.relevantCount = cluster.filter((k) => k.sv >= minSv).length;
       // группы = по «головному» слову фразы (последний токен)
       const g = new Map();
       for (const k of cluster) { const t = tokens(k.phrase); const head = t[t.length - 1] || k.phrase; g.set(head, (g.get(head) || 0) + k.sv); }
       out.groups = [...g.entries()].filter(([, sv]) => sv / (out.clusterSv || 1) >= 0.05).length;
-      out.cluster = sorted.slice(0, 40).map((k) => ({ phrase: k.phrase, sv: k.sv, svTrend: k.svTrend, bid: k.bid, competingProducts: k.competingProducts, competingIsBound: k.competingIsBound, abaClickShare: k.abaClickShare, relevance: k.relevance }));
+      out.cluster = sorted.slice(0, 60).map((k) => ({ phrase: k.phrase, sv: k.sv, svTrend: k.svTrend, bid: k.bid, competingProducts: k.competingProducts, competingIsBound: k.competingIsBound, abaClickShare: k.abaClickShare, relevance: k.relevance, keywordSales: k.keywordSales, rankingCompetitors: k.rankingCompetitors, competitorRankAvg: k.competitorRankAvg, cpr: k.cpr }));
+      out.clusterSales = sum(cluster.map((k) => k.keywordSales));
       const bad = (out.top2Share !== null && out.top2Share > th.traffic.top2ShareMax) || (out.relevantCount < th.traffic.relevantMin) || (out.groups < th.traffic.groupsMin);
       const good = out.top2Share !== null && out.top2Share <= th.traffic.top2ShareMax && out.relevantCount >= th.traffic.relevantMin && out.groups >= th.traffic.groupsMin;
       out.status = good ? "ok" : bad && out.top2Share > th.traffic.top2ShareMax ? "fail" : "warn";

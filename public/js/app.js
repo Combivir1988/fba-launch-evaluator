@@ -152,7 +152,11 @@ function reannotateCerebro() {
   const brands = S.a.aggregates.xray ? [...new Set(S.a.aggregates.xray.asins.map((a) => a.brand))] : [];
   c.keywords = annotateKeywords(c.keywords, { coreKeyword: S.a.coreKeyword, brands });
 }
-function autoCluster() { const c = S.a.aggregates.cerebro; if (!c) return; S.a.inputs.clusterKeywords = suggestCluster(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: mergeThresholds(S.a.thresholds).traffic.minSv }); }
+function autoCluster() { const c = S.a.aggregates.cerebro; if (!c) return; const th = mergeThresholds(S.a.thresholds).traffic; S.a.inputs.clusterKeywords = suggestCluster(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minCompetitors: S.a.inputs.clusterMinCompetitors ?? th.minCompetitors, limit: th.clusterLimit }); }
+$("#kw-minsv").addEventListener("input", (e) => { $("#kw-minsv").parentElement.querySelector("output").textContent = e.target.value; });
+$("#kw-minsv").addEventListener("change", (e) => { S.a.inputs.clusterMinSv = Number(e.target.value); autoCluster(); markDirty(); renderAll(); });
+$("#kw-mincomp").addEventListener("change", (e) => { S.a.inputs.clusterMinCompetitors = Math.max(1, Number(e.target.value) || 3); autoCluster(); markDirty(); renderAll(); });
+$("#kw-sort").addEventListener("change", renderCluster);
 $("#kw-auto").addEventListener("click", () => { autoCluster(); markDirty(); renderAll(); });
 $("#kw-none").addEventListener("click", () => { S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); });
 function removeSource(kind) { delete S.a.aggregates[kind]; S.a.sources[kind] = null; if (kind === "cerebro") S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); }
@@ -167,9 +171,17 @@ function renderCluster() {
   if (!c) { det.classList.add("hidden"); return; }
   det.classList.remove("hidden");
   const sel = new Set(S.a.inputs.clusterKeywords); const q = ($("#kw-filter").value || "").toLowerCase();
-  const list = c.keywords.filter((k) => (S.kwShowAll || sel.has(k.phrase) || (!k.isAsin && !k.isBranded)) && (!q || k.phrase.toLowerCase().includes(q))).slice(0, 400);
-  $("#kwlist").innerHTML = list.map((k) => `<label><input type="checkbox" data-kw="${esc(k.phrase)}" ${sel.has(k.phrase) ? "checked" : ""}><span>${esc(k.phrase)}${k.isCore ? " ★" : ""}${k.isBranded ? ' <span class="chip warn">бренд</span>' : ""}${k.isAsin ? ' <span class="chip na">ASIN</span>' : ""}</span><span class="sv">${k.sv.toLocaleString("ru-RU")}</span></label>`).join("");
+  const th = mergeThresholds(S.a.thresholds).traffic; const minSv = S.a.inputs.clusterMinSv ?? th.minSv;
+  const multi = Boolean(c.flags?.multiAsin);
+  $("#kw-multi").classList.toggle("hidden", !multi);
+  if (multi) { $("#kw-mincomp").value = S.a.inputs.clusterMinCompetitors ?? th.minCompetitors; $("#kw-multi-note").textContent = `Cerebro по ${c.flags.maxCompetitors} ASIN: релевантны фразы, по которым ранжируются ≥ N конкурентов`; }
+  const ms = $("#kw-minsv"); ms.value = minSv; ms.parentElement.querySelector("output").textContent = String(minSv);
+  const sort = $("#kw-sort").value; const by = { sv: (k) => k.sv, sales: (k) => k.keywordSales ?? -1, comp: (k) => (k.rankingCompetitors ?? -1) * 1e6 + k.sv, rel: (k) => k.relevance * 1e7 + k.sv }[sort] || ((k) => k.sv);
+  const list = c.keywords.filter((k) => (S.kwShowAll || sel.has(k.phrase) || (!k.isAsin && !k.isBranded)) && (!q || k.phrase.toLowerCase().includes(q))).sort((a, b) => by(b) - by(a)).slice(0, 400);
+  $("#kwlist").innerHTML = list.map((k) => `<label><input type="checkbox" data-kw="${esc(k.phrase)}" ${sel.has(k.phrase) ? "checked" : ""}><span>${esc(k.phrase)}${k.isCore ? " ★" : ""}${k.isBranded ? ' <span class="chip warn">бренд</span>' : ""}${k.isAsin ? ' <span class="chip na">ASIN</span>' : ""}${k.sv < minSv ? ' <span class="chip na" title="ниже порога SV">low</span>' : ""}</span><span class="sv" title="SV${k.keywordSales != null ? " · продаж " + k.keywordSales : ""}${multi ? " · конкурентов " + (k.rankingCompetitors ?? "—") : ""}">${k.sv.toLocaleString("ru-RU")}${multi && k.rankingCompetitors != null ? ` <small>· ${k.rankingCompetitors}👥</small>` : ""}${k.keywordSales != null ? ` <small>· ${k.keywordSales}🛒</small>` : ""}</span></label>`).join("");
   $("#cluster-count").textContent = `(${sel.size})`;
+  const total = c.keywords.length, shown = c.keywords.filter((k) => !k.isAsin && !k.isBranded).length, asins = c.keywords.filter((k) => k.isAsin).length, branded = c.keywords.filter((k) => k.isBranded).length;
+  $("#kw-stats").textContent = `всего ${total.toLocaleString("ru-RU")} · скрыто ASIN ${asins}, брендовых ${branded} · показано ${Math.min(list.length, 400)}${multi ? " · multi-ASIN" : ""}`;
 }
 function renderBrandChips() {
   const det = $("#det-brands"); const comp = S.a.results?.competition;

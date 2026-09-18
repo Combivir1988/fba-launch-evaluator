@@ -169,19 +169,21 @@
 
   function secTraffic(A, R) {
     const tr = R.traffic; if (!tr.source) return `<h2>Трафик по ключам</h2><div class="empty">Загрузите Cerebro (или POE) — распределение трафика и Adj. SV.</div>`;
-    const rows = tr.cluster.slice(0, 20).map((k) => `<tr><td>${esc(k.phrase)}</td><td class="num">${fmtN(k.sv)}</td><td class="num">${isNum(k.svTrend) ? (k.svTrend > 0 ? "+" : "") + fmtN(k.svTrend) + " %" : "—"}</td><td class="num">${isNum(k.bid) ? fmtMoney(k.bid, 2) : "—"}</td><td class="num">${isNum(k.competingProducts) ? (k.competingIsBound ? ">" : "") + fmtN(k.competingProducts) : "—"}</td><td class="num">${isNum(k.abaClickShare) ? fmtN(k.abaClickShare, 1) + (tr.source === "poe" ? "" : " %") : "—"}</td></tr>`).join("");
+    const multi = Boolean(tr.multiAsin); const hasSales = tr.cluster.some((k) => isNum(k.keywordSales));
+    const rows = tr.cluster.slice(0, 25).map((k) => `<tr><td>${esc(k.phrase)}</td><td class="num">${fmtN(k.sv)}</td>${hasSales ? `<td class="num">${fmtN(k.keywordSales)}</td>` : ""}${multi ? `<td class="num">${isNum(k.rankingCompetitors) ? k.rankingCompetitors : "—"}${isNum(k.competitorRankAvg) ? ` <small class="muted">(ср. ${fmtN(k.competitorRankAvg)})</small>` : ""}</td>` : ""}<td class="num">${isNum(k.svTrend) ? (k.svTrend > 0 ? "+" : "") + fmtN(k.svTrend) + " %" : "—"}</td><td class="num">${isNum(k.bid) ? fmtMoney(k.bid, 2) : "—"}</td><td class="num">${isNum(k.competingProducts) ? (k.competingIsBound ? ">" : "") + fmtN(k.competingProducts) : "—"}</td><td class="num">${isNum(k.abaClickShare) ? fmtN(k.abaClickShare, 1) + (tr.source === "poe" ? "" : " %") : "—"}</td></tr>`).join("");
     const pc = tr.poeConcentration;
     return `<h2>Трафик по ключам (урок 09) <span class="chip ${tr.status === "ok" ? "ok" : tr.status === "fail" ? "fail" : "warn"}">${tr.source === "cerebro" ? "Cerebro" : "POE"} · ${STATUS_LABEL[tr.status]}</span></h2>
       <div class="tiles">
         <div class="tile"><div class="k">SV core</div><div class="v">${fmtN(tr.svCore)}</div><div class="s">/мес</div></div>
         <div class="tile"><div class="k">Adj. SV</div><div class="v">${fmtN(tr.adjSv)}</div><div class="s">core + 0.4 × Σ кластера (${tr.clusterCount})</div></div>
         <div class="tile ${tr.top2Share > 0.8 ? "fail" : "ok"}"><div class="k">Доля топ-2 ключей</div><div class="v">${fmtPct(tr.top2Share)}</div><div class="s">> 80 % — плохо</div></div>
-        <div class="tile ${isNum(tr.relevantCount) && tr.relevantCount >= 30 ? "ok" : "warn"}"><div class="k">Релевантных ключей</div><div class="v">${fmtN(tr.relevantCount)}</div><div class="s">нужно ≥ 30 (SV ≥ 100)</div></div>
+        <div class="tile ${isNum(tr.relevantCount) && tr.relevantCount >= 30 ? "ok" : "warn"}"><div class="k">Релевантных ключей</div><div class="v">${fmtN(tr.relevantCount)}</div><div class="s">нужно ≥ 30 (SV ≥ ${fmtN(tr.minSv ?? 100)})</div></div>
+        ${isNum(tr.clusterSales) && tr.clusterSales > 0 ? `<div class="tile"><div class="k">Продаж по кластеру</div><div class="v">${fmtN(tr.clusterSales)}</div><div class="s">Keyword Sales, шт/мес (урок 15)</div></div>` : ""}
         ${isNum(tr.groups) ? `<div class="tile ${tr.groups >= 3 ? "ok" : "warn"}"><div class="k">Групп ключей</div><div class="v">${tr.groups}</div><div class="s">нужно ≥ 3</div></div>` : ""}
         ${pc ? `<div class="tile ${pc.flags.top20Heavy ? "warn" : ""}"><div class="k">Топ-20 продуктов (клики)</div><div class="v">${fmtPct(pc.top20Products)}</div><div class="s">топ-5 продуктов ${fmtPct(pc.top5Products)}</div></div>` : ""}
       </div>
       <div class="two" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-kw"></canvas></div>
-      <div class="tablewrap"><table><thead><tr><th>Запрос</th><th class="num">SV/мес</th><th class="num">Тренд</th><th class="num">Bid</th><th class="num">Конкур.</th><th class="num">${tr.source === "poe" ? "Click share" : "ABA click %"}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      <div class="tablewrap"><table><thead><tr><th>Запрос</th><th class="num">SV/мес</th>${hasSales ? '<th class="num" title="Keyword Sales — продаж/мес по ключу (урок 15: продают ключи, не объём)">Продаж/мес</th>' : ""}${multi ? '<th class="num" title="Сколько из заданных в Cerebro конкурентов ранжируются по фразе">Конкур. в топе</th>' : ""}<th class="num">Тренд</th><th class="num">Bid</th><th class="num">Конкур. товаров</th><th class="num">${tr.source === "poe" ? "Click share" : "ABA click %"}</th></tr></thead><tbody>${rows}</tbody></table>${multi ? `<p class="muted" style="font-size:.8rem">Cerebro по нескольким ASIN: в кластер автоматически попадают фразы, по которым ранжируются ≥ ${esc(String(A.inputs.clusterMinCompetitors ?? 3))} конкурентов (правило курса), SV ≥ ${fmtN(tr.minSv)}.</p>` : ""}</div></div>`;
   }
   function drawTraffic(container, R) {
     const tr = R.traffic; if (!tr.cluster?.length) return;

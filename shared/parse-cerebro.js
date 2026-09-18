@@ -20,6 +20,12 @@ const COLS = {
   organic: ["organic"],
   titleDensity: ["title density"],
   amazonRecommended: ["amazon recommended"],
+  // Cerebro по нескольким ASIN (multi-ASIN): сколько из заданных конкурентов ранжируются по фразе
+  rankingCompetitors: ["ranking competitors (count)", "ranking competitors", "competitors ranking"],
+  competitorRankAvg: ["competitor rank (avg)", "competitor rank avg", "competitor rank"],
+  position: ["position (rank)", "position"],
+  relativeRank: ["relative rank"],
+  performanceScore: ["competitor performance score"],
 };
 const norm = (h) => String(h || "").replace(/^﻿/, "").toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -87,10 +93,14 @@ export function parseCerebro(rows, opts = {}) {
       keywordSales: toInt(get(r, "keywordSales")), iq: toNum(get(r, "iq")),
       organicRank: toInt(get(r, "organic")), titleDensity: toInt(get(r, "titleDensity")),
       amazonRecommended: toInt(get(r, "amazonRecommended")),
+      rankingCompetitors: toInt(get(r, "rankingCompetitors")), competitorRankAvg: toNum(get(r, "competitorRankAvg")),
+      position: toInt(get(r, "position")), performanceScore: toNum(get(r, "performanceScore")),
     });
   }
   keywords.sort((a, b) => b.sv - a.sv);
-  return { keywords, flags: { rowsTotal: rows.length, coreFound: keywords.some((k) => k.isCore) } };
+  const multiAsin = Boolean(c.rankingCompetitors) && keywords.some((k) => k.rankingCompetitors !== null);
+  const maxCompetitors = multiAsin ? Math.max(...keywords.map((k) => k.rankingCompetitors ?? 0)) : null;
+  return { keywords, flags: { rowsTotal: rows.length, coreFound: keywords.some((k) => k.isCore), multiAsin, maxCompetitors } };
 }
 
 /** Пересчёт флагов isCore/isBranded/relevance при смене core-ключа или списка брендов (без сырых строк). */
@@ -105,17 +115,27 @@ export function annotateKeywords(keywords, opts = {}) {
   });
 }
 
+/** Экспорт Cerebro по нескольким ASIN? (есть колонка Ranking Competitors) */
+export const isMultiAsin = (keywords) => keywords.some((k) => typeof k.rankingCompetitors === "number");
+
 /**
- * Автопредложение кластера: не ASIN, не бренд, релевантность ≥ 2/3 токенов core-ключа
- * (для core из 1–2 слов — все), SV ≥ minSv. Возвращает фразы (≤ limit) по убыванию SV.
+ * Автопредложение кластера.
+ * Multi-ASIN Cerebro (правило курса): фраза релевантна, если по ней ранжируются ≥ minCompetitors из заданных
+ * конкурентов (по умолчанию 3) — и хотя бы одно слово core-ключа совпадает (страховка от мусора).
+ * Single-ASIN: релевантность ≥ 2/3 токенов core-ключа (для core из 1–2 слов — все).
+ * Всегда: не ASIN, не бренд, SV ≥ minSv. Возвращает фразы (≤ limit) по убыванию SV.
  */
 export function suggestCluster(keywords, opts = {}) {
   const minSv = opts.minSv ?? 100;
   const limit = opts.limit ?? 40;
+  const minComp = opts.minCompetitors ?? 3;
   const coreLen = tokens(opts.coreKeyword || "").length;
   const minRel = coreLen <= 2 ? 0.999 : 2 / 3 - 1e-9;
+  const multi = isMultiAsin(keywords);
   return keywords
-    .filter((k) => !k.isAsin && !k.isBranded && k.sv >= minSv && (k.isCore || k.relevance >= minRel))
-    .slice(0, limit)
+    .filter((k) => !k.isAsin && !k.isBranded && k.sv >= minSv && (k.isCore || (multi
+      ? (k.rankingCompetitors ?? 0) >= minComp && (coreLen === 0 || k.relevance > 0)
+      : k.relevance >= minRel)))
+    .slice(0, multi ? Math.max(limit, 60) : limit)
     .map((k) => k.phrase);
 }
