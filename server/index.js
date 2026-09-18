@@ -76,8 +76,12 @@ export function createApp(cfg = configFromEnv()) {
     finally { clearInterval(ping); inflight.count--; res.end(); }
   });
 
-  app.use("/shared", express.static(join(root, "shared"), { extensions: ["js"], maxAge: "1h" }));
-  app.use(express.static(join(root, "public"), { maxAge: "1h", etag: true }));
+  // Кэш: vendor (Chart.js, PapaParse) — долго; файлы приложения — всегда ревалидация по ETag (no-cache),
+  // иначе после деплоя пользователь до часа видит старую версию.
+  app.use("/vendor", express.static(join(root, "public", "vendor"), { maxAge: "7d", immutable: false, etag: true }));
+  const noCache = { etag: true, lastModified: true, setHeaders: (res) => res.set("Cache-Control", "no-cache") };
+  app.use("/shared", express.static(join(root, "shared"), { extensions: ["js"], ...noCache }));
+  app.use(express.static(join(root, "public"), noCache));
   app.use((req, res) => res.status(404).json({ error: "not_found" }));
   return app;
 }
