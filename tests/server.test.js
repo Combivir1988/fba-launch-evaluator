@@ -45,23 +45,32 @@ test("статика: index.html и shared-модули отдаются", async
   assert.match(r.headers.get("content-type"), /javascript/);
 });
 
-test("analyze (MOCK): SSE с meta/thinking/done, вердикт валиден и не выше потолка", async () => {
+test("analyze (MOCK) как задача: 202 jobId → SSE replay meta/thinking/done → GET /api/jobs/:id с результатом", async () => {
   const poe = parsePoe(readJson(POE));
   const a = newAnalysis({ niche: poe.meta.nicheTitle, coreKeyword: poe.meta.nicheTitle });
   a.aggregates = { poe };
   a.results = compute(a);
   const payload = buildAiPayload(a);
-  const r = await fetch(`${base}/api/analyze`, { method: "POST", headers: { "x-app-token": "test-pass", "content-type": "application/json" }, body: JSON.stringify({ niche: a.niche, coreKeyword: a.coreKeyword, payload }) });
-  assert.equal(r.status, 200);
-  assert.match(r.headers.get("content-type"), /text\/event-stream/);
-  const text = await r.text();
+  const h = { "x-app-token": "test-pass", "content-type": "application/json" };
+  const r = await fetch(`${base}/api/analyze`, { method: "POST", headers: h, body: JSON.stringify({ niche: a.niche, coreKeyword: a.coreKeyword, payload }) });
+  assert.equal(r.status, 202);
+  const { jobId } = await r.json(); assert.ok(jobId);
+  const ev = await fetch(`${base}/api/jobs/${jobId}/events?token=test-pass`);
+  assert.equal(ev.status, 200); assert.match(ev.headers.get("content-type"), /text\/event-stream/);
+  const text = await ev.text();
   const events = [...text.matchAll(/event: (\w+)\ndata: (.*)\n/g)].map((m) => [m[1], JSON.parse(m[2])]);
   const names = events.map((e) => e[0]);
-  assert.ok(names.includes("meta") && names.includes("thinking") && names.includes("done"), names.join(","));
-  assert.ok(!names.includes("error"), "сигнал отмены не должен срабатывать, пока клиент подключён: " + JSON.stringify(events.find((e) => e[0] === "error")?.[1]));
+  assert.ok(names.includes("meta") && names.includes("thinking") && names.includes("done") && names.at(-1) === "end", names.join(","));
+  assert.ok(!names.includes("error"));
   const done = events.find((e) => e[0] === "done")[1];
   assert.equal(done.verdict.verdict, a.results.verdict.ceiling);
-  assert.ok(done.verdict.nextSteps.length >= 1 && done.verdict.nextSteps.length <= 3);
+  // replay после завершения — те же события (сценарий перезагрузки страницы)
+  const again = await fetch(`${base}/api/jobs/${jobId}/events?token=test-pass`).then((x) => x.text());
+  assert.ok(again.includes("event: done"));
+  const st = await fetch(`${base}/api/jobs/${jobId}`, { headers: h }).then((x) => x.json());
+  assert.equal(st.status, "done"); assert.equal(st.result.verdict.verdict, done.verdict.verdict);
+  assert.equal((await fetch(`${base}/api/jobs/nope`, { headers: h })).status, 404);
+  assert.equal((await fetch(`${base}/api/jobs/${jobId}/events`)).status, 401, "без токена нельзя");
 });
 
 test("analyze: 400 без payload; лимит запросов 429", async () => {

@@ -7,6 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
 import { mockVerdict } from "./mock-verdict.js";
 import { validateVerdict, apiSchema } from "../shared/validate-verdict.js";
+import { normalizeVerdict } from "../shared/verdict-normalize.js";
 import { log } from "./log.js";
 import { openrouterStream, DEFAULT_OPENROUTER_MODEL, parseModelList } from "./openrouter.js";
 
@@ -78,13 +79,13 @@ export async function* analyzeStream(body, cfg, { signal } = {}) {
       ? client.beta.messages.stream({ ...params, betas: [FALLBACK_BETA], fallbacks: "default" }, { signal })
       : client.messages.stream(params, { signal });
     // первый event приходит сразу, ошибки 400 на бета-параметры — тоже сразу
-    yield* pump(stream, cfg, t0);
+    yield* pump(stream, cfg, t0, body);
   } catch (err) {
     if (cfg.fallbacks && err instanceof Anthropic.BadRequestError && /fallback|beta/i.test(err.message || "")) {
       log("warn", "fallbacks unsupported, retrying without beta", { message: err.message });
       try {
         stream = client.messages.stream(params, { signal });
-        yield* pump(stream, cfg, t0);
+        yield* pump(stream, cfg, t0, body);
         return;
       } catch (err2) { yield { event: "error", data: toError(err2) }; return; }
     }
@@ -92,7 +93,7 @@ export async function* analyzeStream(body, cfg, { signal } = {}) {
   }
 }
 
-async function* pump(stream, cfg, t0) {
+async function* pump(stream, cfg, t0, body) {
   let text = "";
   let metaSent = false;
   for await (const ev of stream) {
@@ -107,7 +108,7 @@ async function* pump(stream, cfg, t0) {
   if (msg.stop_reason === "max_tokens") { yield { event: "error", data: { code: "parse", message: "Ответ обрезан по max_tokens", retryable: true } }; return; }
   const full = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("") || text;
   let verdict;
-  try { verdict = JSON.parse(full); } catch { yield { event: "error", data: { code: "parse", message: "Ответ модели не является JSON", retryable: true } }; return; }
+  try { verdict = normalizeVerdict(JSON.parse(full), body?.payload || {}); } catch { yield { event: "error", data: { code: "parse", message: "Ответ модели не является JSON", retryable: true } }; return; }
   const v = validateVerdict(verdict, VERDICT_SCHEMA);
   if (!v.ok) { yield { event: "error", data: { code: "parse", message: "Ответ не по схеме: " + v.errors.slice(0, 5).join("; "), retryable: true } }; return; }
   const u = msg.usage || {};

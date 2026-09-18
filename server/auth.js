@@ -12,7 +12,7 @@ export function authMiddleware(cfg) {
   return (req, res, next) => {
     if (req.path === "/api/health") return next();
     if (!cfg.appPassword) return res.status(503).json({ error: "app_password_not_configured", message: "На сервере не задан APP_PASSWORD" });
-    const token = req.get("x-app-token") || "";
+    const token = req.get("x-app-token") || (typeof req.query?.token === "string" ? req.query.token : "") || "";
     if (!tokenMatches(token, cfg.appPassword)) return res.status(401).json({ error: "unauthorized" });
     next();
   };

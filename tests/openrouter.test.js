@@ -71,9 +71,12 @@ test("openrouter: модель не из списка → модель по ум
   assert.equal(ev3.at(-1).data.code, "auth");
 });
 
-test("openrouter: ответ не по схеме на всех режимах → parse error, не падение", async () => {
-  const ev = await collect(openrouterStream({ payload }, cfg(), { fetchImpl: async () => sseResponse([{ content: JSON.stringify({ verdict: "go" }) }]) }));
-  assert.equal(ev.at(-1).event, "error");
-  assert.equal(ev.at(-1).data.code, "parse");
+test("openrouter: усечённый ответ слабой модели нормализуется (done), а не-JSON на всех режимах → parse error", async () => {
+  const ev = await collect(openrouterStream({ payload }, cfg(), { fetchImpl: async () => sseResponse([{ content: JSON.stringify({ verdict: "go", nextSteps: ["x"] }) }]) }));
+  assert.equal(ev.at(-1).event, "done", JSON.stringify(ev.at(-1)));
+  assert.equal(ev.at(-1).data.verdict.verdict, "go");
+  assert.ok(Array.isArray(ev.at(-1).data.verdict.gates) && typeof ev.at(-1).data.verdict.summary === "string", "поля добраны нормализатором");
+  const bad = await collect(openrouterStream({ payload }, cfg(), { fetchImpl: async () => sseResponse([{ content: "совсем не json" }]) }));
+  assert.equal(bad.at(-1).event, "error"); assert.equal(bad.at(-1).data.code, "parse");
   assert.ok(VERDICT_SCHEMA.required.length >= 10);
 });

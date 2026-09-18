@@ -6,14 +6,14 @@ import { suggestCluster, annotateKeywords } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
 import { detectAndParse } from "./files.js";
 import { history } from "./history.js";
-import { runAi } from "./ai.js";
+import { runAi, runPatentScan, pendingJob } from "./ai.js";
 import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./export.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const R = () => window.FBARender;
 const S = { a: newAnalysis(), token: localStorage.getItem("fba_token") || "", fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: localStorage.getItem("fba_model") || "" };
-const renderOpts = () => ({ static: false, models: S.models, selectedModel: S.models.includes(S.model) ? S.model : S.models[0] });
+const renderOpts = () => ({ static: false, models: S.models, selectedModel: S.models.includes(S.model) ? S.model : S.models[0], aiRunning: S.aiBusy, patentsRunning: S.patBusy });
 const dash = $("#dashboard");
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const toast = (msg, ms = 3200) => { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), ms); };
@@ -225,25 +225,23 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 
 // ---------- AI ----------
 dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); });
-$("#btn-patents").addEventListener("click", startPatentScan);
-$("#btn-ai").addEventListener("click", startAi);
-async function startAi() {
+$("#btn-patents").addEventListener("click", () => startPatentScan());
+$("#btn-ai").addEventListener("click", () => startAi());
+async function startAi(resumeJobId = null) {
   if (S.aiBusy) return;
   if (!S.token) { $("#login").classList.remove("hidden"); toast("Для AI нужен пароль доступа"); return; }
   if (!S.a.results) renderAll();
   S.aiBusy = true; $("#btn-ai").disabled = true;
+  if (S.a.ai) R().update(dash, S.a, renderOpts(), ["ai"]); // прежний результат затемняем, пока идёт новый
   const prog = $("#ai-progress"), status = $("#ai-status");
-  if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = "запрос…";
-  const ac = new AbortController(); S.aiAbort = ac;
+  if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = resumeJobId ? "продолжаю задачу после перезагрузки…" : "запрос…";
   try {
     const chosen = $("#ai-model")?.value || S.model; if (chosen) { S.model = chosen; localStorage.setItem("fba_model", chosen); }
-    const opts = { token: S.token, signal: ac.signal, model: chosen || undefined,
+    const ai = await runAi(S.a, { token: S.token, model: chosen || undefined, resumeJobId,
       onMeta: (m) => { if (status) status.textContent = `модель ${m.model}…`; },
       onThinking: (t) => { if (prog) { prog.textContent += t; prog.scrollTop = prog.scrollHeight; } },
-      onProgress: (n) => { if (status) status.textContent = `формирую ответ… ${n} симв.`; } };
-    let ai;
-    try { ai = await runAi(S.a, opts); }
-    catch (e1) { if (e1.code !== "disconnected" && e1.code !== "aborted" && !/draining|перезапуск/i.test(e1.message)) throw e1; if (status) status.textContent = "соединение прервано — повторяю через 5 с…"; await new Promise((r) => setTimeout(r, 5000)); ai = await runAi(S.a, opts); }
+      onProgress: (n) => { if (status) status.textContent = `формирую ответ… ${n} симв.`; },
+      onReconnect: (n) => { if (status) status.textContent = `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`; } });
     S.a.ai = ai; S.a.status = "ai_done"; S.dirty = true;
     R().update(dash, S.a, renderOpts(), ["hero", "ai"]);
     if (!S.fromHistory) { await history.put({ ...S.a, updatedAt: new Date().toISOString() }); updateHistCount(); }
@@ -251,35 +249,38 @@ async function startAi() {
   } catch (err) {
     console.error(err);
     if (err.code === "auth") { S.token = ""; localStorage.removeItem("fba_token"); $("#login").classList.remove("hidden"); }
-    if (status) status.textContent = "ошибка: " + err.message; toast("AI: " + err.message, 6000);
-  } finally { S.aiBusy = false; $("#btn-ai").disabled = false; }
+    if (status) status.textContent = "ошибка: " + err.message; toast("AI: " + err.message, 7000);
+  } finally { S.aiBusy = false; $("#btn-ai").disabled = false; R().update(dash, S.a, renderOpts(), ["ai"]); }
 }
 
-async function startPatentScan() {
+async function startPatentScan(resumeJobId = null) {
   if (S.patBusy) return;
   if (!S.token) { $("#login").classList.remove("hidden"); toast("Для патентного скана нужен пароль доступа"); return; }
   if (!S.a.coreKeyword && !S.a.niche) return toast("Укажите нишу / главный ключ");
   if (!S.a.results) renderAll();
   S.patBusy = true; $("#btn-patents").disabled = true;
+  if (S.a.patents) R().update(dash, S.a, renderOpts(), ["patents"]);
   const setStatus = (t) => { for (const el of [$("#patents-status"), $("#patents-side-status")]) if (el) el.textContent = t; };
-  setStatus("запуск…");
+  setStatus(resumeJobId ? "продолжаю скан после перезагрузки…" : "запуск…");
   try {
     const brands = (S.a.results?.competition?.brands || []).slice(0, 6).map((b) => b.brand);
     const hypotheses = (S.a.ai?.differentiation || []).map((d) => d.hypothesis);
     const chosen = $("#ai-model")?.value || S.model;
-    const res = await fetch("/api/patents/scan", { method: "POST", headers: { "content-type": "application/json", "x-app-token": S.token }, body: JSON.stringify({ niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} }) });
-    if (res.status === 401) { S.token = ""; localStorage.removeItem("fba_token"); $("#login").classList.remove("hidden"); throw new Error("Неверный пароль доступа"); }
-    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.message || `HTTP ${res.status}`); }
-    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "", done = null, err = null;
-    while (true) { const { value, done: end } = await reader.read(); if (end) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf("\n\n")) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); const m = chunk.match(/^event: (\w+)\ndata: ([\s\S]*)$/m); if (!m) continue; let d = {}; try { d = JSON.parse(m[2]); } catch {} if (m[1] === "stage") setStatus(d.text || d.stage); else if (m[1] === "done") done = d; else if (m[1] === "error") err = d; } }
-    if (err) throw new Error(err.message || "Ошибка скана");
-    if (!done?.scan) throw new Error("Соединение прервано без результата (сервер перезапускался или таймаут) — нажмите «Повторить»");
-    S.a.patents = done.scan; markDirty(); renderAll();
-    setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[done.scan.status] || done.scan.status}`);
-    toast("Патентный скан завершён — критерий 8 получил статус 🟡 допущение");
+    const scan = await runPatentScan(S.a, { niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} },
+      { token: S.token, resumeJobId, onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
+    S.a.patents = scan; markDirty(); renderAll();
+    setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[scan.status] || scan.status}`);
+    toast("Патентный скан завершён — критерий 8 получил статус «допущение»");
     document.getElementById("sec-patents")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (e) { console.error(e); setStatus("ошибка: " + e.message); toast("Патентный скан: " + e.message, 7000); }
-  finally { S.patBusy = false; $("#btn-patents").disabled = false; }
+  } catch (e) { console.error(e); if (e.code === "auth") { S.token = ""; localStorage.removeItem("fba_token"); $("#login").classList.remove("hidden"); } setStatus("ошибка: " + e.message); toast("Патентный скан: " + e.message, 7000); }
+  finally { S.patBusy = false; $("#btn-patents").disabled = false; R().update(dash, S.a, renderOpts(), ["patents"]); }
+}
+
+/** После загрузки анализа — продолжить незавершённые задачи (страница перезагружалась во время AI). */
+function resumePendingJobs() {
+  const hourAgo = Date.now() - 60 * 60 * 1000;
+  const a = pendingJob.get(S.a.id, "analyze"); if (a?.jobId && a.startedAt > hourAgo && S.token) startAi(a.jobId); else if (a) pendingJob.clear(S.a.id, "analyze");
+  const p = pendingJob.get(S.a.id, "patents"); if (p?.jobId && p.startedAt > hourAgo && S.token) startPatentScan(p.jobId); else if (p) pendingJob.clear(S.a.id, "patents");
 }
 
 // ---------- save / export / new ----------
@@ -301,6 +302,7 @@ function loadAnalysis(doc, fromHistory) {
   if (S.a.aggregates?.cerebro) reannotateCerebro();
   if (S.a.thresholds && Object.keys(S.a.thresholds).length) renderThresholds();
   renderAll(); showTab("analysis"); localStorage.setItem("fba_last", S.a.id);
+  resumePendingJobs();
 }
 async function importDoc(obj) {
   if (obj.type === "fba-launch-evaluator/analysis") { const d = migrate(obj.analysis); await history.put(d); toast(`Импортирован анализ «${d.niche}»`); loadAnalysis(d, true); }
@@ -351,5 +353,5 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
   updateHistCount();
   const last = localStorage.getItem("fba_last");
   if (last) { try { const d = await history.get(last); if (d) { loadAnalysis(d, true); return; } } catch {} }
-  renderAll();
+  renderAll(); resumePendingJobs();
 })();

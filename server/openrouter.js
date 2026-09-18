@@ -3,6 +3,7 @@
 // Каскад надёжности: json_schema (strict) → json_object + схема в промпте → без response_format + извлечение JSON из текста.
 import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
 import { validateVerdict, apiSchema } from "../shared/validate-verdict.js";
+import { normalizeVerdict } from "../shared/verdict-normalize.js";
 import { log } from "./log.js";
 
 export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -97,8 +98,9 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
     } catch (e) { if (e?.name === "AbortError" || signal?.aborted) { yield { event: "error", data: { code: "aborted", message: "Запрос отменён", retryable: false } }; return; } yield { event: "error", data: { code: "upstream", message: "Обрыв потока OpenRouter: " + (e?.message || e), retryable: true } }; return; }
     if (finish === "length") { yield { event: "error", data: { code: "parse", message: "Ответ обрезан по max_tokens", retryable: true } }; return; }
     if (finish === "content_filter") { yield { event: "error", data: { code: "refusal", message: "Модель отклонила запрос (content filter)", retryable: false } }; return; }
-    const verdict = extractJson(text);
-    if (!verdict) { lastErr = { code: "parse", message: `Модель ${gotModel} не вернула JSON (${mode.name})`, retryable: true }; log("warn", "openrouter: не JSON, деградация", { model, mode: mode.name }); continue; }
+    const rawObj = extractJson(text);
+    if (!rawObj) { lastErr = { code: "parse", message: `Модель ${gotModel} не вернула JSON (${mode.name})`, retryable: true }; log("warn", "openrouter: не JSON, деградация", { model, mode: mode.name }); continue; }
+    const verdict = normalizeVerdict(rawObj, payload); // слабые модели теряют поля — добираем детерминированно
     const v = validateVerdict(verdict, cfg.schema);
     if (!v.ok) { lastErr = { code: "parse", message: "Ответ не по схеме: " + v.errors.slice(0, 5).join("; "), retryable: true }; log("warn", "openrouter: не по схеме, деградация", { model, mode: mode.name, errors: v.errors.slice(0, 3) }); if (mode.name === "text") break; continue; }
     const u = usage || {};

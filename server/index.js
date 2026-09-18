@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { authMiddleware, rateLimiter } from "./auth.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
+import { startJob, getJob, subscribe, cancelJob, runningCount } from "./jobs.js";
 import { log } from "./log.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -27,54 +28,51 @@ export function createApp(cfg = configFromEnv()) {
   });
 
   app.get("/api/health", (req, res) => res.json({ ok: true, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model,
-    models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()) }));
+    models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()), running: runningCount() }));
 
   app.use("/api", authMiddleware(cfg));
   app.use("/api", express.json({ limit: "1mb" }));
   app.post("/api/auth/check", (req, res) => res.status(204).end());
 
   const limiter = rateLimiter({ limit: cfg.rateLimitPerHour, windowMs: 60 * 60 * 1000 });
-  app.post("/api/analyze", limiter, async (req, res) => {
+  const sseHeaders = (res) => { res.status(200).set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" }); res.flushHeaders?.(); };
+
+  // Запуск AI-анализа как фоновой задачи → { jobId }. Поток событий — GET /api/jobs/:id/events.
+  app.post("/api/analyze", limiter, (req, res) => {
     const body = req.body || {};
     if (!body.payload || typeof body.payload !== "object") return res.status(400).json({ error: "bad_request", message: "payload обязателен" });
-    res.status(200).set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
-    res.flushHeaders?.();
-    const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
-    const ping = setInterval(() => { if (!res.writableEnded) res.write(": ping\n\n"); }, 15000);
-    const ac = new AbortController();
-    // ВАЖНО: слушать close на ответе, не на запросе — req.close срабатывает сразу после чтения тела
-    res.on("close", () => { if (!res.writableFinished) ac.abort(); });
-    const t0 = Date.now();
-    log("info", "analyze start", { ip: req.ip, niche: String(body.niche || "").slice(0, 60), payloadChars: JSON.stringify(body.payload).length, provider: cfg.mock ? "mock" : cfg.provider, model: body.options?.model || (cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model) });
-    inflight.count++;
-    try {
-      for await (const ev of analyzeStream(body, cfg, { signal: ac.signal })) send(ev.event, ev.data);
-    } catch (err) {
-      log("error", "analyze failed", { message: err?.message });
-      send("error", { code: "upstream", message: err?.message || "Ошибка сервера", retryable: true });
-    } finally {
-      clearInterval(ping); inflight.count--;
-      log("info", "analyze end", { durationMs: Date.now() - t0 });
-      res.end();
-    }
+    const job = startJob("analyze", (signal) => analyzeStream(body, cfg, { signal }), { niche: String(body.niche || "").slice(0, 60) });
+    log("info", "analyze job start", { id: job.id, ip: req.ip, niche: job.meta.niche, payloadChars: JSON.stringify(body.payload).length, provider: cfg.mock ? "mock" : cfg.provider, model: body.options?.model || (cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model) });
+    res.status(202).json({ jobId: job.id });
   });
-
-  app.post("/api/patents/scan", limiter, async (req, res) => {
+  app.post("/api/patents/scan", limiter, (req, res) => {
     const body = req.body || {};
     if (!body.coreKeyword && !body.niche) return res.status(400).json({ error: "bad_request", message: "niche/coreKeyword обязателен" });
     if (!cfg.mock && cfg.provider !== "openrouter") return res.status(400).json({ error: "bad_request", message: "Патентный скан требует AI_PROVIDER=openrouter" });
-    res.status(200).set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
-    res.flushHeaders?.();
-    const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
-    const ping = setInterval(() => { if (!res.writableEnded) res.write(": ping\n\n"); }, 15000);
-    const ac = new AbortController();
-    res.on("close", () => { if (!res.writableFinished) ac.abort(); });
-    log("info", "patent scan start", { ip: req.ip, niche: String(body.niche || body.coreKeyword || "").slice(0, 60) });
-    inflight.count++;
-    try { for await (const ev of patentScanStream(body, cfg, { signal: ac.signal })) send(ev.event, ev.data); }
-    catch (err) { log("error", "patent scan failed", { message: err?.message }); send("error", { code: "upstream", message: err?.message || "Ошибка сервера", retryable: true }); }
-    finally { clearInterval(ping); inflight.count--; res.end(); }
+    const job = startJob("patents", (signal) => patentScanStream(body, cfg, { signal }), { niche: String(body.niche || body.coreKeyword || "").slice(0, 60) });
+    log("info", "patent scan job start", { id: job.id, ip: req.ip, niche: job.meta.niche });
+    res.status(202).json({ jobId: job.id });
   });
+  // Состояние задачи (для восстановления после перезагрузки страницы)
+  app.get("/api/jobs/:id", (req, res) => {
+    const job = getJob(req.params.id);
+    if (!job) return res.status(404).json({ error: "not_found", message: "Задача не найдена или истекла (результаты хранятся 1 час)" });
+    res.json({ id: job.id, type: job.type, status: job.status, createdAt: job.createdAt, events: job.events.length, result: job.status === "done" ? job.result : null, error: job.error });
+  });
+  // SSE с replay: EventSource переподключается сам, Last-Event-ID → продолжаем с нужного места
+  app.get("/api/jobs/:id/events", (req, res) => {
+    const job = getJob(req.params.id);
+    if (!job) return res.status(404).json({ error: "not_found", message: "Задача не найдена или истекла" });
+    sseHeaders(res);
+    const from = Number(req.get("last-event-id") ?? req.query.from ?? -1) + 1;
+    const unsub = subscribe(job, res, from);
+    if (job.status !== "running") { res.end(); return; }
+    const ping = setInterval(() => { if (!res.writableEnded) res.write(": ping\n\n"); }, 15000);
+    const onEnd = (ev) => { if (ev.event === "end") { clearInterval(ping); job.listeners.delete(onEnd); unsub(); res.end(); } };
+    job.listeners.add(onEnd);
+    res.on("close", () => { clearInterval(ping); unsub(); job.listeners.delete(onEnd); });
+  });
+  app.delete("/api/jobs/:id", (req, res) => res.json({ cancelled: cancelJob(req.params.id) }));
 
   // Кэш: vendor (Chart.js, PapaParse) — долго; файлы приложения — всегда ревалидация по ETag (no-cache),
   // иначе после деплоя пользователь до часа видит старую версию.
@@ -99,11 +97,11 @@ if (isMain) {
   const shutdown = (sig) => {
     if (inflight.draining) return;
     inflight.draining = true;
-    log("warn", "shutdown requested", { signal: sig, inflight: inflight.count, drainSeconds: DRAIN });
+    log("warn", "shutdown requested", { signal: sig, running: runningCount(), drainSeconds: DRAIN });
     server.close(() => log("info", "listener closed"));
     const t0 = Date.now();
     const tick = setInterval(() => {
-      if (inflight.count <= 0 || Date.now() - t0 > DRAIN * 1000) { clearInterval(tick); log("info", "exit", { inflight: inflight.count, waitedMs: Date.now() - t0 }); process.exit(0); }
+      if (runningCount() <= 0 || Date.now() - t0 > DRAIN * 1000) { clearInterval(tick); log("info", "exit", { running: runningCount(), waitedMs: Date.now() - t0 }); process.exit(0); }
     }, 500);
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
