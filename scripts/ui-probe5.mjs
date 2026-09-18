@@ -1,0 +1,16 @@
+import { chromium } from "playwright";
+import { spawn } from "node:child_process";
+const srv = spawn(process.execPath, ["server/index.js"], { env: { ...process.env, PORT: "3995", APP_PASSWORD: "dev", MOCK_AI: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+await new Promise((r) => setTimeout(r, 1500));
+const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+const logs = []; page.on("console", (m) => { if (m.type() === "error") logs.push(m.text()); }); page.on("pageerror", (e) => logs.push("pageerror: " + e.message));
+await page.addInitScript(() => localStorage.setItem("fba_token", "dev"));
+await page.goto("http://127.0.0.1:3995/", { waitUntil: "networkidle" });
+await page.click('nav button[data-tab="settings"]'); await page.waitForTimeout(300);
+console.log("settings visible:", await page.isVisible("#tab-settings"), "| provider:", await page.textContent("#set-provider"), "| options:", await page.locator("#set-model-ai option").count());
+await page.click('nav button[data-tab="analysis"]'); await page.fill("#f-core", "test niche"); await page.waitForTimeout(600);
+console.log("ai chip:", await page.textContent("#sec-ai h2").catch(() => "-"), "| link to settings:", await page.locator('#sec-ai [data-action="settings"]').count());
+await page.click('#sec-ai [data-action="settings"]'); await page.waitForTimeout(300);
+console.log("clicked chip → settings visible:", await page.isVisible("#tab-settings"));
+console.log("console:", logs.join("\n") || "(чисто)");
+await browser.close(); srv.kill();

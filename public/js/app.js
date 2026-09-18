@@ -12,8 +12,10 @@ import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./e
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const R = () => window.FBARender;
-const S = { a: newAnalysis(), token: localStorage.getItem("fba_token") || "", fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: localStorage.getItem("fba_model") || "" };
-const renderOpts = () => ({ static: false, models: S.models, selectedModel: S.models.includes(S.model) ? S.model : S.models[0], aiRunning: S.aiBusy, patentsRunning: S.patBusy });
+const S = { a: newAnalysis(), token: localStorage.getItem("fba_token") || "", fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: localStorage.getItem("fba_model") || "", modelPatents: localStorage.getItem("fba_model_patents") || "" };
+const modelAi = () => (S.models.includes(S.model) ? S.model : S.models[0] || "");
+const modelPatents = () => (S.models.includes(S.modelPatents) ? S.modelPatents : modelAi());
+const renderOpts = () => ({ static: false, models: S.models, selectedModel: modelAi(), selectedPatentModel: modelPatents(), aiRunning: S.aiBusy, patentsRunning: S.patBusy });
 const dash = $("#dashboard");
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const toast = (msg, ms = 3200) => { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), ms); };
@@ -42,7 +44,8 @@ if (localStorage.getItem("fba_side") === "collapsed") setSide(true);
 $$(".topbar nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 function showTab(name) {
   $$(".topbar nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  for (const t of ["analysis", "history", "thresholds", "help"]) $(`#tab-${t}`).classList.toggle("hidden", t !== name);
+  for (const t of ["analysis", "history", "settings", "thresholds", "help"]) $(`#tab-${t}`).classList.toggle("hidden", t !== name);
+  if (name === "settings") renderSettings();
   if (name === "history") renderHistory();
   if (name === "thresholds") renderThresholds();
 }
@@ -114,7 +117,8 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("change", (e) => {
   const el = e.target;
-  if (el.id === "ai-model") { S.model = el.value; localStorage.setItem("fba_model", el.value); return; } // выбор модели сохраняем сразу, иначе перерисовка секции его сбросит
+  if (el.id === "set-model-ai") { S.model = el.value; localStorage.setItem("fba_model", el.value); renderSettings(); R().update(dash, S.a, renderOpts(), ["ai", "patents"]); return; }
+  if (el.id === "set-model-patents") { S.modelPatents = el.value; localStorage.setItem("fba_model_patents", el.value); renderSettings(); R().update(dash, S.a, renderOpts(), ["patents"]); return; }
   if (el.dataset.kw) { const set = new Set(S.a.inputs.clusterKeywords); el.checked ? set.add(el.dataset.kw) : set.delete(el.dataset.kw); S.a.inputs.clusterKeywords = [...set]; $("#cluster-count").textContent = `(${set.size})`; markDirty(); scheduleFull(); }
   if (el.dataset.brand) { const set = new Set(S.a.inputs.excludedBrands); el.checked ? set.add(el.dataset.brand) : set.delete(el.dataset.brand); S.a.inputs.excludedBrands = [...set]; reannotateCerebro(); markDirty(); scheduleFull(); }
   if (el.dataset.ov) { const [k, f] = el.dataset.ov.split(":"); const o = (S.a.inputs.manualOverrides[k] ||= { value: null, note: "" }); if (f === "value") o.value = numOrNull(el.value); else o.note = el.value; if (o.value === null && !o.note) delete S.a.inputs.manualOverrides[k]; markDirty(); scheduleFull(); }
@@ -225,7 +229,7 @@ function renderChallengerUser() {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // ---------- AI ----------
-dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); });
+dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); const sb = e.target.closest('[data-action="settings"]'); if (sb) { e.preventDefault(); showTab("settings"); } });
 $("#btn-patents").addEventListener("click", () => startPatentScan());
 $("#btn-ai").addEventListener("click", () => startAi());
 async function startAi(resumeJobId = null) {
@@ -233,7 +237,7 @@ async function startAi(resumeJobId = null) {
   if (!S.token) { $("#login").classList.remove("hidden"); toast("Для AI нужен пароль доступа"); return; }
   if (!S.a.results) renderAll();
   S.aiBusy = true; $("#btn-ai").disabled = true;
-  const chosen = $("#ai-model")?.value || S.model; if (chosen) { S.model = chosen; localStorage.setItem("fba_model", chosen); } // читаем выбор ДО перерисовки
+  const chosen = modelAi();
   if (S.a.ai) R().update(dash, S.a, renderOpts(), ["ai"]); // прежний результат затемняем, пока идёт новый
   const prog = $("#ai-progress"), status = $("#ai-status");
   if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = resumeJobId ? "продолжаю задачу после перезагрузки…" : `запрос… (${chosen || "модель по умолчанию"})`;
@@ -266,7 +270,7 @@ async function startPatentScan(resumeJobId = null) {
   try {
     const brands = (S.a.results?.competition?.brands || []).slice(0, 6).map((b) => b.brand);
     const hypotheses = (S.a.ai?.differentiation || []).map((d) => d.hypothesis);
-    const chosen = $("#ai-model")?.value || S.model;
+    const chosen = modelPatents();
     const scan = await runPatentScan(S.a, { niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} },
       { token: S.token, resumeJobId, onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
     S.a.patents = scan; markDirty(); renderAll();
@@ -327,6 +331,19 @@ $("#hist-search").addEventListener("input", debounce(renderHistory, 200));
 $("#hist-export").addEventListener("click", async () => exportHistoryJson(await history.getAllFull()));
 $("#hist-import").addEventListener("click", () => $("#hist-import-file").click());
 $("#hist-import-file").addEventListener("change", async (e) => { const f = e.target.files[0]; if (!f) return; try { await importDoc(JSON.parse(await f.text())); } catch (err) { toast("Импорт: " + err.message, 6000); } e.target.value = ""; });
+
+// ---------- settings tab ----------
+const FREE_HINT = "Бесплатные :free модели: $0, но ответ 3–6 минут и слабее структура. Платные (Gemini 3.8 Flash ≈ $0.02, GPT-5.6 Sol / Claude Sonnet 5 ≈ $0.05, Opus 5 ≈ $0.10 за анализ) — после пополнения openrouter.ai/settings/credits.";
+function renderSettings() {
+  $("#set-provider").textContent = S.provider || "—";
+  const fill = (id, cur) => { const el = $(id); el.innerHTML = S.models.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(m)}${/:free$/.test(m) ? " — бесплатно" : ""}</option>`).join("") || '<option value="">(список моделей недоступен — сервер не отвечает)</option>'; };
+  fill("#set-model-ai", modelAi()); fill("#set-model-patents", modelPatents());
+  $("#set-model-hint").textContent = `AI-вердикт: ${modelAi() || "—"} · патентный скан: ${modelPatents() || "—"}. ${FREE_HINT}`;
+  $("#set-login-state").textContent = S.token ? "пароль доступа сохранён в этом браузере" : "не авторизован — AI недоступен";
+}
+$("#set-logout").addEventListener("click", () => { S.token = ""; localStorage.removeItem("fba_token"); renderSettings(); $("#login").classList.remove("hidden"); toast("Пароль доступа удалён из браузера"); });
+$("#set-theme").addEventListener("click", () => $("#theme-toggle").click());
+$("#set-side").addEventListener("click", () => { const c = $("#tab-analysis").classList.contains("side-collapsed"); setSide(!c); showTab("analysis"); });
 
 // ---------- thresholds tab ----------
 const THR_NAMES = { criterion1: "Критерий 1", economics: "Экономика", budget: "Бюджет", traffic: "Трафик", poe: "POE", challenger: "Критерии 3–8", reviewsMoat: "Ров отзывов", scorecard: "Scorecard", reconciliation: "Сверка", checklist: "Чеклист" };

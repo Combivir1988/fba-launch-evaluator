@@ -319,7 +319,7 @@
   const RISK = { high: ["fail", "высокий"], med: ["warn", "средний"], low: ["ok", "низкий"], none: ["na", "нет"] };
   function secPatents(A, R, o) {
     const P = A.patents;
-    const btn = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0"><button data-action="patents" style="flex:0 0 auto">${P ? "🔄 Повторить патентный скан" : "🔎 Патентный скан (AI + Google Patents)"}</button><span class="muted" id="patents-status"></span></div>`;
+    const btn = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0"><button data-action="patents" style="flex:0 0 auto">${P ? "🔄 Повторить патентный скан" : "🔎 Патентный скан (AI + Google Patents)"}</button>${o.selectedPatentModel ? `<span class="chip" title="Модель для патентного скана">${esc(o.selectedPatentModel)}</span> <a href="#" data-action="settings" class="muted" style="font-size:.8rem">изменить</a>` : ""}<span class="muted" id="patents-status"></span></div>`;
     if (!P) return `<h2>Патенты / FTO (критерий 8, Gate 4) <span class="chip na">не проверено</span></h2>${btn}<p class="muted">AI формирует запросы к Google Patents по типу товара и вашей ключевой фиче, читает независимые claims найденных патентов и оценивает пересечение с ТЗ. Результат — предварительный скрининг (🟡 допущение), не юридическое заключение. Укажите фичу для проверки в панели «Риски и compliance» → «Ключевая фича для патентного скана».</p>`;
     const cls = P.status === "conflict" ? "fail" : P.status === "unsure" ? "warn" : "ok";
     const label = { conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[P.status] || P.status;
@@ -356,7 +356,7 @@
 
   function secAi(A, R, o) {
     const ai = A.ai;
-    const models = o.models || []; const sel = models.length > 1 ? `<select id="ai-model" aria-label="Модель" style="max-width:260px">${models.map((m) => `<option value="${esc(m)}" ${m === (o.selectedModel || models[0]) ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>` : (models[0] ? `<span class="chip">${esc(models[0])}</span>` : "");
+    const sel = o.selectedModel ? `<span class="chip" title="Модель для AI-вердикта">${esc(o.selectedModel)}</span> <a href="#" data-action="settings" class="muted" style="font-size:.8rem">изменить в Настройках</a>` : "";
     const btns = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0"><button class="primary" data-action="ai" style="flex:0 0 auto">${ai ? "🔄 Повторить AI-анализ" : "✨ Запустить AI-анализ"}</button>${sel}<span class="muted" id="ai-status"></span></div><div id="ai-progress" class="ai-progress hidden"></div>`;
     if (!ai) return `<h2>AI-вердикт и рекомендации</h2>${btns}<div class="empty">AI получает только агрегаты дашборда (не файлы) и возвращает вердикт, обоснование по гейтам, гипотезы дифференциации и шаги. Вердикт не может быть мягче правил.</div>`;
     const gates = (ai.gates || []).map((g) => `<tr><td><b>${esc(GATE_NAMES[g.gate] || g.gate)}</b></td><td>${st(g.status === "pass" ? "ok" : g.status === "fail" ? "fail" : g.status === "rework" ? "warn" : "na")}</td><td>${esc(g.reasoning)}</td></tr>`).join("");
