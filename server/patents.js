@@ -91,7 +91,7 @@ export async function* patentScanStream(body, cfg, { signal, fetchImpl = fetch, 
     yield { event: "stage", data: { stage: "queries", text: "Формирую поисковые запросы…" } };
     let plan;
     if (cfg.mock) plan = { queries: [{ q: `${coreKeyword || niche}`, purpose: "тип товара" }, { q: `${coreKeyword || niche} ${feature}`.trim(), purpose: "наша фича" }], concepts: [feature || "конструкция"] };
-    else plan = await aiJson({ cfg, model, system: SYS_QUERIES, user: product, schema: QUERIES_SCHEMA, signal, fetchImpl, maxTokens: 2000 });
+    else plan = await aiJson({ cfg, model, system: SYS_QUERIES, user: product, schema: QUERIES_SCHEMA, signal, fetchImpl, maxTokens: 8000 });
     const queries = (plan.queries || []).slice(0, 7);
     // B. поиск
     const found = new Map();
@@ -128,7 +128,7 @@ export async function* patentScanStream(body, cfg, { signal, fetchImpl = fetch, 
     const packed = cands.map((c) => ({ number: c.number, title: c.title, assignee: c.assignee, priorityDate: c.priorityDate, expiryEstimate: c.expiryEstimate, expired: c.expired, pending: Boolean(c.pending), legalStatus: c.legalStatus, abstract: (c.abstract || c.snippet || "").slice(0, 700), independentClaims: (c.independentClaims || []).map((t) => t.slice(0, 900)) }));
     let assess;
     if (cfg.mock) assess = { overall: "unsure", summary: "[MOCK] Демонстрационная оценка без AI.", designPatentNote: "Проверьте design patents по картинкам лидеров.", patents: packed.map((p, i) => ({ number: p.number, relevance: 0.5, risk: i === 0 ? "med" : "low", claimed: "mock", overlap: "mock", designAround: "mock" })), nextSteps: ["Показать патентному поверенному"] };
-    else assess = await aiJson({ cfg, model, system: SYS_ASSESS, user: `${product}\n\nТехнические признаки ТЗ: ${(plan.concepts || []).join("; ")}\n\nКандидаты (JSON):\n${JSON.stringify(packed)}`, schema: ASSESS_SCHEMA, signal, fetchImpl, maxTokens: 6000 });
+    else assess = await aiJson({ cfg, model, system: SYS_ASSESS, user: `${product}\n\nТехнические признаки ТЗ: ${(plan.concepts || []).join("; ")}\n\nКандидаты (JSON):\n${JSON.stringify(packed)}`, schema: ASSESS_SCHEMA, signal, fetchImpl, maxTokens: 16000 });
     const byNum = Object.fromEntries(cands.map((c) => [c.number, c]));
     const items = (assess.patents || []).map((a) => { const c = byNum[a.number] || {}; return { ...a, title: c.title || null, assignee: c.assignee || null, priorityDate: c.priorityDate || null, expiryEstimate: c.expiryEstimate || null, expired: Boolean(c.expired), pending: Boolean(c.pending), legalStatus: c.legalStatus || null, url: c.url || `${GP}/patent/${a.number}/en`, hits: c.hits || 0 }; })
       .sort((a, b) => ({ high: 3, med: 2, low: 1, none: 0 }[b.risk] - { high: 3, med: 2, low: 1, none: 0 }[a.risk]) || b.relevance - a.relevance);

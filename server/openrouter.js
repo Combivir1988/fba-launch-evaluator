@@ -69,7 +69,8 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
 
   let lastErr = null;
   for (const mode of modes) {
-    const req = { model, messages: mode.messages, stream: true, temperature: 0.2, max_tokens: 16000, usage: { include: true } };
+    // reasoning-модели тратят на размышления тысячи токенов из того же лимита → запас 32k
+    const req = { model, messages: mode.messages, stream: true, temperature: 0.2, max_tokens: 32000, usage: { include: true } };
     if (mode.response_format) req.response_format = mode.response_format;
     if (cfg.openrouterReasoning) req.reasoning = { effort };
     let res;
@@ -96,7 +97,8 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
         if (j.usage) usage = j.usage;
       }
     } catch (e) { if (e?.name === "AbortError" || signal?.aborted) { yield { event: "error", data: { code: "aborted", message: "Запрос отменён", retryable: false } }; return; } yield { event: "error", data: { code: "upstream", message: "Обрыв потока OpenRouter: " + (e?.message || e), retryable: true } }; return; }
-    if (finish === "length") { yield { event: "error", data: { code: "parse", message: "Ответ обрезан по max_tokens", retryable: true } }; return; }
+    if (finish === "length" && !extractJson(text)) { yield { event: "error", data: { code: "parse", message: `Модель ${gotModel} исчерпала лимит выходных токенов (32k) на размышления и не успела выдать JSON — попробуйте другую модель (Настройки) или повторите`, retryable: true } }; return; }
+    if (finish === "length") log("warn", "openrouter: finish=length, но JSON извлечён", { model: gotModel, mode: mode.name });
     if (finish === "content_filter") { yield { event: "error", data: { code: "refusal", message: "Модель отклонила запрос (content filter)", retryable: false } }; return; }
     const rawObj = extractJson(text);
     if (!rawObj) { lastErr = { code: "parse", message: `Модель ${gotModel} не вернула JSON (${mode.name})`, retryable: true }; log("warn", "openrouter: не JSON, деградация", { model, mode: mode.name }); continue; }
@@ -127,7 +129,7 @@ function classify(status, txt) {
  * Non-streaming JSON-вызов OpenRouter с тем же каскадом (json_schema → json_object → text+extractJson) и валидацией.
  * Возвращает объект или бросает Error с code (auth|billing|rate_limited|bad_request|parse|upstream).
  */
-export async function openrouterJson({ cfg, model, system, user, schema, signal, fetchImpl = fetch, maxTokens = 4000, temperature = 0.2 }) {
+export async function openrouterJson({ cfg, model, system, user, schema, signal, fetchImpl = fetch, maxTokens = 12000, temperature = 0.2 }) {
   if (!cfg.openrouterKey) throw Object.assign(new Error("На сервере не задан OPENROUTER_API_KEY"), { code: "auth" });
   const headers = { Authorization: `Bearer ${cfg.openrouterKey}`, "Content-Type": "application/json", "HTTP-Referer": cfg.publicUrl || "https://github.com/Combivir1988/fba-launch-evaluator", "X-Title": "FBA Launch Evaluator" };
   const strictSchema = apiSchema(schema);
