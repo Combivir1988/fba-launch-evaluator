@@ -226,10 +226,13 @@ async function startAi() {
   const ac = new AbortController(); S.aiAbort = ac;
   try {
     const chosen = $("#ai-model")?.value || S.model; if (chosen) { S.model = chosen; localStorage.setItem("fba_model", chosen); }
-    const ai = await runAi(S.a, { token: S.token, signal: ac.signal, model: chosen || undefined,
+    const opts = { token: S.token, signal: ac.signal, model: chosen || undefined,
       onMeta: (m) => { if (status) status.textContent = `модель ${m.model}…`; },
       onThinking: (t) => { if (prog) { prog.textContent += t; prog.scrollTop = prog.scrollHeight; } },
-      onProgress: (n) => { if (status) status.textContent = `формирую ответ… ${n} симв.`; } });
+      onProgress: (n) => { if (status) status.textContent = `формирую ответ… ${n} симв.`; } };
+    let ai;
+    try { ai = await runAi(S.a, opts); }
+    catch (e1) { if (e1.code !== "disconnected" && e1.code !== "aborted" && !/draining|перезапуск/i.test(e1.message)) throw e1; if (status) status.textContent = "соединение прервано — повторяю через 5 с…"; await new Promise((r) => setTimeout(r, 5000)); ai = await runAi(S.a, opts); }
     S.a.ai = ai; S.a.status = "ai_done"; S.dirty = true;
     R().update(dash, S.a, renderOpts(), ["hero", "ai"]);
     if (!S.fromHistory) { await history.put({ ...S.a, updatedAt: new Date().toISOString() }); updateHistCount(); }
@@ -259,7 +262,7 @@ async function startPatentScan() {
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "", done = null, err = null;
     while (true) { const { value, done: end } = await reader.read(); if (end) break; buf += dec.decode(value, { stream: true }); let i; while ((i = buf.indexOf("\n\n")) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); const m = chunk.match(/^event: (\w+)\ndata: ([\s\S]*)$/m); if (!m) continue; let d = {}; try { d = JSON.parse(m[2]); } catch {} if (m[1] === "stage") setStatus(d.text || d.stage); else if (m[1] === "done") done = d; else if (m[1] === "error") err = d; } }
     if (err) throw new Error(err.message || "Ошибка скана");
-    if (!done?.scan) throw new Error("Соединение прервано без результата");
+    if (!done?.scan) throw new Error("Соединение прервано без результата (сервер перезапускался или таймаут) — нажмите «Повторить»");
     S.a.patents = done.scan; markDirty(); renderAll();
     setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[done.scan.status] || done.scan.status}`);
     toast("Патентный скан завершён — критерий 8 получил статус 🟡 допущение");

@@ -10,8 +10,11 @@ import { log } from "./log.js";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 
+export const inflight = { count: 0, draining: false };
+
 export function createApp(cfg = configFromEnv()) {
   const app = express();
+  app.use("/api", (req, res, next) => { if (inflight.draining && req.path !== "/health") { res.set("Retry-After", "5"); return res.status(503).json({ error: "draining", message: "Сервер перезапускается — повторите через несколько секунд" }); } next(); });
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
 
@@ -43,13 +46,14 @@ export function createApp(cfg = configFromEnv()) {
     res.on("close", () => { if (!res.writableFinished) ac.abort(); });
     const t0 = Date.now();
     log("info", "analyze start", { ip: req.ip, niche: String(body.niche || "").slice(0, 60), payloadChars: JSON.stringify(body.payload).length, provider: cfg.mock ? "mock" : cfg.provider, model: body.options?.model || (cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model) });
+    inflight.count++;
     try {
       for await (const ev of analyzeStream(body, cfg, { signal: ac.signal })) send(ev.event, ev.data);
     } catch (err) {
       log("error", "analyze failed", { message: err?.message });
       send("error", { code: "upstream", message: err?.message || "Ошибка сервера", retryable: true });
     } finally {
-      clearInterval(ping);
+      clearInterval(ping); inflight.count--;
       log("info", "analyze end", { durationMs: Date.now() - t0 });
       res.end();
     }
@@ -66,9 +70,10 @@ export function createApp(cfg = configFromEnv()) {
     const ac = new AbortController();
     res.on("close", () => { if (!res.writableFinished) ac.abort(); });
     log("info", "patent scan start", { ip: req.ip, niche: String(body.niche || body.coreKeyword || "").slice(0, 60) });
+    inflight.count++;
     try { for await (const ev of patentScanStream(body, cfg, { signal: ac.signal })) send(ev.event, ev.data); }
     catch (err) { log("error", "patent scan failed", { message: err?.message }); send("error", { code: "upstream", message: err?.message || "Ошибка сервера", retryable: true }); }
-    finally { clearInterval(ping); res.end(); }
+    finally { clearInterval(ping); inflight.count--; res.end(); }
   });
 
   app.use("/shared", express.static(join(root, "shared"), { extensions: ["js"], maxAge: "1h" }));
@@ -83,5 +88,20 @@ if (isMain) {
   if (!cfg.appPassword) log("warn", "APP_PASSWORD не задан — /api/* будет отвечать 503");
   if (!cfg.mock && cfg.provider === "anthropic" && !cfg.apiKey) log("warn", "ANTHROPIC_API_KEY не задан — AI-анализ недоступен (MOCK_AI=1 для демо или AI_PROVIDER=openrouter)");
   if (!cfg.mock && cfg.provider === "openrouter" && !cfg.openrouterKey) log("warn", "OPENROUTER_API_KEY не задан — AI-анализ недоступен");
-  createApp(cfg).listen(cfg.port, () => log("info", "listening", { port: cfg.port, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model, effort: cfg.effort }));
+  const server = createApp(cfg).listen(cfg.port, () => log("info", "listening", { port: cfg.port, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model, effort: cfg.effort }));
+  server.keepAliveTimeout = 65_000;
+  // Graceful shutdown: при SIGTERM (редеплой) не рвём активные AI-стримы — ждём их до DRAIN_SECONDS
+  const DRAIN = Number(process.env.DRAIN_SECONDS) || 300;
+  const shutdown = (sig) => {
+    if (inflight.draining) return;
+    inflight.draining = true;
+    log("warn", "shutdown requested", { signal: sig, inflight: inflight.count, drainSeconds: DRAIN });
+    server.close(() => log("info", "listener closed"));
+    const t0 = Date.now();
+    const tick = setInterval(() => {
+      if (inflight.count <= 0 || Date.now() - t0 > DRAIN * 1000) { clearInterval(tick); log("info", "exit", { inflight: inflight.count, waitedMs: Date.now() - t0 }); process.exit(0); }
+    }, 500);
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
