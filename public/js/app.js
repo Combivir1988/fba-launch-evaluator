@@ -303,8 +303,7 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
   $("#help-ver").textContent = METHODOLOGY_VERSION;
   try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; } catch {}
   if (!window.Chart) toast("Chart.js не загрузился — графики не будут отрисованы. Проверьте блокировщик скриптов.", 10000);
-  const diag = () => { const cv = [...dash.querySelectorAll("canvas")]; let painted = 0; for (const c of cv) { try { const d = c.getContext("2d").getImageData(0, 0, Math.min(c.width, 50), Math.min(c.height, 50)).data; for (let i = 3; i < d.length; i += 4) if (d[i]) { painted++; break; } } catch {} } return `Chart.js ${window.Chart?.version || "НЕТ"} · canvas ${cv.length}, с пикселями ${painted} · DPR ${window.devicePixelRatio} · ${window.innerWidth}×${window.innerHeight} · ${navigator.userAgent}`; };
-  const diagEl = $("#diag"); if (diagEl) { diagEl.textContent = diag(); $$('.topbar nav button').forEach((b) => b.addEventListener("click", () => { if (b.dataset.tab === "help") diagEl.textContent = diag(); })); }
+
   await initLogin();
   updateHistCount();
   const last = localStorage.getItem("fba_last");
