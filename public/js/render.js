@@ -308,11 +308,12 @@
 
   function secChallenger(A, R) {
     const ch = R.challenger;
-    const rows = Object.entries(ch.items).map(([k, it]) => `<tr><td><b>${k}</b>${it.mandatory ? ' <span class="chip fail" title="обязателен зелёным">обяз.</span>' : ""}</td><td>${esc(it.title)}</td><td>${KIND_ICON[it.kind] || "⚪"} ${st(it.status)}</td><td class="muted">${esc(it.note || "")}</td></tr>`).join("");
-    return `<h2>Критерии 1–8 против доминирующего игрока <span class="chip ${ch.active ? (ch.pass ? "ok" : ch.pending ? "pending" : "fail") : "na"}">${ch.active ? `${ch.greenCount} из 8 🟢 · обязательные 6/8 ${ch.mandatoryOk ? "OK" : "не OK"}` : "справочно"}</span></h2>
-      <p class="muted">${esc(ch.note)}. Правило: входить при ≥ 6 из 8 зелёных, критерии 6 и 8 обязательны. В счёт идут только 🟢 подтверждено (не 🟡 допущение / 🔵 решено).</p>
+    const KIND = { confirmed: ["ok", "данные"], assumed: ["warn", "допущение"], decided: ["pending", "решение"], unknown: ["na", "нет данных"] };
+    const rows = Object.entries(ch.items).map(([k, it]) => { const kd = KIND[it.kind] || KIND.unknown; return `<tr><td><b>${k}</b>${it.mandatory ? ' <span class="chip fail" title="обязателен зелёным">обяз.</span>' : ""}</td><td>${esc(it.title)}</td><td>${st(it.status)}</td><td><span class="chip ${kd[0]}" title="Основание статуса: данные — прямые данные по нише; допущение — прокси/AI-скан; решение — ваш план, не факт">${kd[1]}</span></td><td class="muted">${esc(it.note || "")}</td></tr>`; }).join("");
+    return `<h2>Критерии 1–8 против доминирующего игрока <span class="chip ${ch.active ? (ch.pass ? "ok" : ch.pending ? "pending" : "fail") : "na"}">${ch.active ? `${ch.greenCount} из 8 зелёных по данным · обязательные 6/8 ${ch.mandatoryOk ? "OK" : "не OK"}` : "справочно"}</span></h2>
+      <p class="muted">${esc(ch.note)}. Правило: входить при ≥ 6 из 8 зелёных, критерии 6 и 8 обязательны. В счёт «N из 8» идут только зелёные статусы, подтверждённые данными (колонка «Основание»: не допущение и не решение).</p>
       ${!ch.gate4Discussed ? '<div class="notice">Gate 4 не обсуждён: патентный поиск не отмечен (панель «Риски», поле «Патенты / FTO»).</div>' : ""}
-      <div class="tablewrap"><table><thead><tr><th>#</th><th>Критерий</th><th>Статус</th><th>Основание</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <div class="tablewrap"><table><thead><tr><th>#</th><th>Критерий</th><th>Статус</th><th>Основание</th><th>Комментарий</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   const RISK = { high: ["fail", "высокий"], med: ["warn", "средний"], low: ["ok", "низкий"], none: ["na", "нет"] };
