@@ -3,6 +3,7 @@ import { newAnalysis, migrate } from "/shared/analysis.js";
 import { compute } from "/shared/compute.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION } from "/shared/thresholds.js";
 import { suggestCluster, annotateKeywords } from "/shared/parse-cerebro.js";
+import { toNum } from "/shared/num.js";
 import { detectAndParse } from "./files.js";
 import { history } from "./history.js";
 import { runAi } from "./ai.js";
@@ -16,7 +17,7 @@ const renderOpts = () => ({ static: false, models: S.models, selectedModel: S.mo
 const dash = $("#dashboard");
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const toast = (msg, ms = 3200) => { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), ms); };
-const numOrNull = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
+const numOrNull = (v) => (v === "" || v === null || v === undefined ? null : toNum(String(v))); // «29,9» → 29.9
 
 // ---------- theme ----------
 function applyTheme(t) { if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
@@ -69,6 +70,10 @@ function syncForm() {
   $$("[data-check]").forEach((el) => { const v = inp.checklist?.[el.dataset.check]; if (el.type === "checkbox") el.checked = Boolean(v); else el.value = v ?? (el.tagName === "SELECT" ? el.options[0].value : ""); });
   const bf = $('[data-axis="brandFit"]'); bf.value = inp.axisManual?.brandFit ?? 5; setOutput(bf);
   const op = $('[data-axis="opRisk"]'); const auto = inp.axisManual?.opRisk === null || inp.axisManual?.opRisk === undefined; $("#op-auto").checked = auto; op.disabled = auto; op.value = auto ? (a.results?.scorecard?.axes?.opRisk?.score ?? 8) : inp.axisManual.opRisk; setOutput(op);
+  // авто-значения из выгрузок показываем в placeholder пустых полей
+  const eff = a.results?.effective || {};
+  const cpcEl = $("#f-cpc"); if (cpcEl) cpcEl.placeholder = eff.cpc != null && eff.cpcFromCerebro ? `авто: $${Number(eff.cpc).toFixed(2)} — ${eff.cpcSource || "Cerebro"}` : "нет Cerebro — введите CPC";
+  const priceEl = $("#f-price"); if (priceEl) priceEl.placeholder = eff.priceFromMedian && eff.price != null ? `авто: $${Number(eff.price).toFixed(2)} — медиана проверенных (1b)` : "медиана 1b";
   renderFileList(); renderCluster(); renderBrandChips(); renderOverrides(); renderChallengerUser();
   $("#btn-save").textContent = S.dirty && S.fromHistory ? "💾 Сохранить ●" : "💾 Сохранить";
 }

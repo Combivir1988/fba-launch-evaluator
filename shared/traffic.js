@@ -1,5 +1,5 @@
 // Распределение трафика (урок 09), Adj. SV (SKILL), концентрация кликов POE (урок 11).
-import { sum, safeDiv } from "./num.js";
+import { sum, safeDiv, median } from "./num.js";
 import { tokens } from "./parse-cerebro.js";
 
 export function traffic(p) {
@@ -15,7 +15,9 @@ export function traffic(p) {
     if (cluster.length) {
       out.source = "cerebro";
       out.svCore = coreRow?.sv ?? 0;
-      out.cpcCore = coreRow?.bid ?? null;
+      const bids5 = [...cluster].sort((a, b) => b.sv - a.sv).slice(0, 5).map((k) => k.bid).filter((b) => typeof b === "number");
+      out.cpcCore = coreRow?.bid ?? median(bids5);
+      out.cpcSource = coreRow?.bid != null ? `Sugg. Bid «${coreRow.phrase}»` : bids5.length ? "медиана Sugg. Bid топ-5 ключей кластера" : null;
       const others = cluster.filter((k) => k !== coreRow);
       out.adjSv = out.svCore + 0.4 * sum(others.map((k) => k.sv));
       out.clusterSv = sum(cluster.map((k) => k.sv));

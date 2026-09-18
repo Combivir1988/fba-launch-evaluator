@@ -31,7 +31,7 @@ export function compute(analysis) {
   const results = {
     gate0: g0, criterion1: p.criterion1, economics: p.economics, budget: p.budget, traffic: p.traffic, competition: p.competition,
     priceSegments: priceSegments(p), challenger: p.challenger, scorecard: p.scorecard,
-    effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null },
+    effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p),
   };
   results.verdict = verdictCeiling(results);
