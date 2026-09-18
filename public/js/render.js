@@ -376,7 +376,7 @@
     const yes = (b) => (b ? '<span class="status fail">да</span>' : '<span class="status ok">нет</span>');
     return `<h2>Чеклист рисков и compliance</h2><div class="tablewrap"><table><tbody>
       <tr><td>Закрытая категория (урок 03)</td><td>${yes(c.gatedCategory)}</td><td>Опасные товары</td><td>${yes(c.dangerousGoods)}</td></tr>
-      <tr><td>Сертификаты</td><td>${esc(c.certificates || "—")}</td><td>Amazon продаёт сам</td><td>${yes(c.amazonSells)}</td></tr>
+      <tr><td>Сертификаты</td><td>${esc(c.certificates || "—")}</td><td>Amazon продаёт сам</td><td>${yes(R.competition.amazonSells)} <small class="muted">${R.competition.amazonSellsSource === "user" ? "вручную" : R.competition.amazonSellsSource === "xray" ? "по Xray (Seller)" : "авто"}</small></td></tr>
       <tr><td>Патенты / FTO (урок 13)</td><td>${esc({ none: "не проверял", clear: "не найдено", design_around: "design-around", unsure: "нужен юрист", conflict: "конфликт" }[c.patentSearch] || "—")}</td><td>Торговая марка</td><td>${esc({ none: "не проверял", free: "свободна", conflict: "занята" }[c.trademarkSearch] || "—")}</td></tr>
       <tr><td>Склейка отзывов (урок 14)</td><td>${yes(c.reviewMergingSuspected)}</td><td>Купоны/дилы (урок 11)</td><td>${esc(c.couponsDealsSaturation || "—")}</td></tr>
       <tr><td>Тест дизайна (урок 12)</td><td>${isNum(c.designTestScore) ? c.designTestScore + " % " + (c.designTestScore >= 30 ? "✓" : "✗ (< 30 %)") : "—"}</td><td>Жизненный цикл (урок 09)</td><td>${isNum(c.lifecycleMonths) ? c.lifecycleMonths + " мес " + (c.lifecycleMonths >= 25 ? "✓" : "✗ (< 25)") : "—"}</td></tr>

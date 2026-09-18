@@ -92,3 +92,14 @@ test("Xray + POE одной ниши: сверка источников счит
   assert.ok(R.reconciliation.every((x) => ["noise", "borderline", "conflict"].includes(x.level)));
   assert.ok(typeof R.criterion1.items["1a"].proxyDelta === "number");
 });
+
+test("Amazon как продавец: авто по Xray, «нет» пользователя переопределяет, «да» включает", () => {
+  const a = fullAnalysis();
+  const auto = compute(a).competition;
+  assert.equal(auto.amazonSellsSource, auto.amazonSells ? "xray" : "auto");
+  a.inputs.checklist.amazonSells = "no"; const no = compute(a).competition;
+  assert.equal(no.amazonSells, false); assert.equal(no.amazonSellsSource, "user");
+  a.inputs.checklist.amazonSells = "yes"; const yes = compute(a);
+  assert.equal(yes.competition.amazonSells, true); assert.equal(yes.criterion1.items["1e"].status, "fail");
+  assert.match(yes.criterion1.items["1e"].note, /вручную/);
+});

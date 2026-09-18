@@ -1,5 +1,6 @@
 // Компактный агрегат для Claude: только то, что нужно для синтеза (≈ 6–10k токенов), без сырых файлов.
 import { round } from "./num.js";
+import { gateStatuses } from "./verdict-rules.js";
 
 const r2 = (v) => round(v, 2), r3 = (v) => round(v, 3);
 
@@ -31,6 +32,7 @@ export function buildAiPayload(analysis) {
       items: Object.fromEntries(Object.entries(R.challenger.items).map(([k, v]) => [k, { title: v.title, status: v.status, kind: v.kind, note: v.note }])) },
     scorecard: { total: r2(R.scorecard.total), band: R.scorecard.band, weakest: R.scorecard.weakest, axes: Object.fromEntries(Object.entries(R.scorecard.axes).map(([k, a]) => [k, { score: r2(a.score), note: a.note }])) },
     rulesVerdict: R.verdict,
+    gateStatuses: gateStatuses(R),
     reconciliation: R.reconciliation.map((x) => ({ metric: x.metric, a: { ...x.a, value: r2(x.a.value) }, b: { ...x.b, value: r2(x.b.value) }, deltaPct: r3(x.deltaPct), level: x.level })),
     checklist: inp.checklist, challengerUser: inp.challenger, canDifferentiate: inp.canDifferentiate,
     patentScan: analysis.patents ? { status: analysis.patents.status, summary: analysis.patents.summary, feature: analysis.patents.feature, top: (analysis.patents.items || []).slice(0, 6).map((x) => ({ number: x.number, risk: x.risk, expired: x.expired, claimed: x.claimed, overlap: x.overlap, designAround: x.designAround })) } : null,

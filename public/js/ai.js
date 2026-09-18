@@ -30,6 +30,6 @@ export async function runAi(analysis, { token, onThinking, onProgress, onMeta, s
   }
   if (err) throw Object.assign(new Error(err.message || "Ошибка AI"), { code: err.code, retryable: err.retryable });
   if (!done) throw new Error("Соединение прервано без результата");
-  const ai = reconcile(done.verdict, analysis.results.verdict);
+  const ai = reconcile(done.verdict, analysis.results.verdict, analysis.results);
   return { ...ai, model: done.model, provider: done.provider || null, usage: done.usage, durationMs: done.durationMs, createdAt: new Date().toISOString(), staleSince: null };
 }

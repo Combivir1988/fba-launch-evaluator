@@ -15,7 +15,7 @@ export function defaultInputs() {
     adsReserve: 0, budget: null, canDifferentiate: "unknown", myAsins: [], myBrand: "", evaluateAsNewEntrant: true,
     excludedBrands: [], clusterKeywords: [], clusterMinSv: null, clusterMinCompetitors: null, manualOverrides: {}, challenger: {}, patentFeature: "",
     checklist: { gatedCategory: false, dangerousGoods: false, certificates: "none", patentSearch: "none", trademarkSearch: "none",
-      reviewMergingSuspected: false, amazonSells: false, couponsDealsSaturation: "unknown", designTestScore: null, lifecycleMonths: null, listingsInSearch: null },
+      reviewMergingSuspected: false, amazonSells: "auto", couponsDealsSaturation: "unknown", designTestScore: null, lifecycleMonths: null, listingsInSearch: null },
     axisManual: { brandFit: null, opRisk: null },
   };
 }
@@ -38,6 +38,7 @@ export function migrate(doc) {
   if (v > SCHEMA_VERSION) throw new Error(`Файл из более новой версии (schemaVersion ${v})`);
   const out = { ...newAnalysis(), ...doc, inputs: { ...defaultInputs(), ...(doc.inputs || {}) } };
   out.inputs.checklist = { ...defaultInputs().checklist, ...(doc.inputs?.checklist || {}) };
+  if (typeof out.inputs.checklist.amazonSells === "boolean") out.inputs.checklist.amazonSells = out.inputs.checklist.amazonSells ? "yes" : "auto"; // старые документы
   out.inputs.axisManual = { ...defaultInputs().axisManual, ...(doc.inputs?.axisManual || {}) };
   out.schemaVersion = SCHEMA_VERSION;
   return out;

@@ -100,7 +100,7 @@
       <div class="body">
         <label class="row"><input type="checkbox" data-check="gatedCategory"> Закрытая категория (нужно одобрение)</label>
         <label class="row"><input type="checkbox" data-check="dangerousGoods"> Опасные товары (Dangerous Goods)</label>
-        <label class="row"><input type="checkbox" data-check="amazonSells"> Amazon продаёт сам в этой нише</label>
+        <div class="field"><label for="c-amz">Amazon продаёт сам в этой нише</label><select id="c-amz" data-check="amazonSells"><option value="auto">авто — по колонке Seller в Xray</option><option value="yes">да</option><option value="no">нет (переопределить)</option></select></div>
         <label class="row"><input type="checkbox" data-check="reviewMergingSuspected"> Подозрение на склейку отзывов у конкурентов (урок 14)</label>
         <div class="grid2">
           <div class="field"><label for="c-cert">Сертификаты</label><select id="c-cert" data-check="certificates"><option value="none">не нужны / не проверял</option><option value="CPC">CPC (детские)</option><option value="FDA">FDA</option><option value="Prop65">Prop 65</option><option value="other">другие</option></select></div>

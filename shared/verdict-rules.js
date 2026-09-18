@@ -41,12 +41,43 @@ export function verdictCeiling(r) {
   return { ceiling: v, decisiveGate: decisive, reasons };
 }
 
+/** Детерминированные статусы гейтов для таблицы AI-блока (AI пишет только reasoning). */
+export function gateStatuses(r) {
+  const eco = r.economics, c1 = r.criterion1, ch = r.challenger, tr = r.traffic, b = r.budget, sc = r.scorecard;
+  const g12 = (g) => (!g || g.status === "pending" ? "insufficient_data" : g.status === "pass" ? "pass" : g.status === "rework" ? "rework" : "fail");
+  const three = (s) => (s === "ok" ? "pass" : s === "warn" ? "rework" : s === "fail" ? "fail" : "insufficient_data");
+  const p8 = ch?.items?.["8"];
+  const gate4 = !p8 || p8.status === "na" ? "insufficient_data" : p8.status === "fail" ? "fail" : p8.kind === "assumed" ? "rework" : p8.status === "warn" ? "rework" : "pass";
+  const gate3 = !ch ? "insufficient_data" : ch.active ? (ch.pending ? "insufficient_data" : ch.pass ? "pass" : "fail") : (c1?.pass ? "pass" : "fail");
+  const pct = (v) => (typeof v === "number" ? Math.round(v * 100) + " %" : "—");
+  const usd = (v) => "$" + Math.round(v ?? 0).toLocaleString("ru-RU");
+  return {
+    gate0: { status: r.gate0?.level === "full" ? "pass" : r.gate0?.level === "none" ? "insufficient_data" : "rework", fact: r.gate0?.note || "" },
+    gate1: { status: g12(eco?.gate1), fact: eco?.pending ? "COGS не введён" : `маржа ${pct(eco.gate1.margin0)}, net $${(eco.gate1.net0 ?? 0).toFixed(2)}/юнит, ROI ${pct(eco.roi)}` },
+    gate2: { status: g12(eco?.gate2), fact: eco?.pending || !eco?.gate2?.byCvr?.length ? "нет CPC/COGS" : `Net after ads при CVR 12 %: $${(eco.gate2.byCvr.find((x) => Math.abs(x.cvr - 0.12) < 1e-9)?.net ?? 0).toFixed(2)}; безубыточный CVR ${eco.breakEvenCvr != null ? (eco.breakEvenCvr * 100).toFixed(1) + " %" : "—"}` },
+    gate3: { status: gate3, fact: ch?.active ? `доминирующий бренд; ${ch.greenCount} из 8 зелёных, обязательные 6/8 ${ch.mandatoryOk ? "OK" : "не OK"}` : `без доминирующего бренда; Критерий 1 ${c1?.okCount ?? "?"}/8` },
+    gate4: { status: gate4, fact: p8?.note || "патенты не проверены" },
+    criterion1: { status: c1?.pass ? "pass" : "fail", fact: `${c1?.okCount ?? "?"} из 8 при пороге ${c1?.passCount ?? 6}${c1?.redItems?.length ? "; красные: " + c1.redItems.join(", ") : ""}` },
+    traffic: { status: three(tr?.status), fact: tr?.source ? `${tr.source}: Adj. SV ${Math.round(tr.adjSv ?? 0)}, топ-2 ${pct(tr.top2Share)}, релевантных ${tr.relevantCount ?? "—"}, групп ${tr.groups ?? "—"}` : "нет Cerebro/POE" },
+    budget: { status: b?.status === "ok" ? "pass" : b?.status === "warn" ? "rework" : b?.status === "fail" ? "fail" : "insufficient_data", fact: b?.pending ? "COGS не введён" : b?.status === "unknown" ? `нужно ${usd(b.need)} на две партии + рекламу — бюджет не указан` : `нужно ${usd(b?.need)}, бюджет ${usd(b?.budget)}, ${(b?.gap ?? 0) >= 0 ? "запас" : "дефицит"} ${usd(Math.abs(b?.gap ?? 0))}; стоп-вопросы: ${b?.quickScreenStatus ?? "—"}` },
+    scorecard: { status: !sc?.band ? "insufficient_data" : sc.band === "no_go" ? "fail" : sc.band === "rework" ? "rework" : "pass", fact: sc?.total != null ? `${Math.round(sc.total)} %, слабая ось ${sc.weakest ?? "—"}` : "нет данных" },
+  };
+}
+
 /** Согласование AI-вердикта с потолком правил. */
-export function reconcile(ai, ceilingInfo) {
+export function reconcile(ai, ceilingInfo, results = null) {
   if (!ai) return null;
   const raw = ai.verdict;
   const ceiling = ceilingInfo.ceiling;
   const adjusted = RANK[raw] > RANK[ceiling];
-  return { ...ai, aiVerdictRaw: raw, verdict: adjusted ? ceiling : raw, adjustedByRules: adjusted,
+  let gates = ai.gates || [];
+  if (results) {
+    // статусы гейтов — детерминированные; от AI остаётся только reasoning
+    const det = gateStatuses(results);
+    const byGate = Object.fromEntries(gates.map((g) => [g.gate, g]));
+    gates = Object.entries(det).map(([gate, d]) => ({ gate, status: d.status, aiStatus: byGate[gate]?.status ?? null,
+      reasoning: byGate[gate]?.reasoning ? byGate[gate].reasoning + (byGate[gate].status !== d.status ? ` [статус исправлен правилами: ${d.fact}]` : "") : d.fact }));
+  }
+  return { ...ai, gates, aiVerdictRaw: raw, verdict: adjusted ? ceiling : raw, adjustedByRules: adjusted,
     adjustmentNote: adjusted ? `AI предложил «${VERDICT_LABEL[raw]}», правила ограничили до «${VERDICT_LABEL[ceiling]}»: ${ceilingInfo.reasons[0] || ceilingInfo.decisiveGate}` : null };
 }

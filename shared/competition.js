@@ -54,7 +54,12 @@ export function competition(p) {
   const excluded = inputs.excludedBrands || [];
   const out = { source: null, brands: [], topBrand: null, topBrandShare: null, top5Share: null, top10Share: null, top20Share: null,
     reviewBarrier: { leaderReviews: null, avg: null, median: null, tier: null }, playersOver100: null, brandsOver10pct: null,
-    amazonSells: Boolean(inputs.checklist?.amazonSells) || Boolean(xray?.flags?.amazonSells), contaminationCandidates: [], poeBrands: [] };
+    amazonSells: false, amazonSellsSource: "auto", contaminationCandidates: [], poeBrands: [] };
+  // Amazon как продавец: явный ответ пользователя побеждает автоопределение по колонке Seller в Xray
+  const az = inputs.checklist?.amazonSells;
+  if (az === "yes" || az === true) { out.amazonSells = true; out.amazonSellsSource = "user"; }
+  else if (az === "no") { out.amazonSells = false; out.amazonSellsSource = "user"; }
+  else { out.amazonSells = Boolean(xray?.flags?.amazonSells); out.amazonSellsSource = xray?.flags?.amazonSells ? "xray" : "auto"; }
 
   if (poe?.asinMetrics?.length) {
     out.poeBrands = poeBrandClickShares(poe.asinMetrics, excluded);

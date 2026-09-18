@@ -66,7 +66,7 @@ export function criterion1(p) {
     if (comp?.topBrandShare !== null && comp?.topBrandShare !== undefined) {
       it.value = comp.topBrandShare; it.source = comp.source; it.brand = comp.topBrand;
       it.note = `${comp.topBrand}: ${(comp.topBrandShare * 100).toFixed(1)} % ${comp.source === "xray" ? "выручки" : "кликов (прокси)"}`;
-      if (comp.amazonSells) it.note += "; Amazon продаёт сам — НЕ OK независимо от доли";
+      if (comp.amazonSells) it.note += `; Amazon продаёт сам (${comp.amazonSellsSource === "user" ? "указано вручную" : "по Xray, колонка Seller"}) — НЕ OK независимо от доли`;
     }
     items["1e"] = finalize(it, mo["1e"], (v) => v < t.topBrandShare && !comp?.amazonSells, (v) => v >= t.topBrandShare || Boolean(comp?.amazonSells));
   }
