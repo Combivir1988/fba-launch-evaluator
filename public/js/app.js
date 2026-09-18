@@ -346,11 +346,48 @@ $("#set-theme").addEventListener("click", () => $("#theme-toggle").click());
 $("#set-side").addEventListener("click", () => { const c = $("#tab-analysis").classList.contains("side-collapsed"); setSide(!c); showTab("analysis"); });
 
 // ---------- thresholds tab ----------
-const THR_NAMES = { criterion1: "Критерий 1", economics: "Экономика", budget: "Бюджет", traffic: "Трафик", poe: "POE", challenger: "Критерии 3–8", reviewsMoat: "Ров отзывов", scorecard: "Scorecard", reconciliation: "Сверка", checklist: "Чеклист" };
+const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет (урок 08)", traffic: "Трафик по ключам (урок 09) и Cerebro", poe: "POE / концентрация (урок 11)", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков" };
+// Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
+const THR_LABELS = {
+  "criterion1.passCount": ["Минимум зелёных подпунктов из 8", "шт (порог прохождения Критерия 1)"],
+  "criterion1.nicheRevenueMonthly": ["1a — выручка ниши, минимум", "$/мес"],
+  "criterion1.priceOk": ["1b — цена OK от", "$"], "criterion1.priceWarn": ["1b — цена «погранично» от", "$ (ниже — НЕ OK)"],
+  "criterion1.adjSv": ["1c — Adj. SV главного ключа, минимум", "запросов/мес"],
+  "criterion1.reviewsOk": ["1d — отзывов по нише, OK если меньше", "шт"], "criterion1.reviewsFail": ["1d — НЕ OK если больше", "шт"],
+  "criterion1.topBrandShare": ["1e — доля топ-бренда, НЕ OK от", "доля (0.25 = 25 %)"],
+  "criterion1.top5Ok": ["1f — топ-5 брендов OK если меньше", "доля"], "criterion1.top5Fail": ["1f — НЕ OK если больше", "доля"],
+  "criterion1.seasonOk": ["1g — сезонная просадка OK если меньше", "доля"], "criterion1.seasonFail": ["1g — НЕ OK если больше", "доля"],
+  "criterion1.launchOk": ["1h — успешность запусков OK от", "доля"], "criterion1.launchFail": ["1h — НЕ OK если меньше", "доля"],
+  "criterion1.provenReviews": ["«Проверенный» конкурент — отзывов от", "шт (для медианы цены)"], "criterion1.minTrendWeeks": ["Минимум недель POE для сезонности", "нед."],
+  "economics.marginMin": ["Gate 1 — маржа без рекламы, минимум", "доля"], "economics.profitMin": ["Gate 1 — прибыль на юнит, минимум", "$"],
+  "economics.cheapPrice": ["Дешёвый сегмент — цена ниже", "$"], "economics.cheapMarginMin": ["Дешёвый сегмент — маржа вместо $15, минимум", "доля"],
+  "economics.cvrGrid": ["Gate 2 — сетка CVR для стресс-теста", "доли через запятую"], "economics.cvrPassMax": ["Gate 2 — PASS если Net > 0 при CVR ≤", "доля"],
+  "economics.roiOk": ["ROI норма от", "1.5 = 150 %"], "economics.roiLoss": ["ROI убыток ниже", "1.0 = 100 %"], "economics.roiSuspicious": ["ROI «перепроверь данные» выше", "2.0 = 200 %"],
+  "economics.c2PassCount": ["Критерий 2 — минимум OK из 11", "шт"], "economics.roiAdsMin": ["2j — ROI с рекламой, минимум", "доля"], "economics.marginAdsMin": ["2k — маржинальность с рекламой, минимум", "доля"],
+  "economics.cvrRealistic": ["2c — реалистичный CVR нового листинга", "от, до"], "economics.ppcShareRealistic": ["2e — реалистичная доля PPC на старте", "от, до"], "economics.periodDays": ["Горизонт расчёта 2g–2k", "дней"],
+  "budget.receivingDays": ["Приёмка Amazon", "дней (добавляется к сроку партии)"], "budget.batches": ["Партий в бюджете", "шт (урок 08: две)"],
+  "traffic.top2ShareMax": ["Доля топ-2 ключей, НЕ OK выше", "доля"], "traffic.relevantMin": ["Релевантных ключей, минимум", "шт"], "traffic.minSv": ["Значимый ключ — SV от", "запросов/мес"], "traffic.groupsMin": ["Групп ключей, минимум", "шт"],
+  "traffic.minCompetitors": ["Cerebro multi-ASIN — конкурентов в топе от", "шт (фраза релевантна)"], "traffic.clusterLimit": ["Авто-кластер — максимум фраз", "шт"],
+  "poe.searchConvLow": ["Конверсия поиска — «спрос не удовлетворён» ниже", "доля"], "poe.sponsoredHigh": ["Спонсорских товаров — «рекламная война» выше", "доля"], "poe.top20ProductsHigh": ["Топ-20 продуктов click share — концентрация выше", "доля"],
+  "challenger.activateTopBrand": ["Доминирующий бренд — доля от", "доля (включает критерии 3–8)"], "challenger.passCount": ["Минимум зелёных из 8", "шт"],
+  "challenger.loyaltyOk": ["3 — лояльность к бренду OK ниже", "доля"], "challenger.loyaltyFail": ["3 — НЕ OK выше", "доля"],
+  "challenger.leaderRatingSafe": ["4 — лидер неуязвим при рейтинге выше", "★"], "challenger.complaintMinPct": ["4 — системная жалоба от", "% упоминаний"],
+  "challenger.playersMin": ["5a — брендов с заметной долей, минимум", "шт"], "challenger.playerShareMin": ["5a — заметная доля бренда от", "доля"], "challenger.top5Ok": ["5b — топ-5 OK ниже", "доля"], "challenger.top5Fail": ["5b — НЕ OK выше", "доля"],
+  "reviewsMoat.breakable": ["Ров пробиваем, отзывов лидера меньше", "шт"], "reviewsMoat.medium": ["Средний барьер до", "шт (выше — непробиваем)"],
+  "reconciliation.noise": ["Расхождение источников — шум до", "доля"], "reconciliation.borderline": ["Погранично до", "доля (выше — конфликт)"],
+  "checklist.designTestMin": ["Тест дизайна (PickFu) — минимум голосов", "%"], "checklist.lifecycleMonthsMin": ["Жизненный цикл, минимум", "мес"], "checklist.listingsHigh": ["Листингов в выдаче — высокая конкуренция от", "шт"],
+};
 function renderThresholds() {
   const th = mergeThresholds(S.a.thresholds);
+  const def = DEFAULT_THRESHOLDS;
   const groups = Object.entries(th).filter(([, v]) => v && typeof v === "object");
-  $("#thr").innerHTML = groups.map(([g, obj]) => `<div class="card"><h4>${THR_NAMES[g] || g}</h4>${Object.entries(obj).map(([k, v]) => typeof v === "number" ? `<div class="field"><label>${k}</label><input type="number" step="any" data-thr="${g}.${k}" value="${v}"></div>` : Array.isArray(v) ? `<div class="field"><label>${k}</label><input data-thr="${g}.${k}" data-arr="1" value="${v.join(", ")}"></div>` : "").join("")}</div>`).join("");
+  $("#thr").innerHTML = groups.map(([g, obj]) => `<div class="card"><h4>${THR_NAMES[g] || g}</h4>${Object.entries(obj).map(([k, v]) => {
+    const [label, unit] = THR_LABELS[`${g}.${k}`] || [k, ""]; const d = def[g]?.[k]; const changed = JSON.stringify(d) !== JSON.stringify(v);
+    const hint = `<small class="muted">${esc(unit)}${changed ? ` · по умолчанию ${Array.isArray(d) ? d.join(", ") : d}` : ""}</small>`;
+    if (typeof v === "number") return `<div class="field"><label title="${esc(g + "." + k)}">${esc(label)}${changed ? ' <span class="chip warn">изменено</span>' : ""}</label><input type="number" step="any" data-thr="${g}.${k}" value="${v}">${hint}</div>`;
+    if (Array.isArray(v)) return `<div class="field"><label title="${esc(g + "." + k)}">${esc(label)}${changed ? ' <span class="chip warn">изменено</span>' : ""}</label><input data-thr="${g}.${k}" data-arr="1" value="${v.join(", ")}">${hint}</div>`;
+    return "";
+  }).join("")}</div>`).join("");
   $("#help-ver").textContent = METHODOLOGY_VERSION;
 }
 $("#thr").addEventListener("change", (e) => {
