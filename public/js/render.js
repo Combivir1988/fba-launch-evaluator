@@ -62,7 +62,8 @@
   function secHero(A, R, o) {
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;
     const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(m.fileName || "")}">${SRC_LABEL[k]} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
-    return `<div class="hero">
+    const snap = o.snapshot ? `<div class="notice info snapnote">Подготовил(а): <b>${esc(o.snapshot.preparedBy || "—")}</b> · снимок от ${fmtDate(o.snapshot.snapshotAt)} · только чтение${o.snapshot.mode === "no_economics" ? " · закупочная экономика скрыта автором" : ""}</div>` : "";
+    return `${snap}<div class="hero">
       <div><h1>${esc(A.niche || "Без названия")}</h1>
         <div class="meta">Ключ: <b>${esc(A.coreKeyword || "—")}</b> · ${esc(A.marketplace || "US")} · расчёт ${fmtDate(R.computedAt)} · методология ${esc(R.methodologyVersion || "")}</div>
         <div class="chips" style="margin-top:.4rem">${srcs || '<span class="chip na">файлы не загружены</span>'}</div>
@@ -409,6 +410,7 @@
   function fill(container, id, A, R, opts) {
     const def = SECTIONS.find((s) => s[0] === id); if (!def) return;
     const el = container.querySelector(`#sec-${id}`); if (!el) return;
+    if ((opts.hidden || []).includes(id)) { el.classList.add("hidden"); el.innerHTML = ""; return; } // секция скрыта автором ссылки: данных для неё в снимке нет
     const html = def[1](A, R, opts);
     if (!html) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden"); el.innerHTML = html;

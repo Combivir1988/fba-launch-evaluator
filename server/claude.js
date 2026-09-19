@@ -38,6 +38,7 @@ export function configFromEnv(env = process.env) {
     adminLogin: env.ADMIN_LOGIN || "",
     adminPassword: env.ADMIN_PASSWORD || "",
     maxJobs: Number(env.MAX_JOBS) || 4,
+    publicRateLimit: Number(env.PUBLIC_RATE_LIMIT) || 60, // обращений к публичным ссылкам с одного IP за 10 минут
     loginRateLimit: Number(env.LOGIN_RATE_LIMIT) || 10, // попыток входа с одного IP за 10 минут
     port: Number(env.PORT) || 3000,
     rateLimitPerHour: Number(env.RATE_LIMIT_PER_HOUR) || 20,

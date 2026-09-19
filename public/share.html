@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Отчёт по нише · FBA Launch Evaluator</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="share-page">
+<header class="topbar">
+  <div class="brand">📦 FBA Launch Evaluator <span class="muted share-tag">отчёт · только чтение</span></div>
+  <nav></nav>
+  <button id="share-download" class="hidden" type="button">⬇ Скачать HTML</button>
+  <button id="theme-toggle" aria-label="Переключить тему" type="button">◐</button>
+</header>
+<main class="layout" style="grid-template-columns:1fr">
+  <section class="main" id="dashboard" aria-live="polite"><div class="panel section empty" id="share-loading">Загружаю отчёт…</div></section>
+  <section class="panel section hidden" id="share-unavailable">
+    <h1>Ссылка недействительна</h1>
+    <p>Её не существует, она отозвана или истёк срок действия. Попросите отправителя прислать новую ссылку.</p>
+  </section>
+</main>
+<div id="toast" class="toast hidden" role="status"></div>
+<script src="/vendor/chart.umd.js"></script>
+<script src="/js/render.js"></script>
+<script type="module" src="/js/share.js"></script>
+</body>
+</html>

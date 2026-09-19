@@ -1,5 +1,5 @@
 // Регресс: результат патентного скана не теряется после «История → Открыть» того же анализа и после F5
-// (анализ после перезагрузки всегда fromHistory=true, автосохранение выключено — результат задачи должен сохраняться явно).
+// (spec 002: анализ и результаты задач хранятся на сервере; проба проверяет, что после повторного открытия и F5 результат на месте).
 import { chromium } from "playwright";
 import { startServer, loginContext } from "./probe-helper.mjs";
 import path from "node:path";
@@ -14,8 +14,8 @@ await page.goto("http://127.0.0.1:3996/", { waitUntil: "networkidle" });
 await page.fill("#f-core", "urinal screen deodorizer");
 await page.setInputFiles("#file-input", [path.join(root, "tests/fixtures/POE_urinal_screen_deodorizer_2026-09-15.json")]);
 await page.waitForFunction(() => document.querySelectorAll(".filecard").length >= 1);
-await page.waitForTimeout(2000); // autosave
-// 1) перезагрузка → анализ открыт из истории (fromHistory=true)
+await page.waitForFunction(() => document.querySelector("#save-state")?.textContent.includes("сохранено в общую"), null, { timeout: 20000 }); // автосохранение на сервер; иначе браузер спросит про несохранённые изменения
+// 1) перезагрузка → анализ открыт из общей истории
 await page.reload({ waitUntil: "networkidle" });
 console.log("after reload core:", await page.inputValue("#f-core"), "| chip:", await chip());
 await page.click('details:has(#f-pfeature) summary').catch(() => {});

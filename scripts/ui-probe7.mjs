@@ -1,13 +1,14 @@
 // spec 002 — сквозная проба в Chromium. Часть 1 (US1): вход → смена временного пароля → создание пользователя →
 // второй контекст под новым пользователем → раздел «Пользователи» недоступен → отключение закрывает доступ.
 // Часть 2 (US2): общая история — автор, фильтр и поиск, конфликт версий → копия, F5.
+// Часть 3 (US3): «Поделиться» — гость без входа, графики, 360 px, скачивание HTML, режим без экономики, обновление и отзыв ссылки.
 import { chromium } from "playwright";
 import { startServer, ADMIN } from "./probe-helper.mjs";
 
 const { srv, base } = await startServer(3990);
 const browser = await chromium.launch();
 const logs = [];
-const watch = (page, tag) => { page.on("console", (m) => { if (m.type() === "error" && !/401|403|409/.test(m.text())) logs.push(`${tag}: ${m.text()}`); }); page.on("pageerror", (e) => logs.push(`${tag} pageerror: ${e.message}`)); };
+const watch = (page, tag) => { page.on("console", (m) => { if (m.type() === "error" && !/401|403|404|409/.test(m.text())) logs.push(`${tag}: ${m.text()}`); }); page.on("pageerror", (e) => logs.push(`${tag} pageerror: ${e.message}`)); };
 const ok = (cond, label) => { console.log((cond ? "✔ " : "✖ ") + label); if (!cond) process.exitCode = 1; };
 
 try {
@@ -108,6 +109,76 @@ try {
   await B.click('.topbar nav button[data-tab="history"]');
   await B.waitForFunction(() => document.querySelectorAll("#histlist .histrow").length === 2);
   ok(await B.$$eval("#histlist .histrow", (rows) => rows.map((r) => Boolean(r.querySelector("[data-del]")))).then((a) => a.filter(Boolean).length === 2), "Анна — автор обоих анализов, кнопка «Удалить» есть у обоих");
+
+  // ================= Часть 3 (US3): «Поделиться» =================
+  const fs = await import("node:fs");
+  await setField(B, "#f-cogs", "4.37"); await setField(B, "#f-budget", "18750"); await saved(B);
+  await B.click("#btn-share"); await B.waitForSelector("#share-dlg[open]");
+  await B.click("#share-create");
+  await B.waitForFunction(() => document.querySelectorAll("#share-list .shareitem").length === 1, null, { timeout: 20000 });
+  const urlFull = (await B.textContent("#share-list .shareitem .url")).trim();
+  ok(/\/s\/[A-Za-z0-9_-]{43}$/.test(urlFull), "ссылка создана, адрес неугадываемый (43 символа)");
+  ok((await B.textContent("#share-msg")).includes("создана"), "сообщение: " + (await B.textContent("#share-msg")));
+
+  // получатель без учётной записи: отдельный контекст без cookie
+  const ctxC = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true }); const C = await ctxC.newPage(); watch(C, "guest");
+  await C.goto(urlFull, { waitUntil: "networkidle" });
+  await C.waitForSelector("#sec-hero .snapnote", { timeout: 15000 });
+  const note = (await C.textContent("#sec-hero .snapnote")).trim();
+  ok(note.includes("Анна Коваль") && note.includes("только чтение"), "гость видит дашборд с пометкой: " + note);
+  ok(await C.$eval("#dashboard", (d) => d.querySelectorAll("button, input, select, textarea, [data-action]").length === 0), "в дашборде гостя нет полей ввода, ползунков и кнопок запуска");
+  ok(await C.evaluate(() => !document.querySelector('.topbar nav button, [data-tab="history"], #btn-ai, #set-users')), "у гостя нет вкладок истории, настроек и запуска AI");
+  const painted = await C.$$eval("#dashboard canvas", (cs) => cs.map((c) => { try { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; } catch { return -1; } }));
+  ok(painted.filter((n) => n > 500).length >= 6, "графики у гостя отрисованы: " + painted.filter((n) => n > 500).length + " из " + painted.length + " (Gate 2 пуст без CPC — в анализе только POE)");
+  ok((await C.textContent("#sec-economics")).length > 50 && (await C.textContent("#sec-economics")).includes("4,37"), "полный режим: экономика видна (COGS $4,37)");
+  ok((await ctxC.request.get(base + "/api/analyses")).status() === 401 && (await ctxC.request.get(base + "/api/auth/me")).status() === 401, "у гостя нет доступа к истории и учётным записям");
+  const [dl] = await Promise.all([C.waitForEvent("download"), C.click("#share-download")]);
+  const htmlFull = fs.readFileSync(await dl.path(), "utf8");
+  ok(htmlFull.length > 200000 && htmlFull.includes("FBARender") && htmlFull.includes("Анна Коваль"), "«Скачать HTML» у гостя: автономный файл " + Math.round(htmlFull.length / 1024) + " KB с пометкой автора");
+  await C.setViewportSize({ width: 360, height: 760 }); await C.reload({ waitUntil: "networkidle" }); await C.waitForSelector("#sec-hero .snapnote");
+  const overflow = await C.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+  ok(overflow <= 2, "ширина 360 px: нет горизонтальной прокрутки страницы (переполнение " + overflow + " px)");
+  await C.setViewportSize({ width: 1280, height: 900 });
+
+  // снимок не меняется при правках, «Обновить ссылку» сохраняет адрес
+  await B.click("#share-close"); await setField(B, "#f-price", "31.11"); await saved(B);
+  await C.reload({ waitUntil: "networkidle" }); await C.waitForSelector("#sec-hero .snapnote");
+  ok(!(await C.textContent("#dashboard")).includes("31,11"), "правка автора не попала в ссылку — гость видит прежний снимок");
+  await B.click("#btn-share"); await B.waitForSelector("#share-list .shareitem .chip.warn");
+  ok(true, "в списке ссылок пометка «анализ изменён после снимка»");
+  B.once("dialog", (d) => d.accept()); await B.click('#share-list [data-sact="refresh"]');
+  await B.waitForFunction(() => !document.querySelector("#share-list .shareitem .chip.warn"), null, { timeout: 15000 });
+  ok((await B.textContent("#share-list .shareitem .url")).trim() === urlFull, "после «Обновить ссылку» адрес прежний");
+  await C.reload({ waitUntil: "networkidle" }); await C.waitForSelector("#sec-hero .snapnote");
+  ok((await C.textContent("#dashboard")).includes("31,11"), "после обновления гость видит новую версию (цена $31,11)");
+  ok(/просмотров: 1/.test(await B.textContent("#share-list .shareitem")), "счётчик просмотров: один гость = 1 (повторы за 30 мин и свои не считаются)");
+
+  // режим без закупочной экономики
+  await B.selectOption("#share-mode", "no_economics"); await B.selectOption("#share-expiry", "7"); await B.click("#share-create");
+  await B.waitForFunction(() => document.querySelectorAll("#share-list .shareitem").length === 2, null, { timeout: 20000 });
+  const urlRed = (await B.$$eval("#share-list .shareitem", (els) => els.map((e) => ({ url: e.querySelector(".url")?.textContent.trim(), text: e.textContent })))).find((x) => x.text.includes("без закупочной экономики")).url;
+  await C.goto(urlRed, { waitUntil: "networkidle" }); await C.waitForSelector("#sec-hero .snapnote");
+  ok((await C.textContent("#sec-hero .snapnote")).includes("закупочная экономика скрыта автором"), "режим без экономики: пометка в шапке");
+  ok(await C.$eval("#sec-economics", (e) => e.classList.contains("hidden")) && await C.$eval("#sec-budget", (e) => e.classList.contains("hidden")), "секции «Экономика» и «Бюджет» скрыты");
+  const apiBody = await (await ctxC.request.get(base + "/api/public/shares/" + urlRed.split("/s/")[1])).text();
+  const { aggregates: _agg, ...restSnap } = JSON.parse(apiBody).snapshot.analysis; const restText = JSON.stringify(restSnap);
+  const pageText = await C.textContent("#dashboard");
+  const [dl2] = await Promise.all([C.waitForEvent("download"), C.click("#share-download")]); const htmlRed = fs.readFileSync(await dl2.path(), "utf8");
+  const dataRed = htmlRed.slice(htmlRed.indexOf('id="fba-data"')); const { aggregates: _a2, ...restHtml } = JSON.parse(dataRed.slice(dataRed.indexOf(">") + 1, dataRed.indexOf("</script>"))); const htmlText = JSON.stringify(restHtml);
+  for (const needle of ["4.37", "4,37", "18750", "18 750"]) ok(!restText.includes(needle) && !pageText.includes(needle) && !htmlText.includes(needle), "значение «" + needle + "» отсутствует в ответе сервера, на странице и в скачанном HTML");
+  ok(!/"cogs"|"budget"\s*:|"economics"\s*:\s*\{"pending"/.test(restText), "в данных снимка нет полей закупочной экономики");
+
+  // отзыв: единый экран для отозванной и несуществующей ссылки
+  B.once("dialog", (d) => d.accept()); await B.locator("#share-list .shareitem", { hasText: "без закупочной экономики" }).locator('[data-sact="revoke"]').click();
+  await B.waitForFunction(() => [...document.querySelectorAll("#share-list .shareitem")].some((e) => e.textContent.includes("отозвана")), null, { timeout: 15000 });
+  await C.reload({ waitUntil: "load" }); await C.waitForSelector("#share-unavailable:not(.hidden)", { timeout: 15000 });
+  const gone = (await C.textContent("#share-unavailable")).replace(/\s+/g, " ").trim();
+  await C.goto(base + "/s/" + "Z".repeat(43), { waitUntil: "load" }); await C.waitForSelector("#share-unavailable:not(.hidden)", { timeout: 15000 });
+  ok(gone === (await C.textContent("#share-unavailable")).replace(/\s+/g, " ").trim() && gone.includes("недействительна"), "отозванная и несуществующая ссылки выглядят одинаково: «" + gone.slice(0, 60) + "…»");
+  await B.click("#share-close"); await B.click('.topbar nav button[data-tab="history"]');
+  await B.waitForFunction(() => [...document.querySelectorAll("#histlist .histrow")].some((r) => r.querySelector(".chip.ok")?.textContent === "ссылка"));
+  ok(true, "в истории у анализа значок «ссылка»");
+  await ctxC.close();
 
   // --- отключение ---
   await A.click('.topbar nav button[data-tab="settings"]');

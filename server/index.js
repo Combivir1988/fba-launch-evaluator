@@ -8,6 +8,7 @@ import { migrate } from "./db/migrate.js";
 import { createSessions, csrfGuard } from "./sessions.js";
 import { createUsers, UserError } from "./users.js";
 import { createAnalyses } from "./analyses.js";
+import { createShares } from "./shares.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
 import { startJob, getJob, subscribe, cancelJob, runningCount } from "./jobs.js";
@@ -25,8 +26,9 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const sessions = deps.sessions || createSessions(db, cfg);
   const users = deps.users || createUsers(db, sessions, deps.usersOpts || {});
   const analyses = deps.analyses || createAnalyses(db);
+  const shares = deps.shares || createShares(db, analyses, { publicUrl: cfg.publicUrl, ...(deps.sharesOpts || {}) });
   const app = express();
-  app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses;
+  app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses; app.locals.shares = shares;
   app.use("/api", (req, res, next) => { if (inflight.draining && req.path !== "/health") { res.set("Retry-After", "5"); return res.status(503).json({ error: "draining", message: "Сервер перезапускается — повторите через несколько секунд" }); } next(); });
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
@@ -117,6 +119,31 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
     log("info", "analysis deleted", { id: req.params.id, by: req.user.login });
     res.status(204).end();
   });
+
+  // ---------- публичные ссылки: управление (нужен вход) ----------
+  app.get("/api/shares", authed, async (req, res) => res.json(await shares.listAll(req.user)));
+  app.get("/api/analyses/:id/shares", authed, async (req, res) => res.json(await shares.listForAnalysis(req.params.id)));
+  app.post("/api/analyses/:id/shares", authed, jsonSmall, async (req, res) => {
+    const b = req.body || {};
+    const sh = await shares.create({ analysisId: req.params.id, mode: b.mode ?? "full", expiresInDays: b.expiresInDays === undefined ? 30 : b.expiresInDays }, req.user);
+    log("info", "share created", { share: sh.id, analysis: req.params.id, mode: sh.mode, expiresAt: sh.expiresAt, by: req.user.login }); // токен ссылки в логи не пишем
+    res.status(201).json({ share: sh });
+  });
+  app.post("/api/shares/:shareId/refresh", authed, async (req, res) => { const sh = await shares.refresh(req.params.shareId, req.user); log("info", "share refreshed", { share: sh.id, by: req.user.login }); res.json({ share: sh }); });
+  app.delete("/api/shares/:shareId", authed, async (req, res) => { await shares.revoke(req.params.shareId, req.user); log("info", "share revoked", { share: req.params.shareId, by: req.user.login }); res.status(204).end(); });
+
+  // ---------- публичная часть: без входа (research R7) ----------
+  // Несуществующая, отозванная, истёкшая ссылка и ссылка удалённого анализа дают один и тот же ответ.
+  const publicLimiter = rateLimiter({ limit: cfg.publicRateLimit || 60, windowMs: 10 * 60 * 1000 });
+  const publicHeaders = (res) => res.set({ "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
+  app.get("/api/public/shares/:token", publicLimiter, async (req, res) => {
+    publicHeaders(res);
+    const snap = await shares.getPublic(req.params.token);
+    if (!snap) return res.status(404).json({ error: "link_unavailable", message: "Ссылка недействительна: её не существует, она отозвана или истёк срок действия" });
+    shares.countView(req.params.token, req.ip, Boolean(req.user)).catch(() => {});
+    res.json({ snapshot: snap });
+  });
+  app.get("/s/:token", publicLimiter, (req, res) => { publicHeaders(res); res.sendFile(join(root, "public", "share.html")); }); // одна и та же оболочка для любого токена
 
   const limiter = rateLimiter({ limit: cfg.rateLimitPerHour, windowMs: 60 * 60 * 1000, key: (req) => req.user?.id || req.ip });
   const sseHeaders = (res) => { res.status(200).set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" }); res.flushHeaders?.(); };

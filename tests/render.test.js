@@ -78,3 +78,33 @@ test("render: AI-блок с скорректированным вердикто
   assert.match(el.querySelector("#sec-hero").textContent, /Доработка/);
   assert.ok(el.querySelector(".rec.high"));
 });
+
+// ---------- spec 002, US3: снимок для публичной ссылки ----------
+import { buildSnapshot } from "../shared/share-snapshot.js";
+
+test("снимок публичной ссылки (полный): все секции, шапка «подготовил», без элементов управления", () => {
+  const { w } = makeWindow(); const a = fullAnalysis();
+  const snap = buildSnapshot(a, { mode: "full", preparedBy: "Анна Коваль", snapshotAt: "2026-09-19T12:00:00.000Z" });
+  const el = w.document.getElementById("d");
+  w.FBARender.render(el, snap.analysis, { static: true, hidden: snap.hidden, snapshot: { preparedBy: snap.preparedBy, snapshotAt: snap.snapshotAt, mode: snap.mode } });
+  assert.match(el.querySelector("#sec-hero").textContent, /Подготовил\(а\): Анна Коваль/); assert.match(el.querySelector("#sec-hero").textContent, /только чтение/);
+  assert.equal(el.querySelectorAll("button, input, select, textarea, [data-action]").length, 0, "на публичной странице нет элементов управления");
+  for (const id of ["economics", "budget", "traffic", "competitors", "scorecard", "challenger", "patents", "ai", "conclusion"]) assert.equal(el.querySelector("#sec-" + id).classList.contains("hidden"), false, id);
+  assert.match(el.querySelector("#sec-ai").textContent, /AI получает только агрегаты|AI-вердикт/);
+  assert.match(el.querySelector("#sec-patents").textContent, /не проверено/);
+});
+
+test("снимок без закупочной экономики: секции экономики и бюджета скрыты, рендер не падает, чисел нет в HTML", () => {
+  const { w } = makeWindow(); const a = fullAnalysis();
+  const snap = buildSnapshot(a, { mode: "no_economics", preparedBy: "Анна" });
+  const el = w.document.getElementById("d");
+  assert.doesNotThrow(() => w.FBARender.render(el, snap.analysis, { static: true, hidden: snap.hidden, snapshot: { preparedBy: snap.preparedBy, snapshotAt: snap.snapshotAt, mode: snap.mode } }));
+  for (const id of ["economics", "budget"]) { const s = el.querySelector("#sec-" + id); assert.ok(s.classList.contains("hidden"), id); assert.equal(s.innerHTML, ""); }
+  for (const id of ["hero", "overview", "criterion1", "traffic", "competitors", "challenger", "scorecard", "conclusion"]) assert.ok(el.querySelector("#sec-" + id).textContent.length > 20, id);
+  assert.match(el.querySelector("#sec-hero").textContent, /закупочная экономика скрыта автором/);
+  assert.match(el.querySelector("#sec-challenger").textContent, /экономика скрыта автором/);
+  // Ищем только в секциях, построенных из расчётов: в рыночных секциях (POE/Xray) встречаются свои проценты, напр. «+41 %» роста запусков.
+  const html = ["hero", "criterion1", "challenger", "scorecard", "conclusion", "ai", "checklist", "reconciliation"].map((id) => el.querySelector("#sec-" + id).innerHTML).join(" | "); const e = a.results.economics;
+  for (const needle of ["12.00", "20000", "20 000", e.gate1.net0.toFixed(2), String(Math.round(e.gate1.margin0 * 100)) + " %"]) assert.equal(html.includes(needle), false, `в HTML осталось «${needle}»`);
+  assert.equal(el.querySelectorAll("button, input, select, [data-action]").length, 0);
+});

@@ -416,7 +416,7 @@ async function renderHistory() {
     return `<div class="histrow"><div><div class="t">${esc(h.niche || "Без названия")} ${h.verdict && V[h.verdict] ? `<span class="status ${h.verdict}">${V[h.verdict]}</span>` : ""}${h.aiDone ? ' <span class="chip">AI</span>' : ""}${h.patentsDone ? ' <span class="chip">патенты</span>' : ""}${h.shares ? ` <span class="chip ok" title="Активных публичных ссылок: ${h.shares}">ссылка</span>` : ""}${h.id === S.a.id ? ' <span class="chip">открыт</span>' : ""}</div>
     <div class="m who">${who} · ${esc(t(h.updatedAt))}</div>
     <div class="m">ключ: ${esc(h.coreKeyword || "—")} · Критерий 1: ${h.c1 ?? "—"}/8 · scorecard ${h.score != null ? Math.round(h.score) + " %" : "—"} · ${h.sources.join(", ") || "без файлов"}</div></div>
-    <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-json="${h.id}">JSON</button>${canDelete ? `<button data-del="${h.id}" class="danger">Удалить</button>` : ""}</div></div>`;
+    <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-share="${h.id}" data-niche="${esc(h.niche || "")}">🔗 Поделиться</button><button data-json="${h.id}">JSON</button>${canDelete ? `<button data-del="${h.id}" class="danger">Удалить</button>` : ""}</div></div>`;
   }).join("") || `<div class="empty">${$("#hist-search").value || $("#hist-mine").value === "1" ? "Ничего не найдено." : "История пуста. Анализы сохраняются сюда автоматически и видны всей команде."}</div>`;
   if (data.total > data.items.length) box.insertAdjacentHTML("beforeend", `<div class="muted" style="padding:.5rem">Показаны последние ${data.items.length} из ${data.total} — уточните поиск.</div>`);
 }
@@ -427,7 +427,8 @@ $("#histlist").addEventListener("click", async (e) => {
       if (b.dataset.open === S.a.id) return showTab("analysis");
       if (!(await leaveCurrent("Текущий анализ не сохранён. Открыть другой и потерять несохранённые изменения?"))) return;
       const g = await history.get(b.dataset.open); loadAnalysis(g.doc, g.meta);
-    } else if (b.dataset.json) { exportAnalysisJson((await history.get(b.dataset.json)).doc); }
+    } else if (b.dataset.share) { openShareDialog(b.dataset.share, b.dataset.niche); }
+    else if (b.dataset.json) { exportAnalysisJson((await history.get(b.dataset.json)).doc); }
     else if (b.dataset.del) {
       if (!confirm("Удалить анализ из общей истории? Он пропадёт у всей команды, публичные ссылки на него перестанут работать.")) return;
       await history.delete(b.dataset.del);
@@ -506,6 +507,71 @@ $("#user-new").addEventListener("submit", async (e) => {
 });
 $("#set-theme").addEventListener("click", () => $("#theme-toggle").click());
 $("#set-side").addEventListener("click", () => { const c = $("#tab-analysis").classList.contains("side-collapsed"); setSide(!c); showTab("analysis"); });
+
+// ---------- «Поделиться»: публичные ссылки на снимок дашборда ----------
+const shareUrl = (sh) => location.origin + sh.path;
+const SHARE_STATE = { active: ["ok", "активна"], expired: ["na", "срок истёк"], revoked: ["na", "отозвана"] };
+function shareItemHtml(sh, { withNiche = false } = {}) {
+  const t = (d) => (d ? new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "—");
+  const st = SHARE_STATE[sh.state] || SHARE_STATE.revoked; const active = sh.state === "active";
+  return `<div class="shareitem ${active ? "" : "off"}" data-share-id="${sh.id}">
+    <div>${withNiche ? `<b>${esc(sh.niche || "Без названия")}</b> · ` : ""}<span class="chip ${st[0]}">${st[1]}</span> <span class="chip">${sh.mode === "no_economics" ? "без закупочной экономики" : "весь дашборд"}</span>${active && sh.stale ? ' <span class="chip warn" title="Анализ менялся после создания снимка — получатель видит прежнюю версию">анализ изменён после снимка</span>' : ""}</div>
+    ${active ? `<div class="url">${esc(shareUrl(sh))}</div>` : ""}
+    <div class="muted">создал(а) ${esc(sh.createdBy.name)} ${esc(t(sh.createdAt))} · снимок от ${esc(t(sh.snapshotAt))} · ${sh.expiresAt ? "действует до " + esc(t(sh.expiresAt)) : "без срока"} · просмотров: <b>${sh.views}</b>${sh.lastViewedAt ? ", последний " + esc(t(sh.lastViewedAt)) : ""}</div>
+    ${active ? `<div class="acts"><button data-sact="copy">Копировать</button><button data-sact="open">Открыть</button><button data-sact="refresh" class="${sh.stale ? "primary" : ""}" title="Заменить снимок текущим состоянием анализа, адрес останется прежним">Обновить ссылку</button><button data-sact="revoke" class="danger">Отозвать</button></div>` : ""}</div>`;
+}
+const shareDlg = { analysisId: null, items: [] };
+async function loadShareList() {
+  const box = $("#share-list");
+  try { shareDlg.items = await api("GET", `/api/analyses/${encodeURIComponent(shareDlg.analysisId)}/shares`); box.innerHTML = shareDlg.items.map((sh) => shareItemHtml(sh)).join("") || '<div class="muted">Ссылок пока нет.</div>'; }
+  catch (e) { box.innerHTML = `<div class="muted">Не удалось загрузить ссылки: ${esc(e.message)}</div>`; }
+}
+async function openShareDialog(analysisId, niche) {
+  if (analysisId === S.a.id && hasContent() && !(await saveNow())) return toast("Сначала сохраните анализ — ссылка строится из сохранённой версии", 6000);
+  shareDlg.analysisId = analysisId; $("#share-niche").textContent = niche ? `· ${niche}` : ""; $("#share-msg").textContent = ""; $("#share-list").innerHTML = '<div class="muted">Загружаю…</div>';
+  const d = $("#share-dlg"); if (!d.open) d.showModal();
+  loadShareList();
+}
+$("#btn-share").addEventListener("click", async () => {
+  if (!hasContent()) return toast("Нечем делиться — загрузите файлы или заполните данные");
+  recompute(); if (!(await saveNow())) return toast("Анализ не сохранён — ссылка строится из сохранённой версии", 6000);
+  openShareDialog(S.a.id, S.a.niche);
+});
+$("#share-close").addEventListener("click", () => $("#share-dlg").close());
+$("#share-form").addEventListener("submit", async (e) => {
+  e.preventDefault(); const btn = $("#share-create"), msg = $("#share-msg"); btn.disabled = true; msg.textContent = "создаю…";
+  try {
+    const exp = $("#share-expiry").value;
+    const { share } = await api("POST", `/api/analyses/${encodeURIComponent(shareDlg.analysisId)}/shares`, { mode: $("#share-mode").value, expiresInDays: exp === "null" ? null : Number(exp) });
+    let copied = true; try { await navigator.clipboard.writeText(shareUrl(share)); } catch { copied = false; }
+    msg.textContent = copied ? "Ссылка создана и скопирована в буфер обмена." : "Ссылка создана — скопируйте её из списка ниже.";
+    await loadShareList(); if (!$("#tab-history").classList.contains("hidden")) renderHistory();
+  } catch (err) { msg.textContent = err.message; }
+  finally { btn.disabled = false; }
+});
+async function shareAction(e, reload) {
+  const b = e.target.closest("[data-sact]"); if (!b) return;
+  const id = b.closest("[data-share-id]").dataset.shareId; const sh = [...shareDlg.items, ...(shareAction.all || [])].find((x) => x.id === id); if (!sh) return;
+  try {
+    if (b.dataset.sact === "copy") return copyText(shareUrl(sh));
+    if (b.dataset.sact === "open") return void window.open(shareUrl(sh), "_blank", "noopener");
+    if (b.dataset.sact === "refresh") {
+      if (sh.analysisId === S.a.id && !(await saveNow())) return toast("Анализ не сохранён — обновлять нечем", 6000);
+      if (!confirm("Заменить снимок текущим состоянием анализа? Получатели по этой же ссылке увидят новую версию.")) return;
+      await api("POST", `/api/shares/${id}/refresh`); toast("Снимок обновлён, адрес прежний");
+    }
+    if (b.dataset.sact === "revoke") { if (!confirm("Отозвать ссылку? Она сразу перестанет открываться у всех, кому вы её отправили.")) return; await api("DELETE", `/api/shares/${id}`); toast("Ссылка отозвана"); }
+    await reload(); if (!$("#tab-history").classList.contains("hidden")) renderHistory();
+  } catch (err) { toast(err.message, 7000); }
+}
+$("#share-list").addEventListener("click", (e) => shareAction(e, loadShareList));
+async function loadAllShares() {
+  const box = $("#set-shares-list");
+  try { shareAction.all = await api("GET", "/api/shares"); box.innerHTML = shareAction.all.map((sh) => shareItemHtml(sh, { withNiche: true })).join("") || '<div class="muted">Ссылок нет.</div>'; }
+  catch (e) { box.innerHTML = `<div class="muted">${esc(e.message)}</div>`; }
+}
+$("#set-shares-load").addEventListener("click", loadAllShares);
+$("#set-shares-list").addEventListener("click", (e) => shareAction(e, loadAllShares));
 
 // ---------- перенос локальной истории браузера в общую (одноразово, идемпотентно) ----------
 async function migrateLocalHistory(msgEl) {

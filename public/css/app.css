@@ -183,3 +183,22 @@ tr.leader td { font-weight: 600; }
 .dlg::backdrop { background: rgba(0, 0, 0, .45); }
 .dlg h3 { margin: 0 0 .5rem; }
 .histrow .who { font-size: .78rem; }
+
+/* spec 002: публичная страница отчёта и диалог «Поделиться» */
+.share-tag { font-size: .75rem; font-weight: 400; margin-left: .4rem; }
+.snapnote { margin-bottom: .6rem; }
+.share-page #share-unavailable { max-width: 640px; margin: 10vh auto; text-align: center; }
+.share-page #share-unavailable h1 { font-size: 1.3rem; }
+@media (max-width: 520px) { .share-page .share-tag { display: none; } .share-page .topbar { gap: .4rem; } }
+.sharelist { display: flex; flex-direction: column; gap: .5rem; margin-top: .6rem; }
+.shareitem { border: 1px solid var(--border, #8883); border-radius: 8px; padding: .5rem .6rem; font-size: .85rem; }
+.shareitem.off { opacity: .55; }
+.shareitem .url { font-family: ui-monospace, monospace; font-size: .78rem; word-break: break-all; }
+.shareitem .acts { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .35rem; } .shareitem .acts button { padding: .2rem .55rem; font-size: .8rem; }
+
+/* Узкие экраны (публичная ссылка открывается с телефона, от 360 px): колонка сетки должна сжиматься, а не расти под широкое содержимое. */
+.layout > * { min-width: 0; }
+.panel.section { min-width: 0; overflow-wrap: anywhere; }
+.hero > * { min-width: 0; flex: 1 1 260px; }
+.chartbox { min-width: 0; max-width: 100%; } .chartbox canvas { max-width: 100%; }
+@media (max-width: 520px) { .topbar { flex-wrap: wrap; row-gap: .3rem; } .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cards { grid-template-columns: 1fr; } }
