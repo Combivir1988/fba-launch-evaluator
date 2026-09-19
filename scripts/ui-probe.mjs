@@ -22,5 +22,5 @@ const info = await page.evaluate(() => {
 });
 console.log(JSON.stringify(info));
 console.log("console:", logs.slice(0, 15).join("\n") || "(чисто)");
-for (const id of ["sec-trend","sec-reviews","sec-traffic"]) { const el = page.locator("#"+id); console.log(id, "visible:", await el.isVisible()); if (await el.isVisible()) await el.screenshot({ path: "C:/Users/User/AppData/Local/Temp/claude/f--Claude-Code-Allegro/c3aa2767-d354-43da-bb93-da6326ff096b/scratchpad/"+id+".png" }); }
+for (const id of ["sec-trend","sec-reviews","sec-traffic"]) { const el = page.locator("#"+id); console.log(id, "visible:", await el.isVisible()); if (await el.isVisible()) await el.screenshot({ path: (process.env.PROBE_OUT || (await import("node:os")).tmpdir() + "/")+id+".png" }); }
 await browser.close(); srv.kill();

@@ -2,7 +2,7 @@
 import { chromium } from "playwright";
 import { startServer, loginContext } from "./probe-helper.mjs";
 import path from "node:path";
-const root = process.cwd(); const OUT = "C:/Users/User/AppData/Local/Temp/claude/f--Claude-Code-Allegro/c3aa2767-d354-43da-bb93-da6326ff096b/scratchpad/";
+const root = process.cwd(); const OUT = (process.env.PROBE_OUT || (await import("node:os")).tmpdir() + "/");
 const { srv, base } = await startServer(3997);
 const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
 const logs = []; page.on("console", (m) => { if (["error"].includes(m.type())) logs.push(m.text()); }); page.on("pageerror", (e) => logs.push("pageerror: " + e.message));
