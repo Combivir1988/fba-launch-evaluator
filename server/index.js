@@ -7,6 +7,7 @@ import { connect, isStorageError } from "./db/index.js";
 import { migrate } from "./db/migrate.js";
 import { createSessions, csrfGuard } from "./sessions.js";
 import { createUsers, UserError } from "./users.js";
+import { createAnalyses } from "./analyses.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
 import { startJob, getJob, subscribe, cancelJob, runningCount } from "./jobs.js";
@@ -23,8 +24,9 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   if (!db) throw new Error("createApp: нужна БД (deps.db)");
   const sessions = deps.sessions || createSessions(db, cfg);
   const users = deps.users || createUsers(db, sessions, deps.usersOpts || {});
+  const analyses = deps.analyses || createAnalyses(db);
   const app = express();
-  app.locals.sessions = sessions; app.locals.users = users;
+  app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses;
   app.use("/api", (req, res, next) => { if (inflight.draining && req.path !== "/health") { res.set("Retry-After", "5"); return res.status(503).json({ error: "draining", message: "Сервер перезапускается — повторите через несколько секунд" }); } next(); });
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
@@ -43,6 +45,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   // Лимиты тела — по роутам (contracts/api.md): 100 KB по умолчанию, 1 MB для AI-задач.
   const jsonSmall = express.json({ limit: "100kb" });
   const jsonMid = express.json({ limit: "1mb" });
+  const jsonBig = express.json({ limit: "12mb" }); // агрегаты отчётов и импорт целого анализа
   app.use("/api", sessions.attachUser, csrfGuard);
   const { requireUser, requireAdmin, requirePasswordChanged } = sessions;
   const authed = [requireUser, requirePasswordChanged];
@@ -89,6 +92,29 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   app.post("/api/users/:id/reset-password", admin, jsonSmall, async (req, res) => {
     await users.resetPassword(req.params.id, req.body?.password);
     log("info", "password reset", { id: req.params.id, by: req.user.login });
+    res.status(204).end();
+  });
+
+  // ---------- общая история анализов ----------
+  app.get("/api/analyses", authed, async (req, res) => res.json(await analyses.list({ userId: req.user.id, mine: req.query.mine === "1", q: req.query.q, limit: req.query.limit, offset: req.query.offset })));
+  app.post("/api/analyses/import", authed, jsonBig, async (req, res) => {
+    const r = await analyses.importDoc(req.body?.analysis, req.user);
+    if (r.imported) log("info", "analysis imported", { id: r.id, by: req.user.login });
+    res.status(r.imported ? 201 : 200).json(r);
+  });
+  app.get("/api/analyses/:id", authed, async (req, res) => res.json(await analyses.get(req.params.id)));
+  app.put("/api/analyses/:id", authed, jsonMid, async (req, res) => {
+    const b = req.body || {};
+    res.json(await analyses.saveCore({ id: req.params.id, baseVersion: b.baseVersion ?? null, core: b.core, force: b.force === true }, req.user));
+  });
+  app.put("/api/analyses/:id/aggregates", authed, jsonBig, async (req, res) => {
+    const b = req.body || {};
+    res.json(await analyses.saveAggregates({ id: req.params.id, baseVersion: b.baseVersion, aggregates: b.aggregates, force: b.force === true }, req.user));
+  });
+  app.post("/api/analyses/:id/copy", authed, jsonBig, async (req, res) => res.status(201).json(await analyses.copy({ core: req.body?.core, aggregates: req.body?.aggregates }, req.user)));
+  app.delete("/api/analyses/:id", authed, async (req, res) => {
+    await analyses.remove(req.params.id, req.user);
+    log("info", "analysis deleted", { id: req.params.id, by: req.user.login });
     res.status(204).end();
   });
 
@@ -143,7 +169,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   // Единая обработка ошибок: ошибки логики → их код; хранилище недоступно → 503; остальное → 500 без деталей.
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
     if (res.headersSent) return;
-    if (err instanceof UserError) { if (err.retryAfter) res.set("Retry-After", String(err.retryAfter)); return res.status(err.status).json({ error: err.code, message: err.message, ...(err.retryAfter ? { retryAfter: err.retryAfter } : {}) }); }
+    if (err instanceof UserError) { if (err.retryAfter) res.set("Retry-After", String(err.retryAfter)); return res.status(err.status).json({ error: err.code, message: err.message, ...(err.extra || {}) }); }
     if (err?.type === "entity.too.large") return res.status(413).json({ error: "too_large", message: "Слишком большой запрос" });
     if (err?.type === "entity.parse.failed" || err instanceof SyntaxError) return res.status(400).json({ error: "bad_json", message: "Некорректный JSON" });
     if (isStorageError(err)) { log("error", "storage unavailable", { code: err.code, message: err.message, path: req.path }); return res.status(503).json({ error: "storage_unavailable", message: "Хранилище недоступно — изменения не сохранены, повторите через несколько секунд" }); }

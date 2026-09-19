@@ -175,3 +175,11 @@ tr.leader td { font-weight: 600; }
 #users-table td { vertical-align: middle; } #users-table .acts { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
 #users-table .acts button { padding: .2rem .5rem; font-size: .8rem; }
 #users-table tr.off td { opacity: .55; }
+
+/* spec 002: общая история */
+.savebar { display: flex; flex-direction: column; gap: .15rem; font-size: .78rem; margin-top: .45rem; min-height: 1.1rem; }
+#save-state.bad { color: var(--fail); } #save-state.ok { color: var(--ok); }
+.dlg { border: 1px solid var(--border, #8884); border-radius: 12px; padding: 1.1rem 1.2rem; max-width: min(560px, 92vw); background: var(--panel, var(--bg)); color: inherit; }
+.dlg::backdrop { background: rgba(0, 0, 0, .45); }
+.dlg h3 { margin: 0 0 .5rem; }
+.histrow .who { font-size: .78rem; }

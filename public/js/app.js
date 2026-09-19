@@ -1,11 +1,11 @@
 // FBA Launch Evaluator — состояние приложения, привязка формы, пересчёт, история, AI, экспорт.
-import { newAnalysis, migrate } from "/shared/analysis.js";
+import { newAnalysis, migrate, splitDoc, coreSignature } from "/shared/analysis.js";
 import { compute } from "/shared/compute.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION } from "/shared/thresholds.js";
 import { suggestCluster, annotateKeywords } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
 import { detectAndParse } from "./files.js";
-import { history } from "./history.js";
+import { history, localHistory } from "./history.js";
 import { runAi, runPatentScan, pendingJob } from "./ai.js";
 import { api, goLogin } from "/js/api.js";
 import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./export.js";
@@ -13,7 +13,7 @@ import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./e
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const R = () => window.FBARender;
-const S = { a: newAnalysis(), user: null, fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: "", modelPatents: "" };
+const S = { a: newAnalysis(), user: null, baseVersion: null, meta: null, sig: "", aggDirty: false, conflict: null, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: "", modelPatents: "" };
 const modelAi = () => (S.models.includes(S.model) ? S.model : S.models[0] || "");
 const modelPatents = () => (S.models.includes(S.modelPatents) ? S.modelPatents : modelAi());
 const renderOpts = () => ({ static: false, models: S.models, selectedModel: modelAi(), selectedPatentModel: modelPatents(), aiRunning: S.aiBusy, patentsRunning: S.patBusy });
@@ -95,7 +95,6 @@ function syncForm() {
   const cpcEl = $("#f-cpc"); if (cpcEl) cpcEl.placeholder = eff.cpc != null && eff.cpcFromCerebro ? `авто: $${Number(eff.cpc).toFixed(2)} — ${eff.cpcSource || "Cerebro"}` : "нет Cerebro — введите CPC";
   const priceEl = $("#f-price"); if (priceEl) priceEl.placeholder = eff.priceFromMedian && eff.price != null ? `авто: $${Number(eff.price).toFixed(2)} — медиана проверенных (1b)` : "медиана 1b";
   renderFileList(); renderCluster(); renderBrandChips(); renderOverrides(); renderChallengerUser();
-  $("#btn-save").textContent = S.dirty && S.fromHistory ? "💾 Сохранить ●" : "💾 Сохранить";
 }
 function setOutput(el) {
   const out = el.parentElement.querySelector("output"); if (!out) return;
@@ -136,7 +135,7 @@ function applyInput(el) {
   if (k === "myBrand" || k === "patentFeature" || k === "canDifferentiate") { S.a.inputs[k] = el.value.trim(); return; }
   const scale = Number(el.dataset.scale || 1); const v = numOrNull(el.value); S.a.inputs[k] = v === null ? null : v / scale;
 }
-function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.staleSince = new Date().toISOString(); $("#btn-save").textContent = S.fromHistory ? "💾 Сохранить ●" : "💾 Сохранить"; }
+function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.staleSince = new Date().toISOString(); if (!S.conflict) setSaveState("dirty"); }
 
 // ---------- compute / render ----------
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
@@ -145,18 +144,82 @@ function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const 
 const scheduleFull = debounce(renderAll, 250);
 let rafId = 0; function scheduleEcon() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(renderEcon); }
 
-const autosave = debounce(async () => {
-  if (S.fromHistory) return; // сохранённые из истории перезаписываются только явно (иначе «молча»)
-  if (!hasContent()) return;
-  try { await history.put(S.a); localStorage.setItem("fba_last", S.a.id); updateHistCount(); } catch (e) { console.warn("autosave", e); }
-}, 1500);
-/** Результат дорогой серверной задачи (AI-вердикт, патентный скан) сохраняем сразу и всегда — иначе после F5 или повторного
- *  «Открыть» из истории он терялся: для анализа из истории автосохранение выключено (защита от молчаливой перезаписи правок). */
+// ---------- сохранение в общую историю (сервер) ----------
+// Лёгкая часть документа уходит при любом изменении (не чаще раза в 2 с и только если содержимое реально изменилось),
+// отчёты — только после загрузки/удаления файлов. Чужую правку ловит версия: сервер отвечает 409, мы показываем диалог.
+const SAVE_TEXT = { dirty: "● есть несохранённые изменения", saving: "сохраняю…", saved: "✓ сохранено в общую историю", conflict: "⚠ не сохранено: анализ изменён другим человеком", error: "⚠ не сохранено" };
+function setSaveState(state, extra = "") {
+  const el = $("#save-state"); if (!el) return;
+  el.textContent = state ? SAVE_TEXT[state] + (extra ? " — " + extra : "") : "";
+  el.className = state === "saved" ? "ok" : state === "conflict" || state === "error" ? "bad" : "muted";
+  if (state === "conflict") { el.style.cursor = "pointer"; el.title = "Показать варианты"; } else { el.style.cursor = ""; el.title = ""; }
+}
+function renderDocMeta() {
+  const m = S.meta; const el = $("#doc-meta"); if (!el) return;
+  const t = (d) => new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
+  el.textContent = m ? `автор: ${m.createdBy?.name || "—"} · изменил: ${m.updatedBy?.name || "—"}, ${t(m.updatedAt)}` : "";
+}
+let saveChain = Promise.resolve(true);
+/** Поставить сохранение в очередь (запросы к одному анализу идут строго по одному). → true, если на сервере актуальная версия. */
+function saveNow(opts = {}) { saveChain = saveChain.then(() => doSave(opts)).catch((e) => { console.warn("save", e); return false; }); return saveChain; }
+async function doSave({ force = false } = {}) {
+  if (!hasContent()) return true;
+  if (S.conflict && !force) return false;
+  const doc = S.a, id = doc.id;
+  const sig = coreSignature(splitDoc(doc).core);
+  const coreChanged = sig !== S.sig || S.baseVersion === null || force;
+  if (!coreChanged && !S.aggDirty) { S.dirty = false; return true; }
+  setSaveState("saving");
+  const sendAgg = S.aggDirty; S.aggDirty = false;
+  try {
+    let last = null;
+    if (coreChanged) { last = await history.saveCore(doc, S.baseVersion, { force }); if (S.a.id !== id) return true; S.baseVersion = last.version; S.sig = sig; }
+    if (sendAgg) { last = await history.saveAggregates(doc, S.baseVersion, { force }); if (S.a.id !== id) return true; S.baseVersion = last.version; }
+    S.conflict = null; S.dirty = coreSignature(splitDoc(S.a).core) !== S.sig || S.aggDirty;
+    if (last) S.meta = { ...(S.meta || { createdBy: { id: S.user.id, name: S.user.name }, createdAt: last.updatedAt }), version: last.version, updatedAt: last.updatedAt, updatedBy: { id: S.user.id, name: S.user.name } };
+    localStorage.setItem("fba_last", id); setSaveState(S.dirty ? "dirty" : "saved"); renderDocMeta(); updateHistCount();
+    if (S.dirty) autosave();
+    return true;
+  } catch (e) {
+    if (sendAgg) S.aggDirty = true;
+    if (S.a.id !== id) return false;
+    if (e.code === "conflict" || e.code === "exists") { S.conflict = e; setSaveState("conflict"); showConflict(e); return false; }
+    setSaveState("error", e.message); return false;
+  }
+}
+const autosave = debounce(() => saveNow(), 2000);
+/** Результат дорогой задачи (AI-вердикт, патентный скан) сохраняем сразу, не дожидаясь паузы автосохранения. */
 async function persistJobResult(label) {
   S.a.updatedAt = new Date().toISOString();
-  try { await history.put(S.a); localStorage.setItem("fba_last", S.a.id); S.dirty = false; S.fromHistory = true; $("#btn-save").textContent = "💾 Сохранить"; updateHistCount(); }
-  catch (e) { console.warn("persist", e); toast(`${label}: результат получен, но не сохранился в историю — нажмите «Сохранить»`, 7000); }
+  if (!(await saveNow())) toast(`${label}: результат получен, но не сохранён в общую историю — см. индикатор под кнопками`, 8000);
 }
+window.addEventListener("beforeunload", (e) => { if (S.dirty && hasContent()) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("storage-down", () => setSaveState("error", "хранилище недоступно, скачайте JSON на всякий случай"));
+
+// ---------- конфликт одновременного редактирования ----------
+function showConflict(e) {
+  const who = e.updatedBy?.name || "другой пользователь"; const when = e.updatedAt ? new Date(e.updatedAt).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "";
+  $("#conflict-text").textContent = e.code === "exists" ? "Анализ с таким идентификатором уже есть в общей истории (его сохранили с другого устройства)." : `«${S.a.niche || "Без названия"}» изменил(а) ${who}${when ? " в " + when : ""}, пока вы работали с ним.`;
+  const d = $("#conflict-dlg"); if (!d.open) d.showModal();
+}
+$("#save-state").addEventListener("click", () => { if (S.conflict) showConflict(S.conflict); });
+$("#conflict-later").addEventListener("click", () => $("#conflict-dlg").close());
+$("#conflict-copy").addEventListener("click", async () => {
+  try { recompute(); const r = await history.copy(S.a); const g = await history.get(r.id); $("#conflict-dlg").close(); S.conflict = null; loadAnalysis(g.doc, g.meta); toast("Ваши правки сохранены как копия — вы её автор"); }
+  catch (err) { toast("Не удалось сохранить копию: " + err.message, 7000); }
+});
+$("#conflict-reload").addEventListener("click", async () => {
+  if (!confirm("Открыть свежую версию? Ваши несохранённые правки в этой вкладке пропадут.")) return;
+  try { const g = await history.get(S.a.id); $("#conflict-dlg").close(); S.conflict = null; loadAnalysis(g.doc, g.meta); toast("Открыта свежая версия"); }
+  catch (err) { toast(err.message, 7000); }
+});
+$("#conflict-force").addEventListener("click", async () => {
+  if (!confirm("Перезаписать версию коллеги своими правками? Его изменения будут потеряны.")) return;
+  $("#conflict-dlg").close(); const c = S.conflict; S.conflict = null; S.aggDirty = S.aggDirty || Boolean(Object.keys(S.a.aggregates || {}).length && c?.code === "exists");
+  if (S.baseVersion === null) S.baseVersion = c?.version ?? 0;
+  if (await saveNow({ force: true })) toast("Сохранено поверх версии коллеги"); else toast("Не удалось сохранить", 6000);
+});
+
 const hasContent = () => Boolean(S.a.niche || Object.values(S.a.aggregates || {}).some(Boolean) || S.a.inputs.cogs !== null);
 
 // ---------- files ----------
@@ -172,7 +235,7 @@ async function handleFiles(list) {
       const brands = S.a.aggregates.xray ? [...new Set(S.a.aggregates.xray.asins.map((a) => a.brand))] : [];
       const r = await detectAndParse(f, { coreKeyword: S.a.coreKeyword, brands });
       if (r.kind === "import") { await importDoc(r.data); continue; }
-      S.a.aggregates[r.kind] = r.data; S.a.sources[r.kind] = r.meta;
+      S.a.aggregates[r.kind] = r.data; S.a.sources[r.kind] = r.meta; S.aggDirty = true;
       if (r.kind === "poe") { if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; }
       if (r.kind === "xray") reannotateCerebro();
       if (r.kind === "cerebro") { reannotateCerebro(); if (!S.a.inputs.clusterKeywords.length) autoCluster(); }
@@ -193,7 +256,7 @@ $("#kw-mincomp").addEventListener("change", (e) => { S.a.inputs.clusterMinCompet
 $("#kw-sort").addEventListener("change", renderCluster);
 $("#kw-auto").addEventListener("click", () => { autoCluster(); markDirty(); renderAll(); });
 $("#kw-none").addEventListener("click", () => { S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); });
-function removeSource(kind) { delete S.a.aggregates[kind]; S.a.sources[kind] = null; if (kind === "cerebro") S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); }
+function removeSource(kind) { delete S.a.aggregates[kind]; S.a.sources[kind] = null; S.aggDirty = true; if (kind === "cerebro") S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); }
 
 function renderFileList() {
   const el = $("#filelist"); const labels = { xray: "Xray", cerebro: "Cerebro", poe: "POE", sqp: "SQP" };
@@ -302,48 +365,80 @@ function resumePendingJobs() {
 // ---------- save / export / new ----------
 $("#btn-save").addEventListener("click", async () => {
   if (!hasContent()) return toast("Нечего сохранять");
-  recompute();
-  if (S.fromHistory && S.dirty) {
-    const overwrite = confirm("Перезаписать сохранённый анализ? «Отмена» — сохранить как новую версию.");
-    if (!overwrite) { S.a = { ...S.a, id: crypto.randomUUID(), createdAt: new Date().toISOString() }; }
-  }
-  await history.put(S.a); localStorage.setItem("fba_last", S.a.id); S.dirty = false; S.fromHistory = true; syncForm(); updateHistCount(); toast("Сохранено в историю");
+  recompute(); markDirty();
+  if (await saveNow()) toast("Сохранено в общую историю");
 });
 $("#btn-json").addEventListener("click", () => { recompute(); exportAnalysisJson(S.a); });
 $("#btn-html").addEventListener("click", async () => { recompute(); try { await exportStandaloneHtml(S.a); toast("HTML-дашборд скачан"); } catch (e) { toast("Ошибка экспорта: " + e.message); } });
-$("#btn-new").addEventListener("click", () => { if (S.dirty && !confirm("Начать новый анализ? Несохранённые изменения будут потеряны.")) return; loadAnalysis(newAnalysis(), false); });
+/** Перед уходом с текущего анализа: дописать изменения; если не вышло — спросить. */
+async function leaveCurrent(question) {
+  if (!hasContent()) return true;
+  if (await saveNow()) return true;
+  return confirm(question);
+}
+$("#btn-new").addEventListener("click", async () => { if (!(await leaveCurrent("Текущий анализ не сохранён. Начать новый и потерять несохранённые изменения?"))) return; loadAnalysis(newAnalysis(), null); });
 
-function loadAnalysis(doc, fromHistory) {
-  R().destroy(dash); S.a = migrate(doc); S.fromHistory = fromHistory; S.dirty = false;
+/** meta — сведения сервера ({version, createdBy, updatedBy, …}) или null для нового, ещё не сохранённого анализа. */
+function loadAnalysis(doc, meta = null) {
+  R().destroy(dash); S.a = migrate(doc); S.meta = meta; S.baseVersion = meta?.version ?? null; S.aggDirty = false; S.conflict = null; S.dirty = false;
   if (S.a.aggregates?.cerebro) reannotateCerebro();
   if (S.a.thresholds && Object.keys(S.a.thresholds).length) renderThresholds();
-  renderAll(); showTab("analysis"); localStorage.setItem("fba_last", S.a.id);
+  renderAll(); showTab("analysis");
+  // Подпись — после пересчёта: открытие анализа само по себе ничего не сохраняет и не меняет «кто изменил».
+  S.sig = meta ? coreSignature(splitDoc(S.a).core) : ""; S.dirty = false;
+  if (meta) localStorage.setItem("fba_last", S.a.id);
+  setSaveState(meta ? "saved" : ""); renderDocMeta();
   resumePendingJobs();
 }
 async function importDoc(obj) {
-  if (obj.type === "fba-launch-evaluator/analysis") { const d = migrate(obj.analysis); await history.put(d); toast(`Импортирован анализ «${d.niche}»`); loadAnalysis(d, true); }
-  else if (obj.type === "fba-launch-evaluator/history") { const docs = (obj.analyses || []).map(migrate); const r = await history.importMany(docs); toast(`Импорт: +${r.added} новых, ${r.updated} обновлено, ${r.skipped} пропущено`); updateHistCount(); renderHistory(); }
+  if (obj.type === "fba-launch-evaluator/analysis") {
+    const d = migrate(obj.analysis); const r = await history.importOne(d);
+    toast(r.imported ? `Импортирован анализ «${d.niche}» — вы его автор` : `«${d.niche}» уже есть в общей истории — открыта версия из истории`, 5000);
+    const g = await history.get(d.id); loadAnalysis(g.doc, g.meta);
+  } else if (obj.type === "fba-launch-evaluator/history") {
+    const docs = (obj.analyses || []).map(migrate);
+    const r = await history.importMany(docs, (i, n) => toast(`Импорт: ${i} из ${n}…`, 60000));
+    toast(`Импорт: +${r.added} новых, ${r.skipped} уже были${r.failed ? `, ${r.failed} не удалось` : ""}`, 6000); updateHistCount(); renderHistory();
+  } else throw new Error("Неизвестный формат файла");
 }
 
 // ---------- history tab ----------
-async function updateHistCount() { try { const l = await history.list(); $("#hist-count").textContent = l.length ? `(${l.length})` : ""; } catch {} }
+async function updateHistCount() { try { const n = await history.count(); $("#hist-count").textContent = n ? `(${n})` : ""; } catch {} }
 async function renderHistory() {
-  const q = ($("#hist-search").value || "").toLowerCase();
-  const list = (await history.list()).filter((h) => !q || (h.niche || "").toLowerCase().includes(q) || (h.coreKeyword || "").toLowerCase().includes(q));
-  const V = R().VLABEL;
-  $("#histlist").innerHTML = list.map((h) => `<div class="histrow"><div><div class="t">${esc(h.niche || "Без названия")} ${h.verdict ? `<span class="status ${h.verdict}">${V[h.verdict]}</span>` : ""}${h.aiDone ? ' <span class="chip">AI</span>' : ""}</div>
-    <div class="m">${new Date(h.updatedAt).toLocaleString("ru-RU")} · ключ: ${esc(h.coreKeyword || "—")} · Критерий 1: ${h.c1 ?? "—"}/8 · scorecard ${h.score != null ? Math.round(h.score) + " %" : "—"} · ${h.sources.join(", ") || "без файлов"}</div></div>
-    <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-json="${h.id}">JSON</button><button data-del="${h.id}" class="danger">Удалить</button></div></div>`).join("") || '<div class="empty">История пуста. Сохранённые анализы появятся здесь.</div>';
-  $$("[data-open]").forEach((b) => b.addEventListener("click", async () => {
-    if (b.dataset.open === S.a.id) { showTab("analysis"); if (S.dirty) toast("Показан текущий анализ с несохранёнными правками — нажмите «Сохранить», чтобы записать их"); return; }
-    if (S.dirty && !confirm("Открыть другой анализ? Несохранённые изменения текущего будут потеряны.")) return;
-    loadAnalysis(await history.get(b.dataset.open), true);
-  }));
-  $$("[data-json]").forEach((b) => b.addEventListener("click", async () => exportAnalysisJson(await history.get(b.dataset.json))));
-  $$("[data-del]").forEach((b) => b.addEventListener("click", async () => { if (confirm("Удалить анализ из истории?")) { await history.delete(b.dataset.del); if (S.a.id === b.dataset.del) S.fromHistory = false; renderHistory(); updateHistCount(); } }));
+  const box = $("#histlist");
+  let data;
+  try { data = await history.list({ mine: $("#hist-mine").value === "1", q: $("#hist-search").value.trim() }); }
+  catch (e) { box.innerHTML = `<div class="empty">Не удалось загрузить историю: ${esc(e.message)}</div>`; return; }
+  const V = R().VLABEL; const t = (d) => new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
+  box.innerHTML = data.items.map((h) => {
+    const canDelete = h.createdBy.id === S.user.id || S.user.role === "admin";
+    const who = h.updatedBy.id === h.createdBy.id ? `автор: <b>${esc(h.createdBy.name)}</b>` : `автор: <b>${esc(h.createdBy.name)}</b> · изменил: <b>${esc(h.updatedBy.name)}</b>`;
+    return `<div class="histrow"><div><div class="t">${esc(h.niche || "Без названия")} ${h.verdict && V[h.verdict] ? `<span class="status ${h.verdict}">${V[h.verdict]}</span>` : ""}${h.aiDone ? ' <span class="chip">AI</span>' : ""}${h.patentsDone ? ' <span class="chip">патенты</span>' : ""}${h.shares ? ` <span class="chip ok" title="Активных публичных ссылок: ${h.shares}">ссылка</span>` : ""}${h.id === S.a.id ? ' <span class="chip">открыт</span>' : ""}</div>
+    <div class="m who">${who} · ${esc(t(h.updatedAt))}</div>
+    <div class="m">ключ: ${esc(h.coreKeyword || "—")} · Критерий 1: ${h.c1 ?? "—"}/8 · scorecard ${h.score != null ? Math.round(h.score) + " %" : "—"} · ${h.sources.join(", ") || "без файлов"}</div></div>
+    <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-json="${h.id}">JSON</button>${canDelete ? `<button data-del="${h.id}" class="danger">Удалить</button>` : ""}</div></div>`;
+  }).join("") || `<div class="empty">${$("#hist-search").value || $("#hist-mine").value === "1" ? "Ничего не найдено." : "История пуста. Анализы сохраняются сюда автоматически и видны всей команде."}</div>`;
+  if (data.total > data.items.length) box.insertAdjacentHTML("beforeend", `<div class="muted" style="padding:.5rem">Показаны последние ${data.items.length} из ${data.total} — уточните поиск.</div>`);
 }
-$("#hist-search").addEventListener("input", debounce(renderHistory, 200));
-$("#hist-export").addEventListener("click", async () => exportHistoryJson(await history.getAllFull()));
+$("#histlist").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  try {
+    if (b.dataset.open) {
+      if (b.dataset.open === S.a.id) return showTab("analysis");
+      if (!(await leaveCurrent("Текущий анализ не сохранён. Открыть другой и потерять несохранённые изменения?"))) return;
+      const g = await history.get(b.dataset.open); loadAnalysis(g.doc, g.meta);
+    } else if (b.dataset.json) { exportAnalysisJson((await history.get(b.dataset.json)).doc); }
+    else if (b.dataset.del) {
+      if (!confirm("Удалить анализ из общей истории? Он пропадёт у всей команды, публичные ссылки на него перестанут работать.")) return;
+      await history.delete(b.dataset.del);
+      if (S.a.id === b.dataset.del) { localStorage.removeItem("fba_last"); loadAnalysis(newAnalysis(), null); showTab("history"); }
+      renderHistory(); updateHistCount();
+    }
+  } catch (err) { toast(err.message, 7000); }
+});
+$("#hist-mine").addEventListener("change", renderHistory);
+$("#hist-search").addEventListener("input", debounce(renderHistory, 300));
+$("#hist-export").addEventListener("click", async () => { try { const all = await history.getAllFull((i, n) => toast(`Готовлю экспорт: ${i} из ${n}…`, 60000)); exportHistoryJson(all); toast(`Экспортировано анализов: ${all.length}`); } catch (e) { toast("Экспорт: " + e.message, 7000); } });
 $("#hist-import").addEventListener("click", () => $("#hist-import-file").click());
 $("#hist-import-file").addEventListener("change", async (e) => { const f = e.target.files[0]; if (!f) return; try { await importDoc(JSON.parse(await f.text())); } catch (err) { toast("Импорт: " + err.message, 6000); } e.target.value = ""; });
 
@@ -412,6 +507,38 @@ $("#user-new").addEventListener("submit", async (e) => {
 $("#set-theme").addEventListener("click", () => $("#theme-toggle").click());
 $("#set-side").addEventListener("click", () => { const c = $("#tab-analysis").classList.contains("side-collapsed"); setSide(!c); showTab("analysis"); });
 
+// ---------- перенос локальной истории браузера в общую (одноразово, идемпотентно) ----------
+async function migrateLocalHistory(msgEl) {
+  const say = (t) => { if (msgEl) msgEl.textContent = t; };
+  const docs = (await localHistory.readAll()).filter((d) => d && d.id);
+  if (!docs.length) { say("В этом браузере локальной истории нет."); localStorage.setItem("fba_migrated", "1"); return null; }
+  const prepared = []; for (const d of docs) { try { prepared.push(migrate(d)); } catch (e) { console.warn("migrate", d.id, e); } }
+  const r = await history.importMany(prepared, (i, n) => say(`Переношу: ${i} из ${n}…`));
+  if (!r.failed) localStorage.setItem("fba_migrated", "1");
+  say(`Перенесено: +${r.added} новых, ${r.skipped} уже были в общей истории${r.failed ? `, ${r.failed} не удалось — повторите` : ""}.`);
+  updateHistCount(); if (!$("#tab-history").classList.contains("hidden")) renderHistory();
+  return r;
+}
+async function offerLocalMigration() {
+  if (localStorage.getItem("fba_migrated")) return;
+  const docs = await localHistory.readAll();
+  if (!docs.length) { localStorage.setItem("fba_migrated", "1"); return; }
+  const bar = $("#migrate-bar");
+  bar.innerHTML = `В этом браузере осталось анализов из прежней версии: <b>${docs.length}</b>. Перенести их в общую историю? Вы станете их автором, дубли не появятся. <button id="migrate-go" class="primary">Перенести</button> <button id="migrate-skip">Не сейчас</button> <span id="migrate-msg"></span>`;
+  bar.classList.remove("hidden");
+  toast(`В браузере есть локальная история (${docs.length}) — перенос во вкладке «История»`, 7000);
+  $("#migrate-skip").addEventListener("click", () => bar.classList.add("hidden"));
+  $("#migrate-go").addEventListener("click", async (e) => {
+    e.target.disabled = true; const r = await migrateLocalHistory($("#migrate-msg")); e.target.disabled = false;
+    if (r && !r.failed) { $("#migrate-go").remove(); $("#migrate-skip").textContent = "Закрыть"; await openLastIfEmpty(); }
+  });
+}
+async function openLastIfEmpty() {
+  if (hasContent()) return; const last = localStorage.getItem("fba_last"); if (!last) return;
+  try { const g = await history.get(last); loadAnalysis(g.doc, g.meta); showTab("history"); } catch {}
+}
+$("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
+
 // ---------- thresholds tab ----------
 const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет (урок 08)", traffic: "Трафик по ключам (урок 09) и Cerebro", poe: "POE / концентрация (урок 11)", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков" };
 // Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
@@ -474,6 +601,8 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
   try { await initUser(); } catch { return; } // без сеанса api() уже увёл на страницу входа
   updateHistCount();
   const last = localStorage.getItem("fba_last");
-  if (last) { try { const d = await history.get(last); if (d) { loadAnalysis(d, true); return; } } catch {} }
-  renderAll(); resumePendingJobs();
+  let opened = false;
+  if (last) { try { const g = await history.get(last); loadAnalysis(g.doc, g.meta); opened = true; } catch (e) { if (e.status === 404 && localStorage.getItem("fba_migrated")) localStorage.removeItem("fba_last"); } } // до переноса локальной истории анализ может быть ещё только в браузере
+  if (!opened) { renderAll(); resumePendingJobs(); }
+  offerLocalMigration().catch((e) => console.warn("migration offer", e));
 })();

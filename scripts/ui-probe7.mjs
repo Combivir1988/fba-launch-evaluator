@@ -1,12 +1,13 @@
 // spec 002 — сквозная проба в Chromium. Часть 1 (US1): вход → смена временного пароля → создание пользователя →
 // второй контекст под новым пользователем → раздел «Пользователи» недоступен → отключение закрывает доступ.
+// Часть 2 (US2): общая история — автор, фильтр и поиск, конфликт версий → копия, F5.
 import { chromium } from "playwright";
 import { startServer, ADMIN } from "./probe-helper.mjs";
 
 const { srv, base } = await startServer(3990);
 const browser = await chromium.launch();
 const logs = [];
-const watch = (page, tag) => { page.on("console", (m) => { if (m.type() === "error" && !/401|403/.test(m.text())) logs.push(`${tag}: ${m.text()}`); }); page.on("pageerror", (e) => logs.push(`${tag} pageerror: ${e.message}`)); };
+const watch = (page, tag) => { page.on("console", (m) => { if (m.type() === "error" && !/401|403|409/.test(m.text())) logs.push(`${tag}: ${m.text()}`); }); page.on("pageerror", (e) => logs.push(`${tag} pageerror: ${e.message}`)); };
 const ok = (cond, label) => { console.log((cond ? "✔ " : "✖ ") + label); if (!cond) process.exitCode = 1; };
 
 try {
@@ -60,7 +61,56 @@ try {
   await B.waitForFunction(() => /AI-вердикт|Вердикт AI|MOCK|mock/i.test(document.querySelector("#sec-ai")?.textContent || "") && !document.querySelector("#btn-ai")?.disabled, null, { timeout: 40000 });
   ok(true, "AI-задача (mock) выполняется под cookie-сеансом, без токена в URL");
 
+  // ================= Часть 2 (US2): общая история =================
+  const saved = (page) => page.waitForFunction(() => document.querySelector("#save-state")?.textContent.includes("сохранено в общую историю"), null, { timeout: 20000 });
+  const setField = async (page, sel, val) => { await page.click('.topbar nav button[data-tab="analysis"]'); await page.evaluate((q) => { const el = document.querySelector(q); el.closest("details")?.setAttribute("open", ""); }, sel); await page.fill(sel, val); await page.dispatchEvent(sel, "change"); };
+  await saved(B);
+  ok((await B.textContent("#doc-meta")).includes("автор: Анна Коваль"), "у автора под кнопками: " + (await B.textContent("#doc-meta")));
+
+  await A.click('.topbar nav button[data-tab="history"]');
+  await A.waitForFunction(() => document.querySelector("#histlist .histrow"));
+  const rowA = await A.textContent("#histlist .histrow");
+  ok(rowA.includes("автор: Анна Коваль") && rowA.includes("urinal screen deodorizer"), "администратор видит анализ Анны в общей истории с автором");
+  ok(/AI/.test(rowA), "значок AI в списке (результат задачи сохранён на сервере)");
+  ok(await A.$("#histlist [data-del]") !== null, "администратор может удалить чужой анализ (кнопка есть)");
+  await A.selectOption("#hist-mine", "1");
+  await A.waitForFunction(() => document.querySelector("#histlist .empty"));
+  ok(true, "фильтр «мои» у администратора — пусто");
+  await A.selectOption("#hist-mine", "0"); await A.fill("#hist-search", "коваль");
+  await A.waitForFunction(() => document.querySelectorAll("#histlist .histrow").length === 1);
+  ok(true, "поиск по автору находит анализ");
+  await A.click("#histlist [data-open]");
+  await A.waitForFunction(() => document.querySelector("#f-core")?.value === "urinal screen deodorizer");
+  ok((await A.textContent("#sec-ai")).length > 50 && (await A.textContent("#save-state")).includes("сохранено"), "администратор открыл чужой анализ: дашборд и AI-блок на месте, лишнего сохранения нет");
+  const v0 = await ctxA.request.get(base + "/api/analyses").then((r) => r.json()).then((j) => j.items[0]);
+  ok(v0.updatedBy.name === "Анна Коваль", "открытие чужого анализа не меняет «кто изменил»");
+
+  // администратор правит цену → «изменил: Администратор»
+  await setField(A, "#f-price", "27.5"); await saved(A);
+  ok((await A.textContent("#doc-meta")).includes("изменил: Администратор"), "после правки: " + (await A.textContent("#doc-meta")));
+  // Анна (со старой версией) правит COGS → конфликт, без молчаливой перезаписи
+  await setField(B, "#f-cogs", "4.2");
+  await B.waitForSelector("#conflict-dlg[open]", { timeout: 20000 });
+  ok((await B.textContent("#conflict-text")).includes("Администратор"), "диалог конфликта называет изменившего: " + (await B.textContent("#conflict-text")).trim());
+  const price = await ctxA.request.get(base + "/api/analyses/" + v0.id).then((r) => r.json()).then((j) => j.core.inputs.price);
+  ok(price === 27.5, "правка администратора не затёрта (цена на сервере " + price + ")");
+  await B.click("#conflict-copy");
+  await B.waitForFunction(() => !document.querySelector("#conflict-dlg").open && document.querySelector("#save-state")?.textContent.includes("сохранено"), null, { timeout: 20000 });
+  const list2 = await ctxB.request.get(base + "/api/analyses").then((r) => r.json());
+  ok(list2.total === 2 && list2.items.some((i) => /копия/.test(i.niche) && i.createdBy.name === "Анна Коваль"), "копия сохранена, её автор — Анна; всего анализов: " + list2.total);
+  const copy = list2.items.find((i) => /копия/.test(i.niche));
+  const copyDoc = await ctxB.request.get(base + "/api/analyses/" + copy.id).then((r) => r.json());
+  ok(copyDoc.core.inputs.cogs === 4.2 && Object.keys(copyDoc.aggregates).includes("poe"), "в копии — правка Анны (COGS 4.2) и загруженные отчёты");
+  await B.reload({ waitUntil: "networkidle" });
+  await B.waitForFunction(() => document.querySelector("#f-cogs")?.value === "4.2", null, { timeout: 15000 });
+  ok(true, "после F5 открыта копия с сохранёнными правками");
+  // удалить чужой анализ обычный пользователь не может
+  await B.click('.topbar nav button[data-tab="history"]');
+  await B.waitForFunction(() => document.querySelectorAll("#histlist .histrow").length === 2);
+  ok(await B.$$eval("#histlist .histrow", (rows) => rows.map((r) => Boolean(r.querySelector("[data-del]")))).then((a) => a.filter(Boolean).length === 2), "Анна — автор обоих анализов, кнопка «Удалить» есть у обоих");
+
   // --- отключение ---
+  await A.click('.topbar nav button[data-tab="settings"]');
   await A.waitForSelector('#users-list button[data-uact="toggle"]');
   A.once("dialog", (d) => d.accept());
   await A.locator("#users-list tr", { hasText: "anna" }).locator('button[data-uact="toggle"]').click();

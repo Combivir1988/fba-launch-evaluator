@@ -44,6 +44,31 @@ export function migrate(doc) {
   return out;
 }
 
+/** Сводка для списка истории — считается из лёгкой части документа (одинаково в браузере и на сервере). */
+export function metaFromCore(core = {}) {
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return {
+    niche: String(core.niche || "").slice(0, 200), coreKeyword: String(core.coreKeyword || "").slice(0, 200),
+    verdict: core.ai?.verdict || core.results?.verdict?.ceiling || null,
+    c1: num(core.results?.criterion1?.okCount), score: num(core.results?.scorecard?.total),
+    sources: Object.entries(core.sources || {}).filter(([, v]) => v).map(([k]) => k),
+    aiDone: Boolean(core.ai), patentsDone: Boolean(core.patents),
+  };
+}
+
+/** Серверное хранение (spec 002, R2): лёгкая часть `core` (поля, пороги, результаты, AI, патенты) меняется часто,
+ *  тяжёлая `aggregates` (разобранные отчёты, до нескольких MB) — только при загрузке файлов. */
+export function splitDoc(analysis) {
+  const { aggregates, ...core } = analysis;
+  return { core, aggregates: aggregates || {}, meta: metaFromCore(core) };
+}
+export function joinDoc(core, aggregates) { return { ...core, aggregates: aggregates || {} }; }
+
+/** Подпись содержимого без служебных меток времени — чтобы не сохранять документ, в котором ничего не изменилось. */
+export function coreSignature(core) {
+  return JSON.stringify(core, (k, v) => (k === "updatedAt" || k === "computedAt" ? undefined : v));
+}
+
 export function slug(s) {
   return String(s || "niche").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9а-яіїєґ]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "niche";
 }

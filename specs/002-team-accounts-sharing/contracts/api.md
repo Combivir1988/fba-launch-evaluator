@@ -45,7 +45,7 @@
 |---|---|---|
 | GET | `/api/analyses?mine=1&q=&limit=&offset=` | список без документов: `{items:[{id, niche, coreKeyword, verdict, c1, score, sources, aiDone, patentsDone, createdBy:{id,name}, updatedBy:{id,name}, createdAt, updatedAt, version, shares:N, runningJobs:[type]}], total}`; сортировка по `updatedAt DESC` |
 | GET | `/api/analyses/:id` | `200 {meta, core, aggregates}` (сервер распаковывает gzip); `404` |
-| PUT | `/api/analyses/:id` | создать или сохранить `core`: `{baseVersion:number\|null, core, meta:{niche, coreKeyword, verdict, c1, score, sources, aiDone, patentsDone}, force?:boolean}` → `200 {version, updatedAt}`; `baseVersion=null` — создание (`409 exists`, если id занят); конфликт → `409 {"error":"conflict","version","updatedBy":{id,name},"updatedAt"}`; `force=true` с актуальной `baseVersion` = осознанная перезапись |
+| PUT | `/api/analyses/:id` | создать или сохранить `core`: `{baseVersion:number\|null, core, force?:boolean}` (сводку для списка — нишу, вердикт, C1, score, источники — сервер считает сам из `core` функцией `metaFromCore`, клиенту не доверяет) → `200 {version, updatedAt}`; `baseVersion=null` — создание (`409 exists`, если id занят); конфликт → `409 {"error":"conflict","version","updatedBy":{id,name},"updatedAt"}`; `force=true` с актуальной `baseVersion` = осознанная перезапись |
 | PUT | `/api/analyses/:id/aggregates` | `{baseVersion, aggregates}` (≤ 12 MB) → `200 {version}`; те же правила конфликта |
 | POST | `/api/analyses/:id/copy` | `{core, aggregates?}` → `201 {id, version}` — «сохранить как копию», автор — текущий пользователь |
 | DELETE | `/api/analyses/:id` | автор или admin → `204`; ссылки анализа перестают работать |

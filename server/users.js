@@ -4,7 +4,7 @@ import * as realHasher from "./passwords.js";
 import { validateNewPassword } from "./passwords.js";
 
 export class UserError extends Error {
-  constructor(code, message, status = 400, extra = {}) { super(message); this.code = code; this.status = status; Object.assign(this, extra); }
+  constructor(code, message, status = 400, extra = {}) { super(message); this.code = code; this.status = status; this.extra = extra; Object.assign(this, extra); }
 }
 
 const LOGIN_RE = /^[a-z0-9._-]{3,40}$/;
