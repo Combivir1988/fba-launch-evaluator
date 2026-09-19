@@ -119,5 +119,7 @@ export function priceSegments(p) {
     const s = it.price < q1 ? segs[0] : it.price < q2 ? segs[1] : segs[2];
     s.items++; s.weight += it.weight;
   }
-  return { weightLabel: p.xray?.asins?.length ? "revenue" : "clicks", segments: segs.map((s) => ({ ...s, itemsShare: s.items / items.length, weightShare: s.weight / totalW })) };
+  const band = p.priceBand?.active ? p.priceBand : null; // сегмент пересекается с выбранным коридором цен
+  const hit = (sg) => Boolean(band) && (band.max === null || sg.min <= band.max) && (band.min === null || sg.max >= band.min);
+  return { weightLabel: p.xray?.asins?.length ? "revenue" : "clicks", segments: segs.map((s) => ({ ...s, selected: hit(s), itemsShare: s.items / items.length, weightShare: s.weight / totalW })) };
 }

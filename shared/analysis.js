@@ -12,6 +12,7 @@ export function defaultInputs() {
   return {
     price: null, cogs: null, cogsConfirmed: false, shippingPerUnit: 0, referralPct: 0.15, fbaFee: 0, cpc: null,
     cvr: 0.10, ppcShare: 0.70, targetAcos: 0.30, unitsPerDay: 10, productionDays: 30, shippingDays: 30, receivingDays: 15,
+    priceMin: null, priceMax: null, // ценовой диапазон анализа (spec 003): null — вся ниша
     adsReserve: 0, budget: null, canDifferentiate: "unknown", myAsins: [], myBrand: "", evaluateAsNewEntrant: true,
     excludedBrands: [], clusterKeywords: [], clusterMinSv: null, clusterMinCompetitors: null, manualOverrides: {}, challenger: {}, patentFeature: "",
     checklist: { gatedCategory: false, dangerousGoods: false, certificates: "none", patentSearch: "none", trademarkSearch: "none",

@@ -36,7 +36,8 @@ Scorecard: Market 25 %, Competition 25 %, Economics 25 %, Brand-fit 15 %, Operat
 3. Если пользователь — действующий продавец в нише (myBrand/myAsins заданы) и evaluateAsNewEntrant=true — его бренд считай таким же инкумбентом, как остальные; если evaluateAsNewEntrant=false — формулируй рекомендации в терминах «усилить/расширить».
 4. Дифференциация — из тем негативных отзывов POE и разрыва «маркетинг vs факт»; каждое требование ТЗ измеримо (число, тест, подтверждение поставщика).
 5. nextSteps — ровно 1–3 конкретных шага (что сделать, какими данными закрыть).
-6. Русский язык, без воды, без markdown внутри строк JSON.`;
+6. Русский язык, без воды, без markdown внутри строк JSON.
+7. Если задано поле priceBand — менеджер намерен продавать в этом ценовом диапазоне: конкуренцию (бренды, отзывы, лидера, критерии 3–8) оценивай ВНУТРИ диапазона, а спрос и размер рынка (1a, 1c, трафик) — по всей нише; для сравнения дано wholeNiche. Назови диапазон в summary. При priceBand.sample = "small" или "insufficient" прямо скажи, что выборка мала и выводы о конкуренции ненадёжны; при myPriceOutside = true — что цена товара не соответствует выбранному диапазону.`;
 
 export function buildUserMessage({ niche, coreKeyword, payload }) {
   return `Ниша: ${niche || payload.niche || "—"}\nГлавный ключ: ${coreKeyword || payload.coreKeyword || "—"}\n\nДанные приложения (JSON):\n${JSON.stringify(payload)}\n\nСформируй вердикт по схеме. Помни: verdict не выше rulesVerdict.ceiling = "${payload?.rulesVerdict?.ceiling ?? "?"}".`;

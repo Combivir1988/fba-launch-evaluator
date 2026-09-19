@@ -59,6 +59,22 @@
   const tooltipMoney = (d) => (ctx) => `${ctx.dataset.label ? ctx.dataset.label + ": " : ""}${fmtMoney(ctx.parsed.y ?? ctx.parsed.x, d)}`;
 
   // ---------- sections ----------
+  // ---------- ценовой диапазон анализа (spec 003) ----------
+  const bandOf = (R) => (R.priceBand?.active ? R.priceBand : null);
+  const inBandR = (price, b) => !b || (isNum(price) && (b.min === null || price >= b.min) && (b.max === null || price <= b.max));
+  const shareWord = (b) => (b.weightLabel === "revenue" ? "выручки ниши" : "кликов ниши");
+  function bandNote(R, o) {
+    const pb = R.priceBand; if (!pb) return "";
+    if (pb.valid === false) return o.static ? "" : `<div class="notice bandnote">Ценовой диапазон не применён: ${esc(pb.error || "некорректные границы")}. Анализ посчитан по всей нише.</div>`;
+    if (!pb.active) return "";
+    const warn = [];
+    if (pb.sample === "insufficient") warn.push(`в диапазоне меньше минимума листингов — конкурентные показатели диапазона не считаются («нет данных»)`);
+    else if (pb.sample === "small") warn.push(`малая выборка — доли брендов и медианы в диапазоне ненадёжны`);
+    if (pb.myPriceOutside) warn.push("цена вашего товара вне заданного диапазона");
+    return `<div class="notice info bandnote"><b>Анализ сужен до цен ${esc(pb.label)}:</b> ${fmtN(pb.inCount)} из ${fmtN(pb.totalCount)} листингов${isNum(pb.revenueShare) ? `, ${fmtPct(pb.revenueShare)} ${shareWord(pb)}` : ""}${pb.noPrice ? `; без цены в отчёте — ${fmtN(pb.noPrice)}` : ""}. Конкуренты, бренды, отзывы и критерии 3–8 — по диапазону; спрос по ключам, сезонность и размер рынка (1a) — по всей нише.${warn.length ? ` <b>Внимание:</b> ${esc(warn.join("; "))}.` : ""}</div>`;
+  }
+  const bandChip = (R, kind) => (bandOf(R) ? (kind === "band" ? ` <span class="chip band" title="Посчитано только по листингам ценового диапазона ${esc(R.priceBand.label)}">в диапазоне</span>` : ' <span class="chip whole" title="Поисковый спрос и размер рынка не делятся по цене — показатель по всей нише">вся ниша</span>') : "");
+
   function secHero(A, R, o) {
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;
     const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(m.fileName || "")}">${SRC_LABEL[k]} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
@@ -67,7 +83,7 @@
       <div><h1>${esc(A.niche || "Без названия")}</h1>
         <div class="meta">Ключ: <b>${esc(A.coreKeyword || "—")}</b> · ${esc(A.marketplace || "US")} · расчёт ${fmtDate(R.computedAt)} · методология ${esc(R.methodologyVersion || "")}</div>
         <div class="chips" style="margin-top:.4rem">${srcs || '<span class="chip na">файлы не загружены</span>'}</div>
-        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p></div>
+        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${bandNote(R, o)}</div>
       <div class="verdict ${esc(v)}"><div class="k muted">${ai ? "Вердикт AI" + (ai.adjustedByRules ? " (скорректирован правилами)" : "") : "Потолок по правилам"}</div>
         <div class="big">${esc(VLABEL[v])}</div>
         <div class="muted">Критерий 1: <b>${R.criterion1.okCount} из 8</b> · решающий: ${esc(ai?.decisiveGate || R.verdict.decisiveGate || "—")}</div>
@@ -79,12 +95,12 @@
     const lp = poe?.launchPotential || {};
     const t = (k, v, s, cls = "") => `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s || ""}</div></div>`;
     return `<h2>Обзор</h2><div class="tiles">
-      ${t("Выручка ниши", fmtK(c["1a"].value) + "/мес", (SRC_LABEL[c["1a"].source] || "нет данных"), c["1a"].status)}
-      ${t("Средняя цена", fmtMoney(c["1b"].value, 2), c["1b"].source === "xray" ? "медиана проверенных" : SRC_LABEL[c["1b"].source] || "", c["1b"].status)}
-      ${t("Adj. SV", fmtN(c["1c"].value) + "/мес", SRC_LABEL[c["1c"].source] || "", c["1c"].status)}
-      ${t("Отзывы (ср. / мед.)", `${fmtN(c["1d"].value)} / ${fmtN(c["1d"].median)}`, "барьер: " + (comp.reviewBarrier.tier === "moat" ? "непробиваем" : comp.reviewBarrier.tier === "medium" ? "средний" : comp.reviewBarrier.tier === "breakable" ? "пробиваем" : "—"), c["1d"].status)}
-      ${t("Top brand", fmtPct(c["1e"].value), esc(comp.topBrand || ""), c["1e"].status)}
-      ${t("Топ-5 брендов", fmtPct(c["1f"].value), comp.source === "xray" ? "доля выручки" : "click share", c["1f"].status)}
+      ${t("Выручка ниши", fmtK(c["1a"].value) + "/мес", (SRC_LABEL[c["1a"].source] || "нет данных") + (bandOf(R) ? ` · в диапазоне ${isNum(c["1a"].bandValue) ? fmtK(c["1a"].bandValue) + " (" + fmtPct(c["1a"].bandShare) + ")" : fmtPct(c["1a"].bandShare) + " кликов"}` : ""), c["1a"].status)}
+      ${t("Средняя цена" + bandChip(R, "band"), fmtMoney(c["1b"].value, 2), c["1b"].source === "xray" ? "медиана проверенных" : SRC_LABEL[c["1b"].source] || "", c["1b"].status)}
+      ${t("Adj. SV" + bandChip(R, "whole"), fmtN(c["1c"].value) + "/мес", SRC_LABEL[c["1c"].source] || "", c["1c"].status)}
+      ${t("Отзывы (ср. / мед.)" + bandChip(R, "band"), `${fmtN(c["1d"].value)} / ${fmtN(c["1d"].median)}`, "барьер: " + (comp.reviewBarrier.tier === "moat" ? "непробиваем" : comp.reviewBarrier.tier === "medium" ? "средний" : comp.reviewBarrier.tier === "breakable" ? "пробиваем" : "—"), c["1d"].status)}
+      ${t("Top brand" + bandChip(R, "band"), fmtPct(c["1e"].value), esc(comp.topBrand || ""), c["1e"].status)}
+      ${t("Топ-5 брендов" + bandChip(R, "band"), fmtPct(c["1f"].value), comp.source === "xray" ? "доля выручки" : "click share", c["1f"].status)}
       ${poe ? t("SV ниши T360", fmtN(poe.nicheSummary.searchVolumeT360), "рост за год " + fmtPct(poe.nicheSummary.searchVolumeGrowthT360), "") : ""}
       ${poe ? t("Товары / бренды", `${fmtN(lp.productCount?.current)} / ${fmtN(lp.brandCount?.current)}`, `продавцов ${fmtN(lp.sellingPartnerCount?.current)}`, "") : ""}
       ${tr.poeConcentration ? t("Спонсорских", fmtPct(tr.poeConcentration.sponsoredPct), tr.poeConcentration.flags.adWar ? "рекламная война" : "доля товаров с PPC", tr.poeConcentration.flags.adWar ? "warn" : "") : ""}
@@ -100,9 +116,9 @@
     const c1 = R.criterion1;
     const rows = Object.entries(c1.items).map(([k, it]) => {
       const val = it.value === null ? "—" : it.pct ? fmtPct(it.value, 1) : k === "1a" ? fmtK(it.value) : k === "1b" ? fmtMoney(it.value, 2) : fmtN(it.value, k === "1h" ? 0 : 0);
-      return `<div class="gate ${esc(it.status)}"><div class="id">${k}</div><div>${esc(NAMES1[k])} ${it.source ? `<span class="chip src">${esc(SRC_LABEL[it.source] || it.source)}</span>` : ""}</div>
+      return `<div class="gate ${esc(it.status)}"><div class="id">${k}</div><div>${esc(NAMES1[k])} ${it.source ? `<span class="chip src">${esc(SRC_LABEL[it.source] || it.source)}</span>` : ""}${bandOf(R) ? bandChip(R, it.inBand ? "band" : "whole") : ""}</div>
         <div class="val">${val}</div><div class="thr muted">${esc(it.threshold)}</div><div>${st(it.status)}</div>
-        ${it.note ? `<div class="note">${esc(it.note)}</div>` : ""}</div>`;
+        ${it.note ? `<div class="note">${esc(it.note)}</div>` : ""}${k === "1a" && bandOf(R) ? `<div class="note">Статус — по всей нише (порог описывает размер рынка). В диапазоне ${esc(R.priceBand.label)}: <b>${isNum(it.bandValue) ? fmtK(it.bandValue) + "/мес — " : ""}${fmtPct(it.bandShare)} ${shareWord(R.priceBand)}</b> (справочно).</div>` : ""}</div>`;
     }).join("");
     return `<h2>Критерий 1 — Рыночный контекст <span class="chip ${c1.pass ? "ok" : "fail"}">${c1.okCount} из 8 · ${c1.label}</span></h2>
       <div>${rows}</div>
@@ -189,7 +205,7 @@
     const multi = Boolean(tr.multiAsin); const hasSales = tr.cluster.some((k) => isNum(k.keywordSales));
     const rows = tr.cluster.slice(0, 25).map((k) => `<tr><td>${esc(k.phrase)}</td><td class="num">${fmtN(k.sv)}</td>${hasSales ? `<td class="num">${fmtN(k.keywordSales)}</td>` : ""}${multi ? `<td class="num">${isNum(k.rankingCompetitors) ? k.rankingCompetitors : "—"}${isNum(k.competitorRankAvg) ? ` <small class="muted">(ср. ${fmtN(k.competitorRankAvg)})</small>` : ""}</td>` : ""}<td class="num">${isNum(k.svTrend) ? (k.svTrend > 0 ? "+" : "") + fmtN(k.svTrend) + " %" : "—"}</td><td class="num">${isNum(k.bid) ? fmtMoney(k.bid, 2) : "—"}</td><td class="num">${isNum(k.competingProducts) ? (k.competingIsBound ? ">" : "") + fmtN(k.competingProducts) : "—"}</td><td class="num">${isNum(k.abaClickShare) ? fmtN(k.abaClickShare, 1) + (tr.source === "poe" ? "" : " %") : "—"}</td></tr>`).join("");
     const pc = tr.poeConcentration;
-    return `<h2>Трафик по ключам (урок 09) <span class="chip ${tr.status === "ok" ? "ok" : tr.status === "fail" ? "fail" : "warn"}">${tr.source === "cerebro" ? "Cerebro" : "POE"} · ${STATUS_LABEL[tr.status]}</span></h2>
+    return `<h2>Трафик по ключам (урок 09)${bandChip(R, "whole")} <span class="chip ${tr.status === "ok" ? "ok" : tr.status === "fail" ? "fail" : "warn"}">${tr.source === "cerebro" ? "Cerebro" : "POE"} · ${STATUS_LABEL[tr.status]}</span></h2>
       <div class="tiles">
         <div class="tile"><div class="k">SV core</div><div class="v">${fmtN(tr.svCore)}</div><div class="s">/мес</div></div>
         <div class="tile"><div class="k">Adj. SV</div><div class="v">${fmtN(tr.adjSv)}</div><div class="s">core + 0.4 × Σ кластера (${tr.clusterCount})</div></div>
@@ -210,28 +226,38 @@
   }
 
   function secCompetitors(A, R) {
-    const comp = R.competition; if (!comp.source) return `<h2>Конкуренты</h2><div class="empty">Загрузите Xray (или POE) — доли брендов, барьер отзывов, топ-20 ASIN.</div>`;
+    const comp = R.competition;
+    if (!comp.source && bandOf(R)) return `<h2>Конкурентная карта${bandChip(R, "band")}</h2><div class="empty">В ценовом диапазоне ${esc(R.priceBand.label)} — ${fmtN(R.priceBand.inCount)} из ${fmtN(R.priceBand.totalCount)} листингов: этого мало, чтобы считать доли брендов и барьер отзывов. Расширьте диапазон в панели (раздел 5) или сбросьте его.</div>`;
+    if (!comp.source) return `<h2>Конкуренты</h2><div class="empty">Загрузите Xray (или POE) — доли брендов, барьер отзывов, топ-20 ASIN.</div>`;
     const my = new Set((A.inputs.myAsins || []).map((s) => s.toUpperCase())); const myBrand = (A.inputs.myBrand || "").toLowerCase();
     const xr = A.aggregates?.xray?.asins; const poe = A.aggregates?.poe?.asinMetrics;
     let rows = "";
     if (xr?.length) {
       const ex = new Set((A.inputs.excludedBrands || []).map((b) => b.toLowerCase()));
-      const top = xr.filter((a) => !ex.has(a.brand.toLowerCase())).sort((a, b) => (b.asinRevenue ?? 0) - (a.asinRevenue ?? 0)).slice(0, 20);
+      const top = xr.filter((a) => !ex.has(a.brand.toLowerCase()) && inBandR(a.price, bandOf(R))).sort((a, b) => (b.asinRevenue ?? 0) - (a.asinRevenue ?? 0)).slice(0, 20);
       rows = `<thead><tr><th>#</th><th>Бренд</th><th>ASIN / товар</th><th class="num">Цена</th><th class="num">Продажи</th><th class="num">Выручка</th><th class="num">Отзывы</th><th class="num">★</th><th>Создан</th></tr></thead><tbody>` +
         top.map((a, i) => `<tr class="${my.has(a.asin) || (myBrand && a.brand.toLowerCase() === myBrand) ? "mine" : ""} ${i === 0 ? "leader" : ""}"><td>${i + 1}</td><td>${esc(a.brand)}</td><td><a href="${esc(a.url)}" target="_blank" rel="noopener">${a.asin}</a><br><small class="muted">${esc(a.title.slice(0, 70))}</small></td><td class="num">${fmtMoney(a.price, 2)}</td><td class="num">${fmtN(a.asinSales)}</td><td class="num">${fmtK(a.asinRevenue)}</td><td class="num">${fmtN(a.reviews)}</td><td class="num">${isNum(a.rating) ? a.rating.toFixed(1) : "—"}</td><td>${esc(a.creationDate || "—")}</td></tr>`).join("") + "</tbody>";
     } else if (poe?.length) {
       rows = `<thead><tr><th>#</th><th>Бренд</th><th>ASIN / товар</th><th class="num">Цена</th><th class="num">Click share</th><th class="num">Отзывы</th><th class="num">★</th><th>Запуск</th></tr></thead><tbody>` +
-        poe.slice(0, 20).map((a, i) => `<tr class="${my.has(a.asin) || (myBrand && a.brand.toLowerCase() === myBrand) ? "mine" : ""} ${i === 0 ? "leader" : ""}"><td>${i + 1}</td><td>${esc(a.brand)}</td><td><a href="https://www.amazon.com/dp/${a.asin}" target="_blank" rel="noopener">${a.asin}</a><br><small class="muted">${esc(a.title.slice(0, 70))}</small></td><td class="num">${fmtMoney(a.price, 2)}</td><td class="num">${fmtPct(a.clickShareT360, 1)}</td><td class="num">${fmtN(a.reviews)}</td><td class="num">${isNum(a.rating) ? a.rating.toFixed(1) : "—"}</td><td>${esc(a.launchDate || "—")}</td></tr>`).join("") + "</tbody>";
+        poe.filter((a) => inBandR(a.price, bandOf(R))).slice(0, 20).map((a, i) => `<tr class="${my.has(a.asin) || (myBrand && a.brand.toLowerCase() === myBrand) ? "mine" : ""} ${i === 0 ? "leader" : ""}"><td>${i + 1}</td><td>${esc(a.brand)}</td><td><a href="https://www.amazon.com/dp/${a.asin}" target="_blank" rel="noopener">${a.asin}</a><br><small class="muted">${esc(a.title.slice(0, 70))}</small></td><td class="num">${fmtMoney(a.price, 2)}</td><td class="num">${fmtPct(a.clickShareT360, 1)}</td><td class="num">${fmtN(a.reviews)}</td><td class="num">${isNum(a.rating) ? a.rating.toFixed(1) : "—"}</td><td>${esc(a.launchDate || "—")}</td></tr>`).join("") + "</tbody>";
     }
     const rb = comp.reviewBarrier;
     const cont = comp.contaminationCandidates?.length ? `<div class="notice" style="margin-top:.6rem">Возможная cross-category contamination (бренды из Xray, которых нет в POE): ${comp.contaminationCandidates.slice(0, 8).map((c) => `<b>${esc(c.brand)}</b> (${fmtPct(c.share)})`).join(", ")} — проверьте и исключите в панели «Исключить бренды».</div>` : "";
-    return `<h2>Конкурентная карта <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${comp.amazonSells ? '<span class="chip fail">Amazon продаёт сам</span>' : ""}</h2>
+    const pb = bandOf(R), wh = pb?.whole;
+    const cmpTile = (k, inBandVal, wholeVal) => `<div class="tile"><div class="k">${k}</div><div class="v">${inBandVal}</div><div class="s">во всей нише: <b>${wholeVal}</b></div></div>`;
+    const cmp = wh ? `<h4 style="margin:.8rem 0 0">В диапазоне ${esc(pb.label)} против всей ниши</h4><div class="bandcmp">
+        ${cmpTile("Доля лидера", fmtPct(comp.topBrandShare, 1), `${fmtPct(wh.topBrandShare, 1)}${wh.topBrand && wh.topBrand !== comp.topBrand ? " (" + esc(wh.topBrand) + ")" : ""}`)}
+        ${cmpTile("Топ-5 брендов", fmtPct(comp.top5Share), fmtPct(wh.top5Share))}
+        ${cmpTile("Медиана цены", fmtMoney(R.criterion1.items["1b"].value, 2), fmtMoney(wh.priceMedian, 2))}
+        ${cmpTile("Отзывы (ср. / мед.)", `${fmtN(rb.avg)} / ${fmtN(rb.median)}`, `${fmtN(wh.reviewsAvg)} / ${fmtN(wh.reviewsMedian)}`)}
+      </div>` : "";
+    return `<h2>Конкурентная карта${bandChip(R, "band")} <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${comp.amazonSells ? '<span class="chip fail">Amazon продаёт сам</span>' : ""}</h2>
       <div class="tiles">
         <div class="tile ${comp.dominant ? "fail" : "ok"}"><div class="k">Лидер</div><div class="v">${esc(comp.topBrand || "—")}</div><div class="s">${fmtPct(comp.topBrandShare, 1)} ${comp.source === "xray" ? "выручки" : "кликов"}</div></div>
         <div class="tile ${rb.tier === "moat" ? "fail" : rb.tier === "medium" ? "warn" : "ok"}"><div class="k">Отзывов у лидера</div><div class="v">${fmtN(rb.leaderReviews)}</div><div class="s">${rb.tier === "moat" ? "> 2000 — практически непробиваем" : rb.tier === "medium" ? "500–2000 — нужен дифференциатор + Vine" : rb.tier === "breakable" ? "< 500 — пробиваемый ров" : "—"}</div></div>
         <div class="tile"><div class="k">Игроков с ≥100 отзывов</div><div class="v">${fmtN(comp.playersOver100)}</div><div class="s">брендов с долей > 10 %: ${fmtN(comp.brandsOver10pct)}</div></div>
         <div class="tile"><div class="k">Топ-5 / топ-10 / топ-20</div><div class="v">${fmtPct(comp.top5Share)}</div><div class="s">${fmtPct(comp.top10Share)} / ${fmtPct(comp.top20Share)}</div></div>
-      </div>
+      </div>${cmp}
       <div class="stack" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-brands"></canvas></div>
       <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${cont}
       ${my.size || myBrand ? '<p class="muted" style="font-size:.8rem">Строки, подсвеченные жёлтым — ваш бренд/ASIN. При оценке «нового входа» он считается инкумбентом, как и остальные.</p>' : ""}`;
@@ -243,12 +269,13 @@
       options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => fmtN(c.parsed.x, 1) + " %" } } }, scales: { x: { grid, ticks: { callback: (v) => v + " %" } }, y: { grid: { display: false } } } } });
   }
 
-  function secPricing(A, R) {
+  function secPricing(A, R, o) {
     const ps = R.priceSegments; if (!ps) return "";
-    return `<h2>Ценовые сегменты</h2><div class="two"><div class="chartbox short"><canvas id="ch-price"></canvas></div>
+    const pick = (sg) => (o?.static ? "" : ` <button type="button" class="seg-pick noprint" data-band-min="${sg.min}" data-band-max="${sg.max}" title="Считать конкурентов только в этом ценовом сегменте">выбрать</button>`);
+    return `<h2>Ценовые сегменты${bandChip(R, "whole")}</h2><div class="two"><div class="chartbox short"><canvas id="ch-price"></canvas></div>
       <div class="tablewrap"><table><thead><tr><th>Сегмент</th><th class="num">Диапазон</th><th class="num">Доля товаров</th><th class="num">Доля ${ps.weightLabel === "revenue" ? "выручки" : "кликов"}</th></tr></thead><tbody>
-      ${ps.segments.map((s) => `<tr><td>${s.name}</td><td class="num">${fmtMoney(s.min, 0)}–${fmtMoney(s.max, 0)}</td><td class="num">${fmtPct(s.itemsShare)}</td><td class="num">${fmtPct(s.weightShare)}</td></tr>`).join("")}</tbody></table>
-      <p class="muted" style="font-size:.8rem">Сегмент с большой долей ${ps.weightLabel === "revenue" ? "выручки" : "кликов"} при малой доле товаров — недообслужен; проверяйте концентрацию бренда ВНУТРИ сегмента перед выбором цены.</p></div></div>`;
+      ${ps.segments.map((s) => `<tr class="${s.selected ? "seg-selected" : ""}"><td>${s.name}${s.selected ? ' <span class="chip band">выбран</span>' : ""}${pick(s)}</td><td class="num">${fmtMoney(s.min, 0)}–${fmtMoney(s.max, 0)}</td><td class="num">${fmtPct(s.itemsShare)}</td><td class="num">${fmtPct(s.weightShare)}</td></tr>`).join("")}</tbody></table>
+      <p class="muted" style="font-size:.8rem">Сегмент с большой долей ${ps.weightLabel === "revenue" ? "выручки" : "кликов"} при малой доле товаров — недообслужен; проверяйте концентрацию бренда ВНУТРИ сегмента перед выбором цены${o?.static ? "" : " — кнопка «выбрать» сузит анализ конкурентов до этого сегмента"}.</p></div></div>`;
   }
   function drawPricing(container, R) {
     const ps = R.priceSegments; if (!ps) return; const [s1, s2] = series();
@@ -261,7 +288,7 @@
   function secTrend(A, R) {
     const tr = A.aggregates?.poe?.trends; if (!tr?.length) return "";
     const g = R.criterion1.items["1g"];
-    return `<h2>Сезонность и тренд (POE, ${tr.length} недель) <span class="chip ${g.status}">просадка ${fmtPct(g.value)}</span></h2>
+    return `<h2>Сезонность и тренд (POE, ${tr.length} недель)${bandChip(R, "whole")} <span class="chip ${g.status}">просадка ${fmtPct(g.value)}</span></h2>
       <div class="charts2"><div><h4>Поисковый объём, нед.</h4><div class="chartbox short"><canvas id="ch-sv"></canvas></div></div>
       <div><h4>Топ-5 брендов, click share</h4><div class="chartbox short"><canvas id="ch-top5"></canvas></div></div>
       <div><h4>Средняя цена, $</h4><div class="chartbox short"><canvas id="ch-pr"></canvas></div></div></div>

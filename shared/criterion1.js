@@ -106,6 +106,11 @@ export function criterion1(p) {
     items["1h"] = finalize(it, mo["1h"], (v) => v >= t.launchOk, (v) => v < t.launchFail);
   }
 
+  return summarizeCriterion1(items, t);
+}
+
+/** Итоги Критерия 1 по готовым подпунктам (используется и после подстановки 1a «по всей нише» при активном ценовом диапазоне). */
+export function summarizeCriterion1(items, t) {
   const okCount = Object.values(items).filter((i) => i.status === "ok").length;
   const failCount = Object.values(items).filter((i) => i.status === "fail").length;
   const naCount = Object.values(items).filter((i) => i.status === "na").length;

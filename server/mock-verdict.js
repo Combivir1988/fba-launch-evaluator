@@ -7,7 +7,7 @@ export function mockVerdict(payload) {
   return {
     verdict: ceiling,
     decisiveGate: payload?.rulesVerdict?.decisiveGate || "Gate 0",
-    summary: `[MOCK] Демонстрационный вердикт без обращения к Claude. Потолок по правилам: ${ceiling}. Критерий 1: ${c1.okCount ?? "?"} из 8. ${top ? `Лидер ниши — ${top}.` : ""} Для реального анализа задайте ANTHROPIC_API_KEY и отключите MOCK_AI.`,
+    summary: `[MOCK] Демонстрационный вердикт без обращения к Claude. Потолок по правилам: ${ceiling}. Критерий 1: ${c1.okCount ?? "?"} из 8. ${payload?.priceBand ? `Конкуренция оценена в ценовом диапазоне ${payload.priceBand.label} (${payload.priceBand.listingsInBand} из ${payload.priceBand.listingsTotal} листингов). ` : ""}${top ? `Лидер${payload?.priceBand ? " диапазона" : " ниши"} — ${top}.` : ""} Для реального анализа задайте ANTHROPIC_API_KEY и отключите MOCK_AI.`,
     criterion1Summary: `Критерий 1: ${c1.okCount ?? "?"} из 8 зелёных${c1.redItems?.length ? `, красные: ${c1.redItems.join(", ")}` : ""}.`,
     gates: [
       { gate: "gate0", status: payload?.gate0?.level === "full" ? "pass" : "insufficient_data", reasoning: payload?.gate0?.note || "" },

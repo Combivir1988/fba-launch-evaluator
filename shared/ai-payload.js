@@ -1,6 +1,7 @@
 // Компактный агрегат для Claude: только то, что нужно для синтеза (≈ 6–10k токенов), без сырых файлов.
 import { round } from "./num.js";
 import { gateStatuses } from "./verdict-rules.js";
+import { inBand } from "./price-band.js";
 
 const r2 = (v) => round(v, 2), r3 = (v) => round(v, 3);
 
@@ -27,7 +28,13 @@ export function buildAiPayload(analysis) {
       dominant: R.competition.dominant, amazonSells: R.competition.amazonSells, reviewBarrier: { ...R.competition.reviewBarrier, avg: r2(R.competition.reviewBarrier.avg) }, playersOver100: R.competition.playersOver100, brandsOver10pct: R.competition.brandsOver10pct,
       topBrands: R.competition.brands.slice(0, 10).map((b) => ({ brand: b.brand, share: r3(b.share), asins: b.asins, reviewsMax: b.reviewsMax, rating: r2(b.rating), priceMedian: r2(b.priceMedian) })),
       contaminationCandidates: R.competition.contaminationCandidates.slice(0, 8), priceSegments: R.priceSegments },
-    topAsins: topAsins(agg, inp),
+    // Ценовой диапазон (spec 003): конкуренция выше и topAsins — по листингам коридора; спрос, сегменты цен и размер рынка — по всей нише.
+    priceBand: R.priceBand?.active ? { label: R.priceBand.label, min: R.priceBand.min, max: R.priceBand.max, listingsInBand: R.priceBand.inCount, listingsTotal: R.priceBand.totalCount, noPrice: R.priceBand.noPrice,
+      shareOfNiche: r3(R.priceBand.revenueShare), shareBasis: R.priceBand.weightLabel, revenueBand: r2(R.priceBand.source === "xray" ? R.priceBand.revenueBand : null), sample: R.priceBand.sample, myPriceOutside: R.priceBand.myPriceOutside,
+      note: "criterion1 1b/1d/1e/1f, competition, challenger и topAsins посчитаны ТОЛЬКО по листингам этого ценового диапазона; 1a, 1c, 1g, 1h, traffic, priceSegments — по всей нише" } : null,
+    wholeNiche: R.priceBand?.active && R.priceBand.whole ? { revenue: r2(R.priceBand.whole.revenue), topBrand: R.priceBand.whole.topBrand, topBrandShare: r3(R.priceBand.whole.topBrandShare), top5Share: r3(R.priceBand.whole.top5Share),
+      priceMedian: r2(R.priceBand.whole.priceMedian), reviewsAvg: r2(R.priceBand.whole.reviewsAvg), reviewsMedian: r2(R.priceBand.whole.reviewsMedian) } : null,
+    topAsins: topAsins(agg, inp, R.priceBand),
     challenger: { active: R.challenger.active, greenCount: R.challenger.greenCount, mandatoryOk: R.challenger.mandatoryOk, pass: R.challenger.pass, gate4Discussed: R.challenger.gate4Discussed,
       items: Object.fromEntries(Object.entries(R.challenger.items).map(([k, v]) => [k, { title: v.title, status: v.status, kind: v.kind, note: v.note }])) },
     scorecard: { total: r2(R.scorecard.total), band: R.scorecard.band, weakest: R.scorecard.weakest, axes: Object.fromEntries(Object.entries(R.scorecard.axes).map(([k, a]) => [k, { score: r2(a.score), note: a.note }])) },
@@ -47,14 +54,15 @@ export function buildAiPayload(analysis) {
   return payload;
 }
 
-function topAsins(agg, inp) {
+function topAsins(agg, inp, band) {
+  const keep = (a) => !band?.active || inBand(a.price, band);
   const my = new Set((inp.myAsins || []).map((s) => s.toUpperCase()));
   if (agg.xray?.asins?.length) {
-    return [...agg.xray.asins].sort((a, b) => (b.asinRevenue ?? 0) - (a.asinRevenue ?? 0)).slice(0, 20)
+    return agg.xray.asins.filter(keep).sort((a, b) => (b.asinRevenue ?? 0) - (a.asinRevenue ?? 0)).slice(0, 20)
       .map((a) => ({ asin: a.asin, brand: a.brand, title: a.title.slice(0, 90), price: a.price, revenue: r2(a.asinRevenue), sales: a.asinSales, reviews: a.reviews, rating: a.rating, created: a.creationDate, mine: my.has(a.asin) || (inp.myBrand && a.brand.toLowerCase() === inp.myBrand.toLowerCase()) }));
   }
   if (agg.poe?.asinMetrics?.length) {
-    return agg.poe.asinMetrics.slice(0, 20).map((a) => ({ asin: a.asin, brand: a.brand, title: a.title.slice(0, 90), price: r2(a.price), clickShare: r3(a.clickShareT360), reviews: a.reviews, rating: a.rating, launched: a.launchDate, mine: my.has(a.asin) || (inp.myBrand && a.brand.toLowerCase() === inp.myBrand.toLowerCase()) }));
+    return agg.poe.asinMetrics.filter(keep).slice(0, 20).map((a) => ({ asin: a.asin, brand: a.brand, title: a.title.slice(0, 90), price: r2(a.price), clickShare: r3(a.clickShareT360), reviews: a.reviews, rating: a.rating, launched: a.launchDate, mine: my.has(a.asin) || (inp.myBrand && a.brand.toLowerCase() === inp.myBrand.toLowerCase()) }));
   }
   return [];
 }

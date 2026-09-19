@@ -139,7 +139,7 @@ function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.
 
 // ---------- compute / render ----------
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
-function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); autosave(); }
+function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); autosave(); }
 function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
 const scheduleFull = debounce(renderAll, 250);
 let rafId = 0; function scheduleEcon() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(renderEcon); }
@@ -573,6 +573,31 @@ async function loadAllShares() {
 $("#set-shares-load").addEventListener("click", loadAllShares);
 $("#set-shares-list").addEventListener("click", (e) => shareAction(e, loadAllShares));
 
+// ---------- ценовой диапазон анализа (spec 003) ----------
+function setBand(min, max) {
+  S.a.inputs.priceMin = min; S.a.inputs.priceMax = max;
+  $("#f-pmin").value = min ?? ""; $("#f-pmax").value = max ?? "";
+  markDirty(); renderAll();
+}
+function renderBandPanel() {
+  const pb = S.a.results?.priceBand; const stats = $("#band-stats"); if (!stats) return;
+  const invalid = pb && pb.valid === false;
+  $("#f-pmin").classList.toggle("invalid", Boolean(invalid)); $("#f-pmax").classList.toggle("invalid", Boolean(invalid));
+  $("#band-badge").classList.toggle("hidden", !pb?.active); if (pb?.active) $("#band-badge").textContent = pb.label;
+  const segs = S.a.results?.priceSegments?.segments || [];
+  $("#band-segments").innerHTML = segs.map((sg) => `<button type="button" class="${sg.selected ? "on" : ""}" data-band-min="${sg.min}" data-band-max="${sg.max}" title="Доля товаров ${Math.round(sg.itemsShare * 100)} %, доля ${S.a.results.priceSegments.weightLabel === "revenue" ? "выручки" : "кликов"} ${Math.round(sg.weightShare * 100)} %">${esc(sg.name)} $${Math.round(sg.min)}–${Math.round(sg.max)}</button>`).join("");
+  if (invalid) stats.innerHTML = `<span style="color:var(--fail)">${esc(pb.error)}</span>`;
+  else if (pb?.active) {
+    const share = typeof pb.revenueShare === "number" ? `, ${Math.round(pb.revenueShare * 100)} % ${pb.weightLabel === "revenue" ? "выручки ниши" : "кликов ниши"}` : "";
+    const warn = pb.sample === "insufficient" ? " — слишком мало: конкурентные показатели не считаются" : pb.sample === "small" ? " — малая выборка, доли ненадёжны" : "";
+    stats.innerHTML = `В диапазоне <b>${pb.inCount} из ${pb.totalCount}</b> листингов${share}${pb.noPrice ? `; без цены — ${pb.noPrice}` : ""}<span style="color:var(--warn)">${warn}</span>${pb.myPriceOutside ? '<br><span style="color:var(--warn)">Цена вашего товара вне диапазона.</span>' : ""}`;
+  } else stats.textContent = pb?.source ? `Диапазон не задан — анализ по всем ${pb.totalCount} листингам.` : "Загрузите Xray или POE — появятся сегменты цен.";
+}
+function pickBandFrom(el) { const b = el.closest("[data-band-min]"); if (!b) return false; setBand(Number(b.dataset.bandMin), Number(b.dataset.bandMax)); toast(`Анализ конкурентов сужен до $${Math.round(Number(b.dataset.bandMin))}–${Math.round(Number(b.dataset.bandMax))}`); return true; }
+$("#band-segments").addEventListener("click", (e) => { pickBandFrom(e.target); });
+dash.addEventListener("click", (e) => { if (e.target.closest(".seg-pick")) pickBandFrom(e.target); });
+$("#band-reset").addEventListener("click", () => { if (S.a.inputs.priceMin === null && S.a.inputs.priceMax === null) return; setBand(null, null); toast("Диапазон сброшен — анализ по всей нише"); });
+
 // ---------- перенос локальной истории браузера в общую (одноразово, идемпотентно) ----------
 async function migrateLocalHistory(msgEl) {
   const say = (t) => { if (msgEl) msgEl.textContent = t; };
@@ -606,7 +631,7 @@ async function openLastIfEmpty() {
 $("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
 
 // ---------- thresholds tab ----------
-const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет (урок 08)", traffic: "Трафик по ключам (урок 09) и Cerebro", poe: "POE / концентрация (урок 11)", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков" };
+const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет (урок 08)", traffic: "Трафик по ключам (урок 09) и Cerebro", poe: "POE / концентрация (урок 11)", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа" };
 // Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
 const THR_LABELS = {
   "criterion1.passCount": ["Минимум зелёных подпунктов из 8", "шт (порог прохождения Критерия 1)"],
@@ -635,6 +660,7 @@ const THR_LABELS = {
   "challenger.playersMin": ["5a — брендов с заметной долей, минимум", "шт"], "challenger.playerShareMin": ["5a — заметная доля бренда от", "доля"], "challenger.top5Ok": ["5b — топ-5 OK ниже", "доля"], "challenger.top5Fail": ["5b — НЕ OK выше", "доля"],
   "reviewsMoat.breakable": ["Ров пробиваем, отзывов лидера меньше", "шт"], "reviewsMoat.medium": ["Средний барьер до", "шт (выше — непробиваем)"],
   "reconciliation.noise": ["Расхождение источников — шум до", "доля"], "reconciliation.borderline": ["Погранично до", "доля (выше — конфликт)"],
+  "priceBand.smallSample": ["Малая выборка — листингов в диапазоне меньше", "шт (предупреждение: доли брендов ненадёжны)"], "priceBand.minSample": ["Недостаточная выборка — листингов меньше", "шт (конкурентные показатели диапазона не считаются)"],
   "checklist.designTestMin": ["Тест дизайна (PickFu) — минимум голосов", "%"], "checklist.lifecycleMonthsMin": ["Жизненный цикл, минимум", "мес"], "checklist.listingsHigh": ["Листингов в выдаче — высокая конкуренция от", "шт"],
 };
 function renderThresholds() {

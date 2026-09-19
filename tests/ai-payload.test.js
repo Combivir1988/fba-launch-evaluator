@@ -28,3 +28,17 @@ test("AI payload: компактный (≤ 60k символов ≈ 15k ток�
   assert.ok(p.rulesVerdict.ceiling);
   assert.ok(!s.includes("Display Order"), "сырых полей Xray нет");
 });
+
+// ---------- spec 003: ценовой диапазон ----------
+import { fixtureAnalysis as fxBand } from "./helpers/fixture-analysis.js";
+import { mockVerdict as mockBand } from "../server/mock-verdict.js";
+
+test("ценовой диапазон в AI-пейлоаде: сводка, показатели всей ниши, топ конкурентов только из диапазона", () => {
+  const a = fxBand({ inputs: { priceMin: 20, priceMax: 60 } }); const p = buildAiPayload(a);
+  assert.equal(p.priceBand.label, "$20–$60"); assert.equal(p.priceBand.listingsInBand, a.results.priceBand.inCount); assert.equal(p.priceBand.sample, a.results.priceBand.sample);
+  assert.match(p.priceBand.note, /ТОЛЬКО по листингам этого ценового диапазона/);
+  assert.equal(p.wholeNiche.topBrandShare, Math.round(a.results.priceBand.whole.topBrandShare * 1000) / 1000); assert.ok(p.wholeNiche.revenue > p.priceBand.revenueBand);
+  assert.ok(p.topAsins.length > 0 && p.topAsins.every((x) => x.price >= 20 && x.price <= 60), "в топе только листинги диапазона");
+  assert.match(mockBand(p).summary, /в ценовом диапазоне \$20–\$60/);
+  const off = buildAiPayload(fxBand()); assert.equal(off.priceBand, null); assert.equal(off.wholeNiche, null); assert.ok(off.topAsins.some((x) => x.price > 60 || x.price < 20));
+});

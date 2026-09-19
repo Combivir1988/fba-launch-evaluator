@@ -2,7 +2,8 @@
 import { mergeThresholds } from "./thresholds.js";
 import { competition, priceSegments } from "./competition.js";
 import { traffic } from "./traffic.js";
-import { criterion1 } from "./criterion1.js";
+import { criterion1, summarizeCriterion1 } from "./criterion1.js";
+import { applyPriceBand, wholeNicheRef } from "./price-band.js";
 import { economics } from "./economics.js";
 import { budget } from "./budget.js";
 import { challenger } from "./challenger.js";
@@ -14,11 +15,26 @@ export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
   const inputs = { ...analysis.inputs, coreKeyword: analysis.coreKeyword };
   const agg = analysis.aggregates || {};
-  const p = { xray: agg.xray || null, cerebro: agg.cerebro || null, poe: agg.poe || null, sqp: agg.sqp || null, inputs, thresholds: th, patents: analysis.patents || null };
+  let p = { xray: agg.xray || null, cerebro: agg.cerebro || null, poe: agg.poe || null, sqp: agg.sqp || null, inputs, thresholds: th, patents: analysis.patents || null };
 
+  // Ценовой диапазон (spec 003): конкуренция считается по «виду» — листингам коридора; спрос, уровень данных, сегменты цен и размер рынка (1a) — по всей нише.
+  const whole = p;
+  const bandRes = applyPriceBand(whole);
+  const band = bandRes.summary;
+  if (band.active) p = { ...whole, xray: bandRes.view.xray, poe: bandRes.view.poe };
   p.competition = competition(p);
-  p.traffic = traffic(p);
+  p.traffic = traffic(whole);
   p.criterion1 = criterion1(p);
+  if (band.active) {
+    const compAll = competition(whole);
+    const c1All = criterion1({ ...whole, competition: compAll, traffic: p.traffic });
+    const items = { ...p.criterion1.items };
+    items["1a"] = { ...c1All.items["1a"], bandValue: band.source === "xray" ? band.revenueBand : null, bandShare: band.revenueShare };
+    for (const k of ["1b", "1d", "1e", "1f"]) { items[k] = { ...items[k], inBand: true }; if (band.sample === "insufficient" && items[k].source !== "manual") items[k].note = `в диапазоне ${band.label} меньше ${th.priceBand.minSample} листингов — показатель не считается`; }
+    for (const k of ["1c", "1g", "1h"]) items[k] = c1All.items[k]; // спрос от цены не зависит
+    p.criterion1 = summarizeCriterion1(items, th.criterion1);
+    band.whole = { ...wholeNicheRef(compAll, c1All.items["1b"].value), revenue: c1All.items["1a"].value };
+  }
   // цена по умолчанию = медиана 1b, CPC по умолчанию = bid core-ключа
   const price = inputs.price ?? p.criterion1.items["1b"].value ?? null;
   const cpcFromCerebro = inputs.cpc === null || inputs.cpc === undefined || inputs.cpc === "";
@@ -27,10 +43,10 @@ export function compute(analysis) {
   p.budget = budget({ ...inputs, price }, th, { roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value, revenueSource: p.criterion1.items["1a"].source });
   p.challenger = challenger(p);
   p.scorecard = scorecard(p);
-  const g0 = gate0(p);
+  const g0 = gate0(whole);
   const results = {
     gate0: g0, criterion1: p.criterion1, economics: p.economics, budget: p.budget, traffic: p.traffic, competition: p.competition,
-    priceSegments: priceSegments(p), challenger: p.challenger, scorecard: p.scorecard,
+    priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard,
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p),
   };
