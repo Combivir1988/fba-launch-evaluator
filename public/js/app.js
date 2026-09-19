@@ -7,12 +7,13 @@ import { toNum } from "/shared/num.js";
 import { detectAndParse } from "./files.js";
 import { history } from "./history.js";
 import { runAi, runPatentScan, pendingJob } from "./ai.js";
+import { api, goLogin } from "/js/api.js";
 import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./export.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const R = () => window.FBARender;
-const S = { a: newAnalysis(), token: localStorage.getItem("fba_token") || "", fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: localStorage.getItem("fba_model") || "", modelPatents: localStorage.getItem("fba_model_patents") || "" };
+const S = { a: newAnalysis(), user: null, fromHistory: false, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: "", modelPatents: "" };
 const modelAi = () => (S.models.includes(S.model) ? S.model : S.models[0] || "");
 const modelPatents = () => (S.models.includes(S.modelPatents) ? S.modelPatents : modelAi());
 const renderOpts = () => ({ static: false, models: S.models, selectedModel: modelAi(), selectedPatentModel: modelPatents(), aiRunning: S.aiBusy, patentsRunning: S.patBusy });
@@ -50,22 +51,26 @@ function showTab(name) {
   if (name === "thresholds") renderThresholds();
 }
 
-// ---------- login ----------
-async function checkToken(token) {
-  try { const r = await fetch("/api/auth/check", { method: "POST", headers: { "x-app-token": token } }); return r.status; } catch { return 0; }
+// ---------- учётная запись ----------
+/** Без сеанса приложение не работает: api() сам уводит на /login.html. Модели AI хранятся в аккаунте (одноразово переносим из браузера). */
+async function initUser() {
+  const me = await api("GET", "/api/auth/me");
+  if (me.mustChangePassword) { goLogin("#change"); throw new Error("password change required"); }
+  S.user = me.user;
+  const st = me.user.settings || {}; const patch = {};
+  for (const [key, ls, prop] of [["modelAi", "fba_model", "model"], ["modelPatents", "fba_model_patents", "modelPatents"]]) {
+    const local = localStorage.getItem(ls);
+    if (st[key]) S[prop] = st[key]; else if (local) { S[prop] = local; patch[key] = local; }
+    localStorage.removeItem(ls);
+  }
+  localStorage.removeItem("fba_token");
+  if (Object.keys(patch).length) api("PATCH", "/api/auth/settings", patch).catch(() => {});
+  $("#user-name").textContent = me.user.name + (me.user.role === "admin" ? " · админ" : "");
+  $("#user-chip").classList.remove("hidden");
 }
-async function initLogin() {
-  if (S.token) { const st = await checkToken(S.token); if (st === 204 || st === 503 || st === 0) { if (st === 503) toast("На сервере не задан APP_PASSWORD — AI недоступен"); return; } }
-  $("#login").classList.remove("hidden");
-}
-$("#login-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const pass = $("#login-pass").value; const st = await checkToken(pass);
-  if (st === 204) { S.token = pass; localStorage.setItem("fba_token", pass); $("#login").classList.add("hidden"); toast("Доступ подтверждён"); }
-  else if (st === 503) { $("#login-msg").textContent = "Сервер без APP_PASSWORD: AI недоступен, расчёты работают."; S.token = ""; $("#login").classList.add("hidden"); }
-  else $("#login-msg").textContent = st === 0 ? "Сервер недоступен" : "Неверный пароль";
-});
-$("#login-skip").addEventListener("click", () => $("#login").classList.add("hidden"));
+async function logout() { try { await api("POST", "/api/auth/logout", undefined, { noRedirect: true }); } catch {} goLogin(); }
+$("#user-logout").addEventListener("click", logout);
+window.addEventListener("storage-down", () => toast("Хранилище недоступно — повторите через несколько секунд", 7000));
 
 // ---------- state → form ----------
 function syncForm() {
@@ -117,8 +122,8 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("change", (e) => {
   const el = e.target;
-  if (el.id === "set-model-ai") { S.model = el.value; localStorage.setItem("fba_model", el.value); renderSettings(); R().update(dash, S.a, renderOpts(), ["ai", "patents"]); return; }
-  if (el.id === "set-model-patents") { S.modelPatents = el.value; localStorage.setItem("fba_model_patents", el.value); renderSettings(); R().update(dash, S.a, renderOpts(), ["patents"]); return; }
+  if (el.id === "set-model-ai") { S.model = el.value; api("PATCH", "/api/auth/settings", { modelAi: el.value }).catch((e) => toast("Не удалось сохранить выбор модели: " + e.message)); renderSettings(); R().update(dash, S.a, renderOpts(), ["ai", "patents"]); return; }
+  if (el.id === "set-model-patents") { S.modelPatents = el.value; api("PATCH", "/api/auth/settings", { modelPatents: el.value }).catch((e) => toast("Не удалось сохранить выбор модели: " + e.message)); renderSettings(); R().update(dash, S.a, renderOpts(), ["patents"]); return; }
   if (el.dataset.kw) { const set = new Set(S.a.inputs.clusterKeywords); el.checked ? set.add(el.dataset.kw) : set.delete(el.dataset.kw); S.a.inputs.clusterKeywords = [...set]; $("#cluster-count").textContent = `(${set.size})`; markDirty(); scheduleFull(); }
   if (el.dataset.brand) { const set = new Set(S.a.inputs.excludedBrands); el.checked ? set.add(el.dataset.brand) : set.delete(el.dataset.brand); S.a.inputs.excludedBrands = [...set]; reannotateCerebro(); markDirty(); scheduleFull(); }
   if (el.dataset.ov) { const [k, f] = el.dataset.ov.split(":"); const o = (S.a.inputs.manualOverrides[k] ||= { value: null, note: "" }); if (f === "value") o.value = numOrNull(el.value); else o.note = el.value; if (o.value === null && !o.note) delete S.a.inputs.manualOverrides[k]; markDirty(); scheduleFull(); }
@@ -241,7 +246,6 @@ $("#btn-patents").addEventListener("click", () => startPatentScan());
 $("#btn-ai").addEventListener("click", () => startAi());
 async function startAi(resumeJobId = null) {
   if (S.aiBusy) return;
-  if (!S.token) { $("#login").classList.remove("hidden"); toast("Для AI нужен пароль доступа"); return; }
   if (!S.a.results) renderAll();
   S.aiBusy = true; $("#btn-ai").disabled = true;
   const chosen = modelAi();
@@ -249,7 +253,7 @@ async function startAi(resumeJobId = null) {
   const prog = $("#ai-progress"), status = $("#ai-status");
   if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = resumeJobId ? "продолжаю задачу после перезагрузки…" : `запрос… (${chosen || "модель по умолчанию"})`;
   try {
-    const ai = await runAi(S.a, { token: S.token, model: chosen || undefined, resumeJobId,
+    const ai = await runAi(S.a, { model: chosen || undefined, resumeJobId,
       onMeta: (m) => { if (status) status.textContent = `модель ${m.model}…`; },
       onThinking: (t) => { if (prog) { prog.textContent += t; prog.scrollTop = prog.scrollHeight; } },
       onProgress: (n) => { if (status) status.textContent = `формирую ответ… ${n} симв.`; },
@@ -260,14 +264,13 @@ async function startAi(resumeJobId = null) {
     toast(ai.adjustedByRules ? "AI-вердикт получен и скорректирован правилами" : "AI-вердикт получен");
   } catch (err) {
     console.error(err);
-    if (err.code === "auth") { S.token = ""; localStorage.removeItem("fba_token"); $("#login").classList.remove("hidden"); }
+    if (err.code === "auth") goLogin();
     if (status) status.textContent = "ошибка: " + err.message; toast("AI: " + err.message, 7000);
   } finally { S.aiBusy = false; $("#btn-ai").disabled = false; R().update(dash, S.a, renderOpts(), ["ai"]); }
 }
 
 async function startPatentScan(resumeJobId = null) {
   if (S.patBusy) return;
-  if (!S.token) { $("#login").classList.remove("hidden"); toast("Для патентного скана нужен пароль доступа"); return; }
   if (!S.a.coreKeyword && !S.a.niche) return toast("Укажите нишу / главный ключ");
   if (!S.a.results) renderAll();
   S.patBusy = true; $("#btn-patents").disabled = true;
@@ -279,21 +282,21 @@ async function startPatentScan(resumeJobId = null) {
     const hypotheses = (S.a.ai?.differentiation || []).map((d) => d.hypothesis);
     const chosen = modelPatents();
     const scan = await runPatentScan(S.a, { niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} },
-      { token: S.token, resumeJobId, onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
+      { resumeJobId, onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
     S.a.patents = scan; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.staleSince = new Date().toISOString(); // AI-вердикт считался без этих данных
     renderAll(); await persistJobResult("Патентный скан");
     setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[scan.status] || scan.status}`);
     toast("Патентный скан завершён — критерий 8 получил статус «допущение»");
     document.getElementById("sec-patents")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (e) { console.error(e); if (e.code === "auth") { S.token = ""; localStorage.removeItem("fba_token"); $("#login").classList.remove("hidden"); } setStatus("ошибка: " + e.message); toast("Патентный скан: " + e.message, 7000); }
+  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); setStatus("ошибка: " + e.message); toast("Патентный скан: " + e.message, 7000); }
   finally { S.patBusy = false; $("#btn-patents").disabled = false; R().update(dash, S.a, renderOpts(), ["patents"]); }
 }
 
 /** После загрузки анализа — продолжить незавершённые задачи (страница перезагружалась во время AI). */
 function resumePendingJobs() {
   const hourAgo = Date.now() - 60 * 60 * 1000;
-  const a = pendingJob.get(S.a.id, "analyze"); if (a?.jobId && a.startedAt > hourAgo && S.token) startAi(a.jobId); else if (a) pendingJob.clear(S.a.id, "analyze");
-  const p = pendingJob.get(S.a.id, "patents"); if (p?.jobId && p.startedAt > hourAgo && S.token) startPatentScan(p.jobId); else if (p) pendingJob.clear(S.a.id, "patents");
+  const a = pendingJob.get(S.a.id, "analyze"); if (a?.jobId && a.startedAt > hourAgo) startAi(a.jobId); else if (a) pendingJob.clear(S.a.id, "analyze");
+  const p = pendingJob.get(S.a.id, "patents"); if (p?.jobId && p.startedAt > hourAgo) startPatentScan(p.jobId); else if (p) pendingJob.clear(S.a.id, "patents");
 }
 
 // ---------- save / export / new ----------
@@ -351,9 +354,61 @@ function renderSettings() {
   const fill = (id, cur) => { const el = $(id); el.innerHTML = S.models.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(m)}${/:free$/.test(m) ? " — бесплатно" : ""}</option>`).join("") || '<option value="">(список моделей недоступен — сервер не отвечает)</option>'; };
   fill("#set-model-ai", modelAi()); fill("#set-model-patents", modelPatents());
   $("#set-model-hint").textContent = `AI-вердикт: ${modelAi() || "—"} · патентный скан: ${modelPatents() || "—"}. ${FREE_HINT}`;
-  $("#set-login-state").textContent = S.token ? "пароль доступа сохранён в этом браузере" : "не авторизован — AI недоступен";
+  $("#set-login-state").textContent = S.user ? `Вы вошли как ${S.user.name} (логин ${S.user.login}, ${S.user.role === "admin" ? "администратор" : "пользователь"}).` : "";
+  $("#pw-user").value = S.user?.login || "";
+  $("#set-users").classList.toggle("hidden", S.user?.role !== "admin");
+  if (S.user?.role === "admin") renderUsers();
 }
-$("#set-logout").addEventListener("click", () => { S.token = ""; localStorage.removeItem("fba_token"); renderSettings(); $("#login").classList.remove("hidden"); toast("Пароль доступа удалён из браузера"); });
+$("#set-logout").addEventListener("click", logout);
+$("#pw-form").addEventListener("submit", async (e) => {
+  e.preventDefault(); const msg = $("#pw-msg"); msg.textContent = "";
+  try { await api("POST", "/api/auth/password", { current: $("#pw-current").value, next: $("#pw-next").value }); e.target.reset(); $("#pw-user").value = S.user.login; msg.textContent = "Пароль изменён, остальные сеансы закрыты."; toast("Пароль изменён"); }
+  catch (err) { msg.textContent = err.message; }
+});
+
+// ---------- пользователи (только администратор) ----------
+function genPassword(n = 14) {
+  const abc = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // без похожих символов l/1/I/O/0
+  const buf = new Uint32Array(n); crypto.getRandomValues(buf);
+  return Array.from(buf, (x) => abc[x % abc.length]).join("");
+}
+async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Скопировано"); } catch { window.prompt("Скопируйте вручную:", t); } }
+async function renderUsers() {
+  if (!$("#un-pass").value) $("#un-pass").value = genPassword();
+  let list = [];
+  try { list = await api("GET", "/api/users"); } catch (e) { $("#users-list").innerHTML = `<tr><td colspan="7" class="muted">Не удалось загрузить: ${esc(e.message)}</td></tr>`; return; }
+  const fmt = (d) => (d ? new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "—");
+  $("#users-list").innerHTML = list.map((u) => {
+    const self = u.id === S.user.id; const lockedNow = u.lockedUntil && new Date(u.lockedUntil) > new Date();
+    const status = !u.active ? '<span class="chip na">отключён</span>' : lockedNow ? '<span class="chip warn">заблокирован до ' + esc(fmt(u.lockedUntil)) + "</span>" : u.mustChangePassword ? '<span class="chip">временный пароль</span>' : '<span class="chip ok">активен</span>';
+    return `<tr class="${u.active ? "" : "off"}"><td>${esc(u.name)}${self ? ' <span class="muted">(вы)</span>' : ""}</td><td><code>${esc(u.login)}</code></td><td>${u.role === "admin" ? "администратор" : "пользователь"}</td><td>${status}</td><td>${esc(fmt(u.lastLoginAt))}</td><td>${u.analyses ?? 0}</td>
+      <td><div class="acts"><button data-uact="role" data-id="${u.id}" data-role="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Сделать пользователем" : "Сделать админом"}</button><button data-uact="reset" data-id="${u.id}" data-name="${esc(u.name)}">Сбросить пароль</button><button data-uact="toggle" data-id="${u.id}" data-active="${u.active ? "0" : "1"}" class="${u.active ? "danger" : ""}">${u.active ? "Отключить" : "Включить"}</button></div></td></tr>`;
+  }).join("") || '<tr><td colspan="7" class="muted">Пользователей нет</td></tr>';
+}
+$("#users-list").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-uact]"); if (!b) return;
+  try {
+    if (b.dataset.uact === "role") await api("PATCH", `/api/users/${b.dataset.id}`, { role: b.dataset.role });
+    if (b.dataset.uact === "toggle") { if (b.dataset.active === "0" && !confirm("Отключить пользователя? Он потеряет доступ в течение минуты, его анализы останутся.")) return; await api("PATCH", `/api/users/${b.dataset.id}`, { active: b.dataset.active === "1" }); }
+    if (b.dataset.uact === "reset") {
+      if (!confirm(`Сбросить пароль пользователю «${b.dataset.name}»? Его текущие сеансы будут закрыты.`)) return;
+      const pw = genPassword(); await api("POST", `/api/users/${b.dataset.id}/reset-password`, { password: pw });
+      window.prompt("Новый временный пароль — передайте его пользователю (при входе он задаст свой):", pw);
+    }
+    renderUsers();
+  } catch (err) { toast(err.message, 7000); }
+});
+$("#un-gen").addEventListener("click", () => { $("#un-pass").value = genPassword(); });
+$("#un-copy").addEventListener("click", () => copyText(`Логин: ${$("#un-login").value.trim().toLowerCase()}\nВременный пароль: ${$("#un-pass").value}\n${location.origin}`));
+$("#user-new").addEventListener("submit", async (e) => {
+  e.preventDefault(); const msg = $("#un-msg"); msg.textContent = "";
+  try {
+    const r = await api("POST", "/api/users", { name: $("#un-name").value, login: $("#un-login").value, role: $("#un-role").value, password: $("#un-pass").value });
+    msg.textContent = `Добавлен ${r.user.name} (${r.user.login}). Передайте ему логин и временный пароль.`;
+    await copyText(`Логин: ${r.user.login}\nВременный пароль: ${$("#un-pass").value}\n${location.origin}`);
+    $("#un-name").value = ""; $("#un-login").value = ""; $("#un-pass").value = genPassword(); renderUsers();
+  } catch (err) { msg.textContent = err.message; }
+});
 $("#set-theme").addEventListener("click", () => $("#theme-toggle").click());
 $("#set-side").addEventListener("click", () => { const c = $("#tab-analysis").classList.contains("side-collapsed"); setSide(!c); showTab("analysis"); });
 
@@ -416,7 +471,7 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
   try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; } catch {}
   if (!window.Chart) toast("Chart.js не загрузился — графики не будут отрисованы. Проверьте блокировщик скриптов.", 10000);
 
-  await initLogin();
+  try { await initUser(); } catch { return; } // без сеанса api() уже увёл на страницу входа
   updateHistCount();
   const last = localStorage.getItem("fba_last");
   if (last) { try { const d = await history.get(last); if (d) { loadAnalysis(d, true); return; } } catch {} }

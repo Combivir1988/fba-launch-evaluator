@@ -1,10 +1,9 @@
 import { chromium } from "playwright";
-import { spawn } from "node:child_process";
-const srv = spawn(process.execPath, ["server/index.js"], { env: { ...process.env, PORT: "3996", APP_PASSWORD: "dev", MOCK_AI: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-await new Promise((r) => setTimeout(r, 1500));
+import { startServer, loginContext } from "./probe-helper.mjs";
+const { srv, base } = await startServer(3996);
 const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const logs = []; page.on("console", (m) => { if (m.type() === "error") logs.push(m.text()); }); page.on("pageerror", (e) => logs.push("pageerror: " + e.message));
-await page.addInitScript(() => localStorage.setItem("fba_token", "dev"));
+await loginContext(page.context(), base);
 await page.goto("http://127.0.0.1:3996/", { waitUntil: "networkidle" });
 const box = async () => page.evaluate(() => { const s = document.getElementById("side").getBoundingClientRect(); const d = document.getElementById("dashboard").getBoundingClientRect(); return { collapsed: document.getElementById("tab-analysis").classList.contains("side-collapsed"), sideW: Math.round(s.width), sideX: Math.round(s.x), dashX: Math.round(d.x), dashW: Math.round(d.width), openBtnHidden: document.getElementById("side-open").classList.contains("hidden") }; });
 console.log("before:", JSON.stringify(await box()));

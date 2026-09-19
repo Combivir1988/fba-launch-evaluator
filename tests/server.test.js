@@ -1,41 +1,36 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { createApp } from "../server/index.js";
-import { configFromEnv } from "../server/claude.js";
+import { startApp } from "./helpers/app.js";
 import { parsePoe } from "../shared/parse-poe.js";
 import { newAnalysis } from "../shared/analysis.js";
 import { compute } from "../shared/compute.js";
 import { buildAiPayload } from "../shared/ai-payload.js";
 import { readJson, POE } from "./helpers.js";
 
-let server, base;
+let T, base, h;
 before(async () => {
-  const cfg = configFromEnv({ APP_PASSWORD: "test-pass", MOCK_AI: "1", RATE_LIMIT_PER_HOUR: "5" });
-  server = createApp(cfg).listen(0);
-  await new Promise((r) => server.once("listening", r));
-  base = `http://127.0.0.1:${server.address().port}`;
+  T = await startApp({ RATE_LIMIT_PER_HOUR: "5" });
+  base = T.base;
+  h = (await T.userWithSession({ login: "tester", name: "Тестер" })).headers;
 });
-after(() => server.close());
+after(async () => { await T.close(); });
 
 test("health без авторизации", async () => {
   const r = await fetch(`${base}/api/health`);
   assert.equal(r.status, 200);
   const j = await r.json();
-  assert.equal(j.ok, true); assert.equal(j.mock, true);
+  assert.equal(j.ok, true); assert.equal(j.mock, true); assert.equal(j.storage, "pglite");
 });
 
-test("401 без токена, 204 с токеном", async () => {
-  assert.equal((await fetch(`${base}/api/auth/check`, { method: "POST" })).status, 401);
-  assert.equal((await fetch(`${base}/api/auth/check`, { method: "POST", headers: { "x-app-token": "wrong" } })).status, 401);
-  assert.equal((await fetch(`${base}/api/auth/check`, { method: "POST", headers: { "x-app-token": "test-pass" } })).status, 204);
+test("401 без сеанса; общий пароль X-App-Token больше не действует", async () => {
+  assert.equal((await fetch(`${base}/api/auth/me`)).status, 401);
+  assert.equal((await fetch(`${base}/api/auth/me`, { headers: { "x-app-token": "test-pass" } })).status, 401);
+  assert.equal((await fetch(`${base}/api/auth/me`, { headers: h })).status, 200);
 });
 
-test("503 когда APP_PASSWORD не задан", async () => {
-  const s = createApp(configFromEnv({ MOCK_AI: "1" })).listen(0);
-  await new Promise((r) => s.once("listening", r));
-  const r = await fetch(`http://127.0.0.1:${s.address().port}/api/auth/check`, { method: "POST", headers: { "x-app-token": "x" } });
-  assert.equal(r.status, 503);
-  s.close();
+test("createApp без БД — понятная ошибка", async () => {
+  const { createApp } = await import("../server/index.js");
+  assert.throws(() => createApp({}), /нужна БД/);
 });
 
 test("статика: index.html и shared-модули отдаются", async () => {
@@ -51,11 +46,10 @@ test("analyze (MOCK) как задача: 202 jobId → SSE replay meta/thinking
   a.aggregates = { poe };
   a.results = compute(a);
   const payload = buildAiPayload(a);
-  const h = { "x-app-token": "test-pass", "content-type": "application/json" };
   const r = await fetch(`${base}/api/analyze`, { method: "POST", headers: h, body: JSON.stringify({ niche: a.niche, coreKeyword: a.coreKeyword, payload }) });
   assert.equal(r.status, 202);
   const { jobId } = await r.json(); assert.ok(jobId);
-  const ev = await fetch(`${base}/api/jobs/${jobId}/events?token=test-pass`);
+  const ev = await fetch(`${base}/api/jobs/${jobId}/events`, { headers: h });
   assert.equal(ev.status, 200); assert.match(ev.headers.get("content-type"), /text\/event-stream/);
   const text = await ev.text();
   const events = [...text.matchAll(/event: (\w+)\ndata: (.*)\n/g)].map((m) => [m[1], JSON.parse(m[2])]);
@@ -65,16 +59,16 @@ test("analyze (MOCK) как задача: 202 jobId → SSE replay meta/thinking
   const done = events.find((e) => e[0] === "done")[1];
   assert.equal(done.verdict.verdict, a.results.verdict.ceiling);
   // replay после завершения — те же события (сценарий перезагрузки страницы)
-  const again = await fetch(`${base}/api/jobs/${jobId}/events?token=test-pass`).then((x) => x.text());
+  const again = await fetch(`${base}/api/jobs/${jobId}/events`, { headers: h }).then((x) => x.text());
   assert.ok(again.includes("event: done"));
   const st = await fetch(`${base}/api/jobs/${jobId}`, { headers: h }).then((x) => x.json());
   assert.equal(st.status, "done"); assert.equal(st.result.verdict.verdict, done.verdict.verdict);
   assert.equal((await fetch(`${base}/api/jobs/nope`, { headers: h })).status, 404);
-  assert.equal((await fetch(`${base}/api/jobs/${jobId}/events`)).status, 401, "без токена нельзя");
+  assert.equal((await fetch(`${base}/api/jobs/${jobId}/events`)).status, 401, "без сеанса нельзя");
+  assert.equal((await fetch(`${base}/api/jobs/${jobId}/events?token=test-pass`)).status, 401, "токен в URL больше не принимается");
 });
 
 test("analyze: 400 без payload; лимит запросов 429", async () => {
-  const h = { "x-app-token": "test-pass", "content-type": "application/json" };
   const r = await fetch(`${base}/api/analyze`, { method: "POST", headers: h, body: "{}" });
   assert.equal(r.status, 400);
   let last;

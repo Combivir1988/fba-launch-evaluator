@@ -21,16 +21,20 @@
 
 ```bash
 npm install
-cp .env.example .env      # OPENROUTER_API_KEY (или ANTHROPIC_API_KEY), APP_PASSWORD
-npm test                  # ~50 тестов на реальных фикстурах
+cp .env.example .env      # OPENROUTER_API_KEY (или ANTHROPIC_API_KEY), ADMIN_LOGIN, ADMIN_PASSWORD
+npm test                  # ~100 тестов: расчёты на реальных фикстурах + аккаунты на Postgres в процессе (PGlite)
 npm start                 # http://localhost:3000
 ```
 
-Без ключа AI: `MOCK_AI=1 APP_PASSWORD=dev npm start` (или `npm run dev`) — AI вернёт демонстрационный вердикт.
+Без ключа AI и без внешней базы: `npm run dev` — демонстрационный вердикт, локальная база PGlite в `.data/pg`, вход `admin` / `admin-dev-pass` (при первом входе приложение попросит сменить пароль). PGlite занимает ~700 MB RAM — только для разработки и тестов.
+
+**Учётные записи.** Каждый входит под своим логином; людей заводит администратор в «Настройки → Пользователи». Первый администратор создаётся из `ADMIN_LOGIN` / `ADMIN_PASSWORD` при старте, если в базе нет активного администратора (так же восстанавливается потерянный доступ).
+
+**База данных.** Production — Postgres через `DATABASE_URL` (бесплатно: Neon Free, pooled-строка подключения). Схема создаётся сама при старте (`server/db/migrations`).
 
 ## Деплой (бесплатно)
 
-**Render Free** (рекомендуется): New → Blueprint → этот репозиторий (`render.yaml`), задать `OPENROUTER_API_KEY` и `APP_PASSWORD`. Сервер засыпает после 15 мин простоя — первый запрос до ~60 с.
+**Render Free** (рекомендуется): New → Blueprint → этот репозиторий (`render.yaml`), задать `OPENROUTER_API_KEY`, `DATABASE_URL`, `ADMIN_LOGIN`, `ADMIN_PASSWORD`. Сервер засыпает после 15 мин простоя — первый запрос до ~60 с.
 
 **Railway**: Deploy from GitHub — подхватит `Dockerfile` / `railway.json` (после пробного кредита тариф платный).
 
@@ -45,12 +49,15 @@ npm start                 # http://localhost:3000
 | `OPENROUTER_MODEL` / `OPENROUTER_MODELS` | модель по умолчанию / список для выбора в UI | `google/gemini-3.8-flash` / см. `.env.example` |
 | `OPENROUTER_REASONING` | запрашивать reasoning у модели | `0` |
 | `ANTHROPIC_API_KEY` | ключ Claude напрямую (при `AI_PROVIDER=anthropic`) | — |
-| `APP_PASSWORD` | общий пароль доступа к `/api/*` | — (без него 503) |
+| `DATABASE_URL` | строка подключения Postgres (Neon pooled). В production обязательна | — (локально PGlite) |
+| `ADMIN_LOGIN` / `ADMIN_PASSWORD` | первый администратор (пароль ≥ 10 символов, меняется при первом входе) | — |
+| `MAX_JOBS` | общий предел одновременных AI-задач | `4` |
+| `LOGIN_RATE_LIMIT` | попыток входа с одного IP за 10 минут | `10` |
 | `CLAUDE_MODEL` | модель | `claude-opus-5` |
 | `CLAUDE_EFFORT` | `low\|medium\|high\|xhigh\|max` | `high` |
 | `CLAUDE_FALLBACKS` | серверные fallbacks при refusal (beta) | `1` |
 | `MOCK_AI` | демонстрационный вердикт без Claude | `0` |
-| `RATE_LIMIT_PER_HOUR` | лимит `/api/analyze` на IP | `20` |
+| `RATE_LIMIT_PER_HOUR` | лимит запусков AI-задач на пользователя | `20` |
 | `PORT` | порт | `3000` |
 
 Стоимость одного AI-анализа (≈ 6–10k входных + 2–3k выходных токенов): `google/gemini-3.8-flash` ≈ $0.02, `openai/gpt-5.6-sol` ≈ $0.05, `anthropic/claude-sonnet-5` ≈ $0.05, `anthropic/claude-opus-5` ≈ $0.10; модели `:free` на OpenRouter — $0 (с лимитами частоты). Структурированный вывод: каскад json_schema → json_object → извлечение JSON из текста, ответ всегда валидируется по схеме.
@@ -61,8 +68,8 @@ npm start                 # http://localhost:3000
 - `server/` — Express: статика, авторизация, rate-limit, `POST /api/analyze` (SSE-стрим OpenRouter/Claude, structured outputs), `POST /api/patents/scan` (SSE: запросы → Google Patents → оценка claims).
 - `public/` — SPA без сборки: `js/app.js` (состояние), `js/render.js` (дашборд, инлайнится в экспорт), `js/history.js` (IndexedDB), `vendor/` (Chart.js, PapaParse).
 - `tests/` — `node --test` на фикстурах (`tests/fixtures/`).
-- `specs/001-fba-launch-evaluator/` — spec / plan / research / data-model / contracts / tasks.
+- `specs/001-fba-launch-evaluator/`, `specs/002-team-accounts-sharing/` — spec / plan / research / data-model / contracts / tasks.
 
 ## Безопасность
 
-Ключи AI-провайдеров никогда не попадают в браузер. Все `/api/*` кроме `/api/health` требуют заголовок `X-App-Token` = `APP_PASSWORD` (сравнение в постоянное время), лимит 20 запросов/час на IP, тело ≤ 1 МБ, CSP без inline-скриптов, логи без содержимого запросов.
+Ключи AI-провайдеров никогда не попадают в браузер. Все `/api/*`, кроме `/api/health` и входа, требуют сеанс: непрозрачный токен в cookie `HttpOnly; Secure; SameSite=Lax`, в базе хранится только его SHA-256. Пароли — scrypt (N=2^15, r=8, p=3) с очередью по одному вызову; 5 неудачных входов подряд блокируют логин на 15 минут, ответ не раскрывает, существует ли логин. Изменяющие запросы принимаются только как JSON с заголовком `X-Requested-With` и с того же origin (CSRF). Отключение пользователя закрывает его сеансы сразу.

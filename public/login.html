@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Вход · FBA Launch Evaluator</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body class="login-page">
+<main class="login-wrap">
+  <form class="panel login" id="login-form" autocomplete="on">
+    <h1>📦 FBA Launch Evaluator</h1>
+    <p class="muted">Войдите под своей учётной записью. Логин и временный пароль выдаёт администратор.</p>
+    <div class="field"><label for="login-name">Логин</label><input id="login-name" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="40"></div>
+    <div class="field"><label for="login-pass">Пароль</label><input id="login-pass" name="password" type="password" autocomplete="current-password" required maxlength="200"></div>
+    <div class="row"><button class="primary" type="submit" id="login-btn">Войти</button></div>
+    <p id="login-msg" class="notice fail hidden" role="alert"></p>
+  </form>
+
+  <form class="panel login hidden" id="change-form" autocomplete="on">
+    <h1>Смена пароля</h1>
+    <p class="muted" id="change-hello">Пароль, выданный администратором, временный. Задайте свой — не короче 10 символов.</p>
+    <input type="text" id="change-user" name="username" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true">
+    <div class="field"><label for="change-current">Текущий (временный) пароль</label><input id="change-current" type="password" autocomplete="current-password" required maxlength="200"></div>
+    <div class="field"><label for="change-next">Новый пароль</label><input id="change-next" type="password" autocomplete="new-password" required minlength="10" maxlength="200"></div>
+    <div class="field"><label for="change-next2">Новый пароль ещё раз</label><input id="change-next2" type="password" autocomplete="new-password" required minlength="10" maxlength="200"></div>
+    <div class="row"><button class="primary" type="submit" id="change-btn">Сохранить и продолжить</button><button type="button" id="change-logout">Выйти</button></div>
+    <p id="change-msg" class="notice fail hidden" role="alert"></p>
+  </form>
+</main>
+<script type="module" src="js/login.js"></script>
+</body>
+</html>

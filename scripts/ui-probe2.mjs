@@ -1,14 +1,14 @@
 import { chromium } from "playwright";
-import { spawn } from "node:child_process";
+import { startServer, loginContext } from "./probe-helper.mjs";
 import path from "node:path";
 const root = process.cwd(); const OUT = "C:/Users/User/AppData/Local/Temp/claude/f--Claude-Code-Allegro/c3aa2767-d354-43da-bb93-da6326ff096b/scratchpad/";
-const srv = spawn(process.execPath, ["server/index.js"], { env: { ...process.env, PORT: "3998", APP_PASSWORD: "dev", MOCK_AI: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-await new Promise((r) => setTimeout(r, 1500));
+const { srv, base } = await startServer(3998);
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, colorScheme: "dark" });
 const page = await ctx.newPage();
 const logs = []; page.on("console", (m) => { if (["error", "warning"].includes(m.type())) logs.push(m.type() + ": " + m.text()); }); page.on("pageerror", (e) => logs.push("pageerror: " + e.message));
-await page.addInitScript(() => { localStorage.setItem("fba_theme", "dark"); localStorage.setItem("fba_token", "dev"); });
+await page.addInitScript(() => { localStorage.setItem("fba_theme", "dark"); });
+await loginContext(page.context(), base);
 await page.goto("http://127.0.0.1:3998/", { waitUntil: "networkidle" });
 await page.fill("#f-core", "sound deadening mat");
 await page.setInputFiles("#file-input", ["tests/fixtures/Helium_10_Xray_2026-08-21.csv", "tests/fixtures/US_AMAZON_cerebro__2026-08-21.csv", "tests/fixtures/POE_urinal_screen_deodorizer_2026-09-15.json"].map((f) => path.join(root, f)));

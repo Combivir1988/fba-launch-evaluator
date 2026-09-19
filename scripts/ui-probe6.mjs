@@ -1,15 +1,15 @@
 // Регресс: результат патентного скана не теряется после «История → Открыть» того же анализа и после F5
 // (анализ после перезагрузки всегда fromHistory=true, автосохранение выключено — результат задачи должен сохраняться явно).
 import { chromium } from "playwright";
-import { spawn } from "node:child_process";
+import { startServer, loginContext } from "./probe-helper.mjs";
 import path from "node:path";
 const root = process.cwd();
-const srv = spawn(process.execPath, ["server/index.js"], { env: { ...process.env, PORT: "3996", APP_PASSWORD: "dev", MOCK_AI: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-await new Promise((r) => setTimeout(r, 1500));
+const { srv, base } = await startServer(3996);
 const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
 const logs = []; page.on("console", (m) => { if (m.type() === "error") logs.push(m.text()); }); page.on("pageerror", (e) => logs.push("pageerror: " + e.message));
-await page.addInitScript(() => { if (!localStorage.getItem("probe6")) { localStorage.clear(); localStorage.setItem("probe6", "1"); } localStorage.setItem("fba_token", "dev"); });
+await page.addInitScript(() => { if (!localStorage.getItem("probe6")) { localStorage.clear(); localStorage.setItem("probe6", "1"); } });
 const chip = () => page.evaluate(() => document.querySelector("#sec-patents h2 .chip")?.textContent);
+await loginContext(page.context(), base);
 await page.goto("http://127.0.0.1:3996/", { waitUntil: "networkidle" });
 await page.fill("#f-core", "urinal screen deodorizer");
 await page.setInputFiles("#file-input", [path.join(root, "tests/fixtures/POE_urinal_screen_deodorizer_2026-09-15.json")]);

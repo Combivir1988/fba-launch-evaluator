@@ -38,7 +38,7 @@ test("searchGooglePatents: разбор XHR-ответа", async () => {
 });
 
 test("patentScanStream (mock): stage-события, done со сканом по схеме; критерий 8 → 🟡 допущение", async () => {
-  const cfg = configFromEnv({ MOCK_AI: "1", APP_PASSWORD: "x" });
+  const cfg = configFromEnv({ MOCK_AI: "1" });
   const ev = []; for await (const e of patentScanStream({ niche: "urinal screen deodorizer", coreKeyword: "urinal screen deodorizer", feature: "enzyme odor neutralizer" }, cfg)) ev.push(e);
   const names = ev.map((e) => e.event);
   assert.ok(names.filter((n) => n === "stage").length >= 4);
@@ -64,7 +64,7 @@ test("patentScanStream (mock): stage-события, done со сканом по
 });
 
 test("patentScanStream: реальный поиск и AI подменяются (fetchImpl/aiJson), результат по схеме", async () => {
-  const cfg = configFromEnv({ OPENROUTER_API_KEY: "k", APP_PASSWORD: "x" });
+  const cfg = configFromEnv({ OPENROUTER_API_KEY: "k" });
   const searchJson = { results: { total_num_results: 1, cluster: [{ result: [{ id: "patent/US9309657B2/en", patent: { title: "Floor mat", snippet: "s", priority_date: "2012-09-14", publication_number: "US9309657B2", assignee: "New Pig" } }] }] } };
   const html = readFileSync(join(FIX, "patent_US9309657B2.html"), "utf8");
   const fetchImpl = async (url) => url.includes("/xhr/query") ? new Response(JSON.stringify(searchJson), { status: 200 }) : new Response(html, { status: 200 });
