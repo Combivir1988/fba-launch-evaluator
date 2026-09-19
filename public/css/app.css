@@ -198,7 +198,13 @@ tr.leader td { font-weight: 600; }
 
 /* Узкие экраны (публичная ссылка открывается с телефона, от 360 px): колонка сетки должна сжиматься, а не расти под широкое содержимое. */
 .layout > * { min-width: 0; }
-.panel.section { min-width: 0; overflow-wrap: anywhere; }
+.panel.section { min-width: 0; overflow-wrap: break-word; }
+/* В таблицах слова по буквам не ломаем: узкая таблица прокручивается внутри .tablewrap. */
+th, td { overflow-wrap: normal; word-break: normal; }
+.kwtable td:first-child, .kwtable th:first-child { min-width: 11rem; }
+/* Пары «график + таблица» складываются в столбик по доступной ширине секции (а не окна): при открытой боковой панели места меньше. */
+.two { grid-template-columns: repeat(auto-fit, minmax(min(470px, 100%), 1fr)); }
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: .8rem; }
 .hero > * { min-width: 0; flex: 1 1 260px; }
 .chartbox { min-width: 0; max-width: 100%; } .chartbox canvas { max-width: 100%; }
 @media (max-width: 520px) { .topbar { flex-wrap: wrap; row-gap: .3rem; } .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cards { grid-template-columns: 1fr; } }
