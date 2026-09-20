@@ -145,7 +145,7 @@
     if (e.pending) return `<h2>Экономика <span class="chip pending">ожидает COGS</span></h2>${sliders}
       <div class="notice info">Критерий 2 (2a–2k) и критерий 6 пусты (⚪), пока менеджер не введёт цену и COGS от поставщика. AI не заполняет их оценками. Введите COGS в панели «Экономика» — Gate 1/2 посчитаются мгновенно.</div>`;
     const g1 = e.gate1, g2 = e.gate2;
-    const c2rows = Object.entries(e.criterion2).map(([k, v]) => `<tr><td><b>${k}</b> ${esc(NAMES2[k])}</td><td class="num">${fmtC2(k, v.value)}</td><td>${st(v.status)}</td><td class="muted">${esc(v.note || "")}</td></tr>`).join("");
+    const c2rows = Object.entries(e.criterion2).map(([k, v]) => `<tr><td><b>${k}</b> ${esc(NAMES2[k])}</td><td class="num">${fmtC2(k, v.value)}</td><td>${st(v.status)}</td><td class="muted">${esc(v.note || "")}${k === "2c" && R.cvrHint?.note ? "; " + esc(R.cvrHint.note) : ""}</td></tr>`).join("");
     const s2 = e.criterion2Summary;
     return `<h2>Экономика — Gate 1 / Gate 2 <span class="chip ${g1.status === "pass" ? "ok" : g1.status === "rework" ? "warn" : "fail"}">Gate 1 ${STATUS_LABEL[g1.status]}</span><span class="chip ${g2.status === "pass" ? "ok" : g2.status === "rework" ? "warn" : g2.status === "pending" ? "pending" : "fail"}">Gate 2 ${STATUS_LABEL[g2.status]}</span></h2>
       ${sliders}

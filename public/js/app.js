@@ -596,19 +596,22 @@ $("#set-shares-list").addEventListener("click", (e) => shareAction(e, loadAllSha
 // ---------- подсказка CVR из SQP ----------
 function renderCvrHint() {
   const box = $("#cvr-hint"); if (!box) return; const h = S.a.results?.cvrHint;
-  const pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %"; const cur = S.a.inputs.cvr;
+  const pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %"; const cur = S.a.inputs.cvr; const be = S.a.results?.economics?.breakEvenCvr;
+  const beLine = typeof be === "number" && be > 0 ? `<br>Безубыточный CVR для вашей экономики: <b>${pc(be)}</b> — ниже него реклама съедает всю прибыль с единицы.` : "";
   if (!h) {
-    // Без SQP честного источника конверсии «клик → покупка» нет — говорим об этом прямо, а не оставляем пустое место.
-    const sc = S.a.results?.traffic?.poeConcentration?.searchConv; const be = S.a.results?.economics?.breakEvenCvr;
-    const hasFiles = Object.values(S.a.aggregates || {}).some(Boolean);
-    box.innerHTML = `<b>${pc(cur)} — допущение, не данные.</b> ${hasFiles ? "В загруженных файлах конверсии «клик → покупка» нет: Xray, Cerebro и POE её не содержат." : ""} Подсказка из данных появится после загрузки <b>SQP</b> (Brand Analytics → Search Query Performance) — отчёт доступен только бренду, который уже продаёт по этим запросам; для новой ниши его нет.${typeof sc === "number" ? `<br>Для ориентира POE: ${pc(sc)} поисков в нише заканчиваются покупкой. Это <b>не</b> CVR клика — он всегда выше, потому что кликают не после каждого поиска.` : ""}${typeof be === "number" && be > 0 ? `<br>Безубыточный CVR для вашей экономики: <b>${pc(be)}</b> — ниже него реклама съедает всю прибыль с единицы.` : ""}`;
+    // Данных о конверсии клика нет ни в одном файле — говорим об этом прямо, а не оставляем пустое место.
+    box.innerHTML = `<b>${pc(cur)} — допущение, не данные.</b> Подсказка появится после загрузки <b>POE</b> (конверсия клика ниши — есть для любой ниши) или <b>SQP</b> из Brand Analytics (только если вы уже продаёте по этим запросам).${beLine}`;
     box.classList.remove("hidden"); return;
   }
-  const part = (label, x, key) => (x ? `${label}: <b>${pc(x.cvr)}</b> <span title="${x.purchases} покупок на ${x.clicks} кликов, запросов: ${x.queries}">(${x.clicks.toLocaleString("ru-RU")} кликов${x.smallSample ? ", мало данных" : ""})</span> <button type="button" data-cvr-set="${x.cvr}" style="padding:.1rem .45rem;font-size:.75rem">подставить</button>` : "");
+  const btn = (x) => `<button type="button" data-cvr-set="${x.cvr}" style="padding:.1rem .45rem;font-size:.75rem">подставить</button>`;
+  const lines = [];
+  if (h.niche) lines.push(`<b>POE, конверсия клика ниши: ${pc(h.niche.cvr)}</b> <span title="${h.niche.purchases.toLocaleString("ru-RU")} покупок на ${h.niche.clicks.toLocaleString("ru-RU")} кликов по товарам ниши за 360 дней; запросов в расчёте: ${h.niche.queries} из ${h.niche.queriesTotal}">(${h.niche.clicks.toLocaleString("ru-RU")} кликов${h.niche.smallSample ? ", мало данных" : ""})</span> ${btn(h.niche)}<br><span class="muted">Это средняя по зрелым листингам ниши — у нового листинга без отзывов обычно ниже. Для сравнения: покупкой заканчиваются ${pc(h.niche.searchConv)} поисков, но реклама платится за клик, а не за поиск.</span>`);
+  const sq = [h.market ? `рынок <b>${pc(h.market.cvr)}</b> (${h.market.clicks.toLocaleString("ru-RU")} кликов${h.market.smallSample ? ", мало данных" : ""}) ${btn(h.market)}` : "", h.mine ? `ваш ASIN <b>${pc(h.mine.cvr)}</b> (${h.mine.clicks.toLocaleString("ru-RU")} кликов${h.mine.smallSample ? ", мало данных" : ""}) ${btn(h.mine)}` : ""].filter(Boolean);
+  if (sq.length) lines.push(`SQP, клик → покупка ${esc(h.scopeLabel)}: ${sq.join(" · ")}`);
   const notes = [];
   if (h.aboveRealistic) notes.push("выше 15 % — для нового листинга без отзывов это оптимистично");
-  if (Math.abs(cur - h.suggested) / h.suggested > 0.25) notes.push(`сейчас в расчёте ${pc(cur)}`);
-  box.innerHTML = `SQP, клик → покупка ${esc(h.scopeLabel)}. ${[part("рынок", h.market), part("ваш ASIN", h.mine)].filter(Boolean).join(" · ")}${notes.length ? `<br><span style="color:var(--warn)">${esc(notes.join("; "))}</span>` : ""}`;
+  if (Math.abs(cur - h.suggested) / h.suggested > 0.25) notes.push(`сейчас в расчёте ${pc(cur)} — ${cur > h.suggested ? "оптимистичнее" : "осторожнее"} данных`);
+  box.innerHTML = lines.join("<br>") + (notes.length ? `<br><span style="color:var(--warn)">${esc(notes.join("; "))}</span>` : "") + beLine;
   box.classList.remove("hidden");
 }
 $("#cvr-hint").addEventListener("click", (e) => {

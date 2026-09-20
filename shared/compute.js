@@ -51,11 +51,13 @@ export function compute(analysis) {
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p),
   };
-  // Подсказка CVR из SQP (клик → покупка). Значение по умолчанию (10 %) — допущение; подсказка ничего не меняет сама, только предлагает.
-  results.cvrHint = cvrHint(whole.sqp, { coreKeyword: analysis.coreKeyword, clusterKeywords: inputs.clusterKeywords || [], realistic: th.economics.cvrRealistic });
-  if (results.cvrHint && results.economics?.criterion2?.["2c"]) {
-    const h = results.cvrHint, pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %";
-    results.economics.criterion2["2c"].note += `; по SQP (${h.scopeLabel}) клик→покупка: рынок ${h.market ? pc(h.market.cvr) : "—"}${h.mine ? `, ваш ASIN ${pc(h.mine.cvr)}` : ""}`;
+  // Подсказка CVR (клик → покупка): конверсия клика ниши из POE и/или SQP. Значение по умолчанию (10 %) — допущение; подсказка сама ничего не меняет.
+  results.cvrHint = cvrHint({ sqp: whole.sqp, poe: whole.poe }, { coreKeyword: analysis.coreKeyword, clusterKeywords: inputs.clusterKeywords || [], realistic: th.economics.cvrRealistic });
+  if (results.cvrHint) {
+    const h = results.cvrHint, pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %"; const parts = [];
+    if (h.niche) parts.push(`конверсия клика ниши по POE ${pc(h.niche.cvr)}`);
+    if (h.market) parts.push(`SQP ${h.scopeLabel}: рынок ${pc(h.market.cvr)}${h.mine ? `, ваш ASIN ${pc(h.mine.cvr)}` : ""}`);
+    h.note = "по данным: " + parts.join("; ");
   }
   results.verdict = verdictCeiling(results);
   results.computedAt = new Date().toISOString();
