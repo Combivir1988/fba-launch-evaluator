@@ -1,6 +1,6 @@
 # Feature Specification: Несколько POE-файлов в одном анализе — объединение ниш
 
-**Feature Branch**: `007-merge-poe-niches` · **Created**: 2026-09-21 · **Status**: Approved 2026-09-21 (владелец выбрал вариант «объединить»)
+**Feature Branch**: `007-merge-poe-niches` · **Created**: 2026-09-21 · **Status**: Implemented 2026-09-21 · Approved 2026-09-21 (владелец выбрал вариант «объединить»)
 
 ## Проблема
 
