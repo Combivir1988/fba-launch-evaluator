@@ -69,3 +69,14 @@ test("в общем расчёте: сценарий берёт старт из 
   const cheaper = entryFixture({ inputs: { cogs: 2 } }).results; assert.ok(cheaper.cashflow.peak < R.cashflow.peak);
   const poor = entryFixture({ inputs: { budget: 1000 } }).results; assert.equal(poor.budget.quickScreen.budgetFit.status, "fail"); assert.equal(poor.verdict.ceiling, "no_go");
 });
+
+test("первые 90 дней по сценарию разгона — тот же горизонт, что у Критерия 2, но продажи ниже цели; на целевом старте суммы совпадают с 2g–2i", () => {
+  const c = cashflow(BASE, TH, { cohortSalesMedian: 90 }); const f = c.first90, first3 = c.rows.filter((r) => r.sellingMonth && r.sellingMonth <= 3);
+  assert.equal(f.months, 3); assert.equal(f.days, 90); assert.equal(f.targetUnits, 900); near(f.units, sum(first3, "sold")); near(f.units, 90 + 132 + 174); near(f.revenue, f.units * 40); near(f.ads, sum(first3, "ads"));
+  near(f.profit, f.units * (40 - 6 - 6 - 10) - f.ads, 1e-6); assert.ok(f.units < f.targetUnits);
+  const a = entryFixture({ inputs: { startSalesMonthly: 300, rampMonths: 1, vineReviews: 0, reviewRate: 0.0001 } }); // старт сразу с цели
+  const R = a.results, p = R.economics.criterion2Summary.period; near(R.cashflow.first90.units, p.units); near(R.cashflow.first90.revenue, p.revenue, 1e-6);
+  const noPenalty = entryFixture({ inputs: { startSalesMonthly: 300, rampMonths: 1, vineReviews: 30, reviewRate: 0.02 } }).results; // планка отзывов влияет только на рекламу
+  assert.ok(noPenalty.cashflow.first90.ads >= p.adSpend - 1e-6, "до планки отзывов реклама дороже, чем на целевом уровне");
+  assert.equal(cashflow({ ...BASE, cogs: null }, TH).first90, null);
+});

@@ -121,6 +121,10 @@ function syncForm() {
   const eff = a.results?.effective || {};
   const cpcEl = $("#f-cpc"); if (cpcEl) cpcEl.placeholder = eff.cpc != null && eff.cpcFromCerebro ? `авто: $${Number(eff.cpc).toFixed(2)} — ${eff.cpcSource || "Cerebro"}` : "нет Cerebro — введите CPC";
   const priceEl = $("#f-price"); if (priceEl) priceEl.placeholder = eff.priceFromMedian && eff.price != null ? `авто: $${Number(eff.price).toFixed(2)} — медиана проверенных (1b)` : "медиана 1b";
+  const cf = a.results?.cashflow; // поля сценария: в пустом поле видно, какое значение взято автоматически
+  const ph = (id, text) => { const el = $(id); if (el) el.placeholder = text; };
+  if (cf && !cf.pending) { ph("#f-start", `авто: ${Math.round(cf.startSales)} — ${{ cohort: "новички ниши", zero: "с нуля", input: "задано" }[cf.startSource]}`); ph("#f-first", `авто: ${cf.firstBatchUnits} шт`); }
+  else { ph("#f-start", "авто"); ph("#f-first", "авто"); }
   renderFileList(); renderCluster(); renderBrandChips(); renderOverrides(); renderChallengerUser();
 }
 function setOutput(el) {

@@ -25,7 +25,7 @@ export function collectEconomicsValues(analysis) {
   [inp.cogs, inp.shippingPerUnit, inp.fbaFee, inp.adsReserve, inp.budget].forEach(addM);
   [e.cogs, e.gate1?.net0, e.gate1?.landed, e.gate1?.condProfit, b.landed, b.batchCost, b.twoBatches, b.adsReserve, b.need, b.needTwoBatches, b.budget, b.gap, inp.startupCosts].forEach(addM);
   const cf = analysis?.results?.cashflow || {}; // помесячные деньги (spec 005): пик, итоги и строки сценария
-  [cf.peak, cf.endCum, cf.stockValueEnd, cf.landed].forEach(addM);
+  [cf.peak, cf.endCum, cf.stockValueEnd, cf.landed, cf.first90?.revenue, cf.first90?.ads, cf.first90?.profit].forEach(addM);
   for (const row of cf.rows || []) [row.orderCost, row.payout, row.ads, row.net, row.cum].forEach(addM);
   [e.gate1?.margin0, e.gate1?.roi, e.gate1?.condMargin, e.roi, e.marginNoAds, e.marginWithAds, b.markup].forEach(addR);
   for (const row of e.gate2?.byCvr || []) for (const [k, v] of Object.entries(row || {})) { if (/net|profit|spend|cost|ads/i.test(k)) addM(v); if (/margin|roi|acos/i.test(k)) addR(v); }

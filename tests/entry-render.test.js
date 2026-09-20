@@ -87,3 +87,12 @@ test("FR-012: ссылка «без закупочной экономики» �
   assert.doesNotMatch(el.textContent, /Пик вложений|1[\s  ]?850/); assert.match(text(el, "entry"), /Новые участники/);
   const full = buildSnapshot(a, { mode: "full" }); assert.ok(full.analysis.results.cashflow.rows.length > 10); assert.match(text(draw(full.analysis, { static: true, hidden: full.hidden, snapshot: full }), "cashflow"), /Пик вложений/);
 });
+
+test("Критерий 2 и «Деньги по месяцам» не спорят: у 2g–2i рядом стоят суммы по сценарию разгона, оба допущения подписаны", () => {
+  const a = entryFixture(); const el = draw(a); const t = text(el, "economics"); const f = a.results.cashflow.first90;
+  assert.ok(f.units < f.targetUnits); assert.equal((t.match(/это целевой уровень продаж; по сценарию разгона за первые 90 дн\./g) || []).length, 3, "строки 2g, 2h, 2i");
+  assert.match(t, /На целевом уровне \(10 шт\/день, как после разгона\), 90 дн\./); assert.match(t, /По сценарию разгона \(старт \d+ шт\/мес — медиана продаж новичков ниши\), первые 90 дн\. продаж/);
+  assert.match(t, /от объёма продаж не зависят/); assert.match(t, /впишите её в поле «Стартовые продажи, шт\/мес»/); assert.match(text(el, "cashflow"), /обе цифры показаны рядом в строках 2g–2i/);
+  const same = draw(entryFixture({ inputs: { startSalesMonthly: 300, rampMonths: 1 } })); assert.doesNotMatch(text(same, "economics"), /по сценарию разгона за первые/, "старт сразу с цели — расхождения нет, лишних пометок тоже");
+  const p = buildAiPayload(a); assert.ok(p.cashflow.first90DaysByRampScenario.units > 0); assert.match(SYSTEM_PROMPT, /first90DaysByRampScenario/);
+});

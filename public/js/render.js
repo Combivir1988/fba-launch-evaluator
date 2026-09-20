@@ -145,7 +145,10 @@
     if (e.pending) return `<h2>Экономика <span class="chip pending">ожидает COGS</span></h2>${sliders}
       <div class="notice info">Критерий 2 (2a–2k) и критерий 6 пусты (⚪), пока менеджер не введёт цену и COGS от поставщика. AI не заполняет их оценками. Введите COGS в панели «Экономика» — Gate 1/2 посчитаются мгновенно.</div>`;
     const g1 = e.gate1, g2 = e.gate2;
-    const c2rows = Object.entries(e.criterion2).map(([k, v]) => `<tr><td><b>${k}</b> ${esc(NAMES2[k])}</td><td class="num">${fmtC2(k, v.value)}</td><td>${st(v.status)}</td><td class="muted">${esc(v.note || "")}${k === "2c" && R.cvrHint?.note ? "; " + esc(R.cvrHint.note) : ""}</td></tr>`).join("");
+    // 2g–2i считаются на ЦЕЛЕВОМ уровне продаж; рядом — те же 90 дней по сценарию разгона из «Денег по месяцам», чтобы две секции не спорили.
+    const f90 = R.cashflow && !R.cashflow.pending ? R.cashflow.first90 : null, ramped = f90 && Math.round(f90.units) < Math.round(f90.targetUnits);
+    const scen90 = (k) => { const val = f90 && ramped ? { "2g": f90.ads, "2h": f90.revenue, "2i": f90.profit }[k] : undefined; return val === undefined ? "" : ` — это целевой уровень продаж; по сценарию разгона за первые ${f90.days} дн.: <b>${fmtMoney(val)}</b>`; };
+    const c2rows = Object.entries(e.criterion2).map(([k, v]) => `<tr><td><b>${k}</b> ${esc(NAMES2[k])}</td><td class="num">${fmtC2(k, v.value)}</td><td>${st(v.status)}</td><td class="muted">${esc(v.note || "")}${k === "2c" && R.cvrHint?.note ? "; " + esc(R.cvrHint.note) : ""}${scen90(k)}</td></tr>`).join("");
     const s2 = e.criterion2Summary;
     return `<h2>Экономика — Gate 1 / Gate 2 <span class="chip ${g1.status === "pass" ? "ok" : g1.status === "rework" ? "warn" : "fail"}">Gate 1 ${STATUS_LABEL[g1.status]}</span><span class="chip ${g2.status === "pass" ? "ok" : g2.status === "rework" ? "warn" : g2.status === "pending" ? "pending" : "fail"}">Gate 2 ${STATUS_LABEL[g2.status]}</span></h2>
       ${sliders}
@@ -167,7 +170,7 @@
       </div>
       <h3 style="margin-top:1rem">Критерий 2 — детальная экономика <span class="chip ${s2.pass ? "ok" : s2.pending ? "pending" : "fail"}">${s2.okCount} из 11 · 2f/2j/2k ${s2.mandatoryOk ? "OK" : "не все OK"}</span></h3>
       <div class="tablewrap"><table><thead><tr><th>Показатель</th><th class="num">Значение</th><th>Статус</th><th>Примечание</th></tr></thead><tbody>${c2rows}</tbody></table></div>
-      <p class="muted" style="font-size:.8rem">Горизонт ${s2.period.days} дн.: ${fmtN(s2.period.units)} шт, реклама ${fmtMoney(s2.period.adSpend)}, выручка ${fmtMoney(s2.period.revenue)}, прибыль ${fmtMoney(s2.period.totalProfit)}.</p>`;
+      <p class="muted" style="font-size:.8rem"><b>На целевом уровне</b> (${fmtN(inp.unitsPerDay)} шт/день, как после разгона), ${s2.period.days} дн.: ${fmtN(s2.period.units)} шт, реклама ${fmtMoney(s2.period.adSpend)}, выручка ${fmtMoney(s2.period.revenue)}, прибыль ${fmtMoney(s2.period.totalProfit)}.${f90 && ramped ? ` <b>По сценарию разгона</b> (старт ${fmtN(R.cashflow.startSales)} шт/мес — ${{ input: "задан вами", cohort: "медиана продаж новичков ниши", zero: "с нуля, данных о новичках нет" }[R.cashflow.startSource]}), первые ${f90.days} дн. продаж: ${fmtN(f90.units)} шт, реклама ${fmtMoney(f90.ads)}, выручка ${fmtMoney(f90.revenue)}, прибыль ${fmtMoney(f90.profit)}. Статусы Критерия 2, прибыль на юнит, ROI и маржа от объёма продаж не зависят — различаются только эти суммы. Чтобы сценарий стартовал сразу с цели, впишите её в поле «Стартовые продажи, шт/мес».` : ""}</p>`;
   }
   const NAMES2 = { "2a": "Цена продажи", "2b": "COGS", "2c": "Конверсия", "2d": "Bid/CPC", "2e": "PPC/органика", "2f": "Чистая прибыль/юнит", "2g": "Всего потрачено (реклама)", "2h": "Revenue", "2i": "Всего прибыли", "2j": "% ROI", "2k": "% Маржинальность" };
   const fmtC2 = (k, v) => (["2c", "2e", "2j", "2k"].includes(k) ? fmtPct(v, 1) : fmtMoney(v, 2));
@@ -402,7 +405,7 @@
       </div>
       <div class="stack" style="margin-top:.8rem"><div class="chartbox"><canvas id="ch-cash"></canvas></div>
       <div class="tablewrap" style="max-height:420px;overflow:auto"><table class="cashtable"><thead><tr><th>Месяц</th><th class="num">Заказ, шт</th><th class="num">Оплата партии</th><th class="num">Продано</th><th class="num">Поступления</th><th class="num">Реклама</th><th class="num">За месяц</th><th class="num">Итог</th><th class="num">Склад</th><th class="num">Отзывы</th></tr></thead><tbody>${rows}</tbody></table></div></div>
-      <p class="muted" style="font-size:.8rem">Поступления — выручка минус комиссия Amazon и FBA. Себестоимость списывается один раз, при оплате партии, и с продаж повторно не вычитается. Допущения сценария: ${esc(c.assumptions.join("; "))}. Горизонт, разгон, первая партия и стартовые расходы задаются в панели «Экономика и бюджет».</p>`;
+      <p class="muted" style="font-size:.8rem">Поступления — выручка минус комиссия Amazon и FBA. Себестоимость списывается один раз, при оплате партии, и с продаж повторно не вычитается. Допущения сценария: ${esc(c.assumptions.join("; "))}. Горизонт, разгон, первая партия и стартовые расходы задаются в панели «Экономика и бюджет». Критерий 2 считает свои 90 дней на целевом уровне продаж; здесь продажи идут по разгону — обе цифры показаны рядом в строках 2g–2i.</p>`;
   }
   function drawCashflow(container, R) {
     const c = R.cashflow; if (!c || c.pending) return; const [s1, s2] = series();
@@ -715,9 +718,9 @@
     "2d": "Цена клика в рекламе. Берётся из рекомендованной ставки главного ключа или вводится вручную.",
     "2e": "Какая доля продаж идёт через рекламу. На старте обычно около 70 %.",
     "2f": "Чистая прибыль с одной штуки после рекламы. Обязательный показатель.",
-    "2g": "Расходы на рекламу за 90 дней при заданной цели продаж.",
-    "2h": "Выручка за 90 дней при заданной цели продаж.",
-    "2i": "Прибыль за 90 дней после рекламы.",
+    "2g": "Расходы на рекламу за 90 дней на целевом уровне продаж — как после разгона. В примечании рядом — те же 90 дней по сценарию разгона из «Денег по месяцам».",
+    "2h": "Выручка за 90 дней на целевом уровне продаж — как после разгона. В примечании рядом — те же 90 дней по сценарию разгона.",
+    "2i": "Прибыль за 90 дней после рекламы на целевом уровне продаж. В примечании рядом — те же 90 дней по сценарию разгона, где первые месяцы продажи ниже, а реклама дороже.",
     "2j": "Прибыль после рекламы, делённая на вложенное (товар + реклама). Порог — 20 %. Обязательный показатель.",
     "2k": "Прибыль после рекламы, делённая на выручку. Порог — 25 %. Обязательный показатель.",
     "k1": "Итог Критерия 1 — рыночный контекст, 6 из 8.",

@@ -26,7 +26,7 @@ export function cashflow(inputs, th, ctx = {}) {
   const reviewRate = pos(rateIn, t.reviewRate), vine = isNum(vineIn) && vineIn >= 0 ? vineIn : t.vineReviews;
   const out = { pending: true, reason: null, rows: [], horizonMonths: horizon, rampMonths: ramp, leadDays, leadMonths: null, targetMonthly: perDay * 30, startSales: null, startSource: null,
     firstBatchUnits: null, landed: null, peak: null, peakMonth: null, batches: 0, unitsPurchased: 0, unitsSold: 0, paybackMonth: null, endCum: null, stockUnitsEnd: null, stockValueEnd: null,
-    stockoutMonths: 0, cpcMissing: cpc === null, adsReserveUsed: 0, startupCosts: startup, reviewThreshold: isNum(ctx.reviewThreshold) ? ctx.reviewThreshold : null, reviewsReachedMonth: null, assumptions: [] };
+    stockoutMonths: 0, cpcMissing: cpc === null, adsReserveUsed: 0, startupCosts: startup, reviewThreshold: isNum(ctx.reviewThreshold) ? ctx.reviewThreshold : null, reviewsReachedMonth: null, first90: null, assumptions: [] };
   if (price === null || price <= 0 || cogs === null) { out.reason = "введите цену и COGS — без себестоимости помесячный сценарий не строится"; return out; }
   if (!(perDay > 0)) { out.reason = "задайте цель продаж (штук в день)"; return out; }
   out.pending = false;
@@ -77,6 +77,11 @@ export function cashflow(inputs, th, ctx = {}) {
     out.rows.push(row);
   }
   out.unitsSold = cumSold; out.peak = -minCum; out.endCum = cum; out.stockUnitsEnd = stock; out.stockValueEnd = stock * landed;
+  // Первые месяцы продаж на горизонте Критерия 2 (90 дней): те же показатели 2g–2i, но по сценарию разгона, а не на целевом уровне.
+  // Прибыль здесь «по отгрузке» (продано × прибыль с единицы − реклама), чтобы сравнивалась с 2i; деньги партий — в пике вложений.
+  const pm = Math.max(1, Math.round((th.economics?.periodDays ?? 90) / 30)), firstRows = out.rows.filter((r) => r.sellingMonth && r.sellingMonth <= pm);
+  const fUnits = firstRows.reduce((a, r) => a + r.sold, 0), fAds = firstRows.reduce((a, r) => a + r.ads, 0);
+  out.first90 = { months: pm, days: pm * 30, units: fUnits, revenue: fUnits * price, ads: fAds, profit: fUnits * (payoutUnit - landed) - fAds, targetUnits: target * pm };
   // месяц возврата: первый месяц, начиная с которого итог нарастающим неотрицателен до конца горизонта
   let pay = null; for (let i = out.rows.length - 1; i >= 1; i--) { if (out.rows[i].cum >= 0) pay = out.rows[i].month; else break; }
   out.paybackMonth = pay;
