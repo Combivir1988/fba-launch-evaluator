@@ -22,6 +22,6 @@
 
 ## Phase 4: Выпуск
 
-- [ ] T010 `npm test` + пробы 7, 9, 10; переменные Railway `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` (без автодеплоя) → деплой при `health.running = 0` → проверка на проде: `health.googleLogin = true`, `/api/auth/google/start` ведёт на Google с верными `client_id`, `redirect_uri`, `code_challenge`, cookie `fba_oauth` с флагами HttpOnly/Secure/Lax; почта владельца привязывается к его администратору; память проекта и `CLAUDE.md`
+- [x] T010 `npm test` + пробы 7, 9, 10; переменные Railway `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` (без автодеплоя) → деплой при `health.running = 0` → проверка на проде: `health.googleLogin = true`, `/api/auth/google/start` ведёт на Google с верными `client_id`, `redirect_uri`, `code_challenge`, cookie `fba_oauth` с флагами HttpOnly/Secure/Lax; почта владельца привязывается к его администратору; память проекта и `CLAUDE.md`
 
 **Итого**: 10 задач. Полный вход через экран Google проверяет владелец: автоматизировать его нельзя, а подмена Google в тестах покрывает всю нашу часть потока.
