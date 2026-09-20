@@ -27,6 +27,7 @@ const safeJson = (o) => JSON.stringify(o).replace(/<\/script/gi, "<\\/script").r
 export async function buildStandaloneHtml(analysis, opts = {}) {
   const { css, chart, render } = await assets();
   const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  if (analysis?.aggregates?.poeParts) { const { poeParts, ...rest } = analysis.aggregates; analysis = { ...analysis, aggregates: rest }; } // ниши по отдельности в HTML не нужны
   const ropts = { ...opts, static: true };
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>FBA · ${esc(analysis.niche || "анализ")} · ${fileStamp()}</title><style>${css}</style></head>

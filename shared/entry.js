@@ -5,6 +5,7 @@
 // Всё считается по ВСЕЙ нише (не по ценовому диапазону): внимание покупателей по цене не делится.
 // Чистые функции: одинаково работают в браузере и в тестах. Когда данных мало — возвращают причину, а не оценку «на глаз».
 import { median, monthsSince } from "./num.js";
+import { mergedPoeNotes } from "./merge-poe.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const num = (v) => (v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
@@ -159,6 +160,7 @@ export function poeDataNotes(xray, poe, th) {
     const days = Math.abs(new Date(x.creationDate) - new Date(p.launchDate)) / 86400000;
     if (days > th.dateGapDays) gaps.push({ asin: up(p.asin), brand: p.brand, xray: x.creationDate, poe: String(p.launchDate).slice(0, 10), days: Math.round(days) });
   }
+  notes.push(...mergedPoeNotes(poe)); // объединение нескольких ниш (spec 007)
   if (gaps.length) notes.push({ id: "dateGap", text: `У ${gaps.length} товар(ов) дата создания в Xray и дата запуска в POE расходятся больше чем на ${th.dateGapDays} дней — в расчёте возраста взята дата Xray.`, items: gaps.sort((a, b) => b.days - a.days).slice(0, 8) });
   return notes;
 }

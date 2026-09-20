@@ -75,15 +75,19 @@
   }
   const bandChip = (R, kind) => (bandOf(R) ? (kind === "band" ? ` <span class="chip band" title="Посчитано только по листингам ценового диапазона ${esc(R.priceBand.label)}">в диапазоне</span>` : ' <span class="chip whole" title="Поисковый спрос и размер рынка не делятся по цене — показатель по всей нише">вся ниша</span>') : "");
 
+  function mergedNote(A) {
+    const m = A.aggregates?.poe?.merged; if (!m) return "";
+    return `<div class="notice info bandnote"><b>POE объединён из ${m.count} ниш:</b> ${m.niches.map((n) => `${esc(n.title)} — ${fmtPct(n.weight)}`).join(" · ")}. Товаров без дублей ${fmtN(m.asinsTotal)} (общих ${fmtN(m.overlapAsins)}), запросов ${fmtN(m.termsTotal)} (общих ${fmtN(m.overlapTerms)}). Доли кликов, конверсия клика и новички посчитаны по общему рынку; что сложено, а что взято приближённо — в секции «Вход в нишу» → «Особенности данных POE».</div>`;
+  }
   function secHero(A, R, o) {
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;
-    const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(m.fileName || "")}">${SRC_LABEL[k]} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
+    const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(k === "poe" && m.parts?.length > 1 ? m.parts.map((p) => p.nicheTitle || p.fileName).join(" + ") : m.fileName || "")}">${SRC_LABEL[k]}${k === "poe" && m.parts?.length > 1 ? ` · ${m.parts.length} ниш(и)` : ""} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
     const snap = o.snapshot ? `<div class="notice info snapnote">Подготовил(а): <b>${esc(o.snapshot.preparedBy || "—")}</b> · снимок от ${fmtDate(o.snapshot.snapshotAt)} · только чтение${o.snapshot.mode === "no_economics" ? " · закупочная экономика скрыта автором" : ""}</div>` : "";
     return `${snap}<div class="hero">
       <div><h1>${esc(A.niche || "Без названия")}</h1>
         <div class="meta">Ключ: <b>${esc(A.coreKeyword || "—")}</b> · ${esc(A.marketplace || "US")} · расчёт ${fmtDate(R.computedAt)} · методология ${esc(R.methodologyVersion || "")}</div>
         <div class="chips" style="margin-top:.4rem">${srcs || '<span class="chip na">файлы не загружены</span>'}</div>
-        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${bandNote(R, o)}</div>
+        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${mergedNote(A)}${bandNote(R, o)}</div>
       <div class="verdict ${esc(v)}"><div class="k muted">${ai ? "Вердикт AI" + (ai.adjustedByRules ? " (скорректирован правилами)" : "") : "Потолок по правилам"}</div>
         <div class="big">${esc(VLABEL[v])}</div>
         <div class="muted">Критерий 1: <b>${R.criterion1.okCount} из 8</b> · решающий: ${esc(ai?.decisiveGate || R.verdict.decisiveGate || "—")}</div>

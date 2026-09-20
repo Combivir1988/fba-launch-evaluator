@@ -4,6 +4,7 @@ import { compute } from "/shared/compute.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION } from "/shared/thresholds.js";
 import { suggestCluster, annotateKeywords } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
+import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
 import { detectAndParse } from "./files.js";
 import { history, localHistory } from "./history.js";
 import { runAi, runPatentScan, pendingJob } from "./ai.js";
@@ -266,6 +267,7 @@ async function handleFiles(list) {
       const brands = S.a.aggregates.xray ? [...new Set(S.a.aggregates.xray.asins.map((a) => a.brand))] : [];
       const r = await detectAndParse(f, { coreKeyword: S.a.coreKeyword, brands });
       if (r.kind === "import") { await importDoc(r.data); continue; }
+      if (r.kind === "poe") { toast(addPoePart(r.data, r.meta), 5000); if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; continue; } // POE не заменяется, а добавляется к объединению ниш
       S.a.aggregates[r.kind] = r.data; S.a.sources[r.kind] = r.meta; S.aggDirty = true;
       if (r.kind === "poe") { if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; }
       if (r.kind === "xray") reannotateCerebro();
@@ -287,12 +289,35 @@ $("#kw-mincomp").addEventListener("change", (e) => { S.a.inputs.clusterMinCompet
 $("#kw-sort").addEventListener("change", renderCluster);
 $("#kw-auto").addEventListener("click", () => { autoCluster(); markDirty(); renderAll(); });
 $("#kw-none").addEventListener("click", () => { S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); });
-function removeSource(kind) { delete S.a.aggregates[kind]; S.a.sources[kind] = null; S.aggDirty = true; if (kind === "cerebro") S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); }
+// ---------- несколько ниш POE в одном анализе (spec 007) ----------
+// aggregates.poe — всегда ОДИН объект, по которому идёт расчёт (одна ниша как есть или объединение); aggregates.poeParts хранит ниши по отдельности, только когда их больше одной.
+function poeParts() { const g = S.a.aggregates; return g.poeParts?.length ? g.poeParts : g.poe && !g.poe.merged ? [g.poe] : []; }
+function setPoeParts(parts, metas) {
+  const g = S.a.aggregates;
+  if (!parts.length) { delete g.poe; delete g.poeParts; S.a.sources.poe = null; }
+  else { const poe = mergePoe(parts); g.poe = poe; if (parts.length > 1) g.poeParts = parts; else delete g.poeParts;
+    const byKey = new Map(metas.map((m) => [m.key, m])); const w = new Map((poe.merged?.niches || []).map((n) => [n.key, n.weight]));
+    const list = parts.map((p) => { const key = poePartKey(p), m = byKey.get(key) || {}; return { key, fileName: m.fileName || "", nicheTitle: p.meta?.nicheTitle || "", nicheId: p.meta?.nicheId || null, rows: p.asinMetrics.length, capturedAt: p.meta?.capturedAt || null, loadedAt: m.loadedAt || null, weight: w.get(key) ?? 1 }; });
+    S.a.sources.poe = parts.length > 1 ? { fileName: `${parts.length} ниш(и) POE`, rows: poe.asinMetrics.length, nicheTitle: poe.meta.nicheTitle, capturedAt: poe.meta.capturedAt, parts: list } : { ...list[0], parts: undefined }; }
+  S.aggDirty = true;
+}
+const poeMetas = () => (S.a.sources.poe?.parts?.length ? S.a.sources.poe.parts : S.a.sources.poe ? [{ ...S.a.sources.poe, key: poePartKey(S.a.aggregates.poe) }] : []);
+function addPoePart(data, meta) {
+  const before = poeParts(), metas = poeMetas(); const { parts, action } = upsertPoePart(before, data); const key = poePartKey(data);
+  setPoeParts(parts, [...metas.filter((m) => m.key !== key), { ...meta, key }]);
+  const title = data.meta.nicheTitle || meta.fileName;
+  return action === "updated" ? `POE: ниша «${title}» обновлена (${data.asinMetrics.length} ASIN)` : parts.length > 1 ? `POE: добавлена ниша «${title}» — объединено ниш: ${parts.length}, товаров без дублей: ${S.a.aggregates.poe.asinMetrics.length}` : `POE: ${data.asinMetrics.length} ASIN из ${meta.fileName}`;
+}
+function removePoePart(key) { setPoeParts(poeParts().filter((p) => poePartKey(p) !== key), poeMetas().filter((m) => m.key !== key)); markDirty(); renderAll(); }
+function removeSource(kind) { if (kind === "poe") delete S.a.aggregates.poeParts; delete S.a.aggregates[kind]; S.a.sources[kind] = null; S.aggDirty = true; if (kind === "cerebro") S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); }
 
 function renderFileList() {
   const el = $("#filelist"); const labels = { xray: "Xray", cerebro: "Cerebro", poe: "POE", sqp: "SQP" };
-  el.innerHTML = Object.entries(S.a.sources || {}).filter(([, v]) => v).map(([k, v]) => `<div class="filecard"><span class="tag">${labels[k]}</span><span class="muted">${esc(v.fileName || "")} · ${v.rows ?? ""} ${k === "xray" ? "ASIN" : k === "cerebro" ? "ключей" : k === "poe" ? "ASIN" : "строк"}${v.duplicatesDropped ? ` · <b title="одинаковые ASIN учтены один раз">дублей удалено: ${v.duplicatesDropped}</b>` : ""}${v.nicheTitle ? " · " + esc(v.nicheTitle) : ""}</span><button class="x" data-rm="${k}" title="Убрать">✕</button></div>`).join("") || '<div class="muted" style="font-size:.85rem">Ничего не загружено</div>';
+  const pc = (v) => Math.round(v * 100) + " %";
+  const poeCards = (v) => v.parts.map((p) => `<div class="filecard"><span class="tag">POE</span><span class="muted">${esc(p.nicheTitle || p.fileName)} · ${p.rows} ASIN · ${pc(p.weight)} рынка${p.fileName ? ` · <small>${esc(p.fileName)}</small>` : ""}</span><button class="x" data-rm-poe="${esc(p.key)}" title="Убрать эту нишу из объединения">✕</button></div>`).join("") + `<div class="muted" style="font-size:.8rem;margin:-.1rem 0 .3rem">Ниши объединены в один рынок: ${v.rows} товаров без дублей. Ещё один POE-файл добавит нишу, файл той же ниши — обновит её.</div>`;
+  el.innerHTML = Object.entries(S.a.sources || {}).filter(([, v]) => v).map(([k, v]) => k === "poe" && v.parts?.length > 1 ? poeCards(v) : `<div class="filecard"><span class="tag">${labels[k]}</span><span class="muted">${esc(v.fileName || "")} · ${v.rows ?? ""} ${k === "xray" ? "ASIN" : k === "cerebro" ? "ключей" : k === "poe" ? "ASIN" : "строк"}${v.duplicatesDropped ? ` · <b title="одинаковые ASIN учтены один раз">дублей удалено: ${v.duplicatesDropped}</b>` : ""}${v.nicheTitle ? " · " + esc(v.nicheTitle) : ""}</span><button class="x" data-rm="${k}" title="Убрать">✕</button></div>`).join("") || '<div class="muted" style="font-size:.85rem">Ничего не загружено</div>';
   $$("[data-rm]", el).forEach((b) => b.addEventListener("click", () => removeSource(b.dataset.rm)));
+  $$("[data-rm-poe]", el).forEach((b) => b.addEventListener("click", () => removePoePart(b.dataset.rmPoe)));
 }
 function renderCluster() {
   const c = S.a.aggregates.cerebro; const det = $("#det-cluster");
