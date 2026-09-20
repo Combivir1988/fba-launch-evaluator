@@ -64,7 +64,7 @@ try {
   // пороги: новые группы с человеческими подписями
   await page.click('[data-tab="thresholds"]').catch(() => {}); const thr = await txt(page, "#thr");
   ok(/Вход в нишу/.test(thr) && /Деньги по месяцам и отзывы/.test(thr) && /Пограничное значение — ближе к порогу чем/.test(thr) && !/entry\.|cashflow\./.test(thr.replace(/title="[^"]*"/g, "")), "пороги spec 005 во вкладке «Пороги» с подписями");
-  await page.click('[data-tab="dashboard"]').catch(() => {});
+  await page.click('[data-tab="analysis"]');
 
   // сохранение и F5
   await page.waitForFunction(() => document.querySelector("#save-state")?.textContent.includes("сохранено"), null, { timeout: 25000 });

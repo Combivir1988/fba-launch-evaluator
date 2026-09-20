@@ -62,9 +62,17 @@ if (localStorage.getItem("fba_side") === "collapsed") setSide(true, true); // п
 
 // ---------- tabs ----------
 $$(".topbar nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+// Открытый раздел живёт в адресе (#history) и запоминается в браузере: после F5 открывается тот же раздел, ссылку на раздел можно переслать.
+const TABS = ["analysis", "history", "settings", "thresholds", "help"];
+const wantedTab = () => { const h = location.hash.slice(1); if (TABS.includes(h)) return h; try { const t = localStorage.getItem("fba_tab"); if (TABS.includes(t)) return t; } catch {} return "analysis"; };
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.includes(h)) showTab(h); });
 function showTab(name) {
-  $$(".topbar nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  for (const t of ["analysis", "history", "settings", "thresholds", "help"]) $(`#tab-${t}`).classList.toggle("hidden", t !== name);
+  if (!TABS.includes(name)) name = "analysis";
+  $$(".topbar nav button").forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle("active", on); if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+  for (const t of TABS) $(`#tab-${t}`).classList.toggle("hidden", t !== name);
+  try { localStorage.setItem("fba_tab", name); } catch {}
+  if (location.hash.slice(1) !== name) window.history.replaceState(null, "", name === "analysis" && !location.hash ? location.pathname + location.search : "#" + name); // history в этом файле — модуль истории анализов
+  if (name === "analysis") setTimeout(() => { for (const c of Object.values(dash.__charts || {})) { try { c.resize(); } catch {} } }, 0); // графики, нарисованные в скрытом разделе, получают размер
   if (name === "settings") renderSettings();
   if (name === "history") renderHistory();
   if (name === "thresholds") renderThresholds();
@@ -759,6 +767,7 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
 
 // ---------- init ----------
 (async function init() {
+  const startTab = wantedTab(); // до загрузки анализа: она сама переключает на «Анализ»
   try { R().initTips(); R().annotateInputs($(".side")); } catch (e) { console.warn("tips", e); } // подсказки у полей панели (spec 006)
   $("#help-ver").textContent = METHODOLOGY_VERSION;
   try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; } catch {}
@@ -770,5 +779,6 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
   let opened = false;
   if (last) { try { const g = await history.get(last); loadAnalysis(g.doc, g.meta); opened = true; } catch (e) { if (e.status === 404 && localStorage.getItem("fba_migrated")) localStorage.removeItem("fba_last"); } } // до переноса локальной истории анализ может быть ещё только в браузере
   if (!opened) { renderAll(); resumePendingJobs(); }
+  showTab(startTab);
   offerLocalMigration().catch((e) => console.warn("migration offer", e));
 })();
