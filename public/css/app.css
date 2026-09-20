@@ -239,3 +239,9 @@ input.invalid { border-color: var(--fail) !important; }
   font: 400 .82rem/1.4 var(--font); text-align: left; text-transform: none; letter-spacing: normal; white-space: normal; box-shadow: 0 6px 24px rgba(0,0,0,.28); pointer-events: none; }
 .tipbox[hidden] { display: none; }
 @media print { .tipbox { display: none !important; } .has-tip { text-decoration: none; } }
+
+/* Текстовая колонка «заголовок → список / абзац» (AI-блок, патенты): текст списков и абзацев начинается с одной линии,
+   маркеры висят слева от неё; между блоками — отступ, чтобы заголовок не прилипал к предыдущему тексту. */
+.textcol > h4 { margin: .95rem 0 .3rem; } .textcol > h4:first-child { margin-top: 0; }
+.textcol > ol, .textcol > ul { margin: 0; padding-left: 1.5rem; } .textcol > p { margin: 0; padding-left: 1.5rem; }
+.textcol li + li { margin-top: .25rem; }
