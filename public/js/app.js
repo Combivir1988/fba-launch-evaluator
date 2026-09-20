@@ -678,7 +678,7 @@ async function openLastIfEmpty() {
 $("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
 
 // ---------- thresholds tab ----------
-const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет (урок 08)", traffic: "Трафик по ключам (урок 09) и Cerebro", poe: "POE / концентрация (урок 11)", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа" };
+const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет (урок 08)", traffic: "Трафик по ключам (урок 09) и Cerebro", poe: "POE / концентрация (урок 11)", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения" };
 // Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
 const THR_LABELS = {
   "criterion1.passCount": ["Минимум зелёных подпунктов из 8", "шт (порог прохождения Критерия 1)"],
@@ -708,6 +708,13 @@ const THR_LABELS = {
   "reviewsMoat.breakable": ["Ров пробиваем, отзывов лидера меньше", "шт"], "reviewsMoat.medium": ["Средний барьер до", "шт (выше — непробиваем)"],
   "reconciliation.noise": ["Расхождение источников — шум до", "доля"], "reconciliation.borderline": ["Погранично до", "доля (выше — конфликт)"],
   "priceBand.smallSample": ["Малая выборка — листингов в диапазоне меньше", "шт (предупреждение: доли брендов ненадёжны)"], "priceBand.minSample": ["Недостаточная выборка — листингов меньше", "шт (конкурентные показатели диапазона не считаются)"],
+  "entry.minOverlap": ["Продажи на 1 % кликов — общих товаров Xray и POE, минимум", "шт"], "entry.cohortMinAgeMonths": ["Новичок — возраст листинга от", "мес"], "entry.cohortMaxAgeMonths": ["Новичок — возраст листинга до", "мес"],
+  "entry.minCohort": ["Когорта новичков — минимум товаров для ориентиров", "шт"], "entry.inheritedReviewRate": ["Унаследованные отзывы — больше чем продажи × возраст ×", "доля (плюс 50 отзывов запаса)"],
+  "entry.reachOkPct": ["Достижимо — нужная доля кликов не выше перцентиля новичков", "перцентиль, 0–100"], "entry.reachWarnPct": ["На пределе — не выше перцентиля новичков", "перцентиль, 0–100"], "entry.reachOkProducts": ["Без когорты: достижимо, если такая доля есть у товаров, минимум", "шт"],
+  "entry.dateGapDays": ["Расхождение дат Xray и POE — показывать от", "дней"], "entry.clickPriceGap": ["Цена по кликам — подсвечивать расхождение от", "доля"],
+  "cashflow.horizonMonths": ["Горизонт сценария по умолчанию", "месяцев продаж"], "cashflow.rampMonths": ["Разгон до цели по умолчанию", "мес"], "cashflow.reviewRate": ["Покупателей с отзывом по умолчанию", "доля (допущение)"],
+  "cashflow.vineReviews": ["Отзывов по программе Vine по умолчанию", "шт"], "cashflow.newListingCvrFactor": ["Конверсия до планки отзывов — множитель", "доля от заданного CVR"],
+  "borderline.pct": ["Пограничное значение — ближе к порогу чем", "доля"],
   "checklist.designTestMin": ["Тест дизайна (PickFu) — минимум голосов", "%"], "checklist.lifecycleMonthsMin": ["Жизненный цикл, минимум", "мес"], "checklist.listingsHigh": ["Листингов в выдаче — высокая конкуренция от", "шт"],
 };
 function renderThresholds() {

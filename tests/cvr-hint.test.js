@@ -67,5 +67,5 @@ test("в расчёте: подсказка ничего не меняет са�
   const withSqp = fixtureAnalysis(); withSqp.aggregates.sqp = SQP; withSqp.inputs.clusterKeywords = ["urinal cakes", "urinal screen"]; const R2 = compute(withSqp);
   assert.match(R2.cvrHint.note, /по POE .*; SQP по запросам вашего кластера: рынок 11,9 %, ваш ASIN 15,5 %/); assert.deepEqual(R2.economics.gate2, compute(Object.assign(fixtureAnalysis(), { inputs: withSqp.inputs })).economics.gate2);
   const p = buildAiPayload(a); assert.equal(p.cvrHint.usedCvr, 0.10); assert.ok(p.cvrHint.nicheClickCvr.cvr > 0); assert.equal(p.cvrHint.market, null);
-  assert.equal(resultsHash(R), "c5e5835d0ca04abf", "расчёты не изменились");
+  assert.equal(resultsHash(R), "1d212554e8f27864", "расчёты не изменились");
 });

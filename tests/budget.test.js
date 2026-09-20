@@ -34,3 +34,14 @@ test("Стоп-вопрос «выручка ≥ $500k» по прокси POE �
   const x = budget({ cogs: 5, unitsPerDay: 10, budget: 20000, canDifferentiate: "yes" }, TH, { roi: 1.8, revenueStatus: "fail", revenueSource: "xray", revenueMonthly: 145000 });
   assert.equal(x.quickScreen.revenue500k.status, "fail", "по Xray — реальный стоп");
 });
+
+test("spec 005: стоп-вопрос о бюджете оценивается по пику вложений помесячного сценария; прежняя сумма остаётся справочно", () => {
+  const inp = { cogs: 10, unitsPerDay: 10, productionDays: 45, shippingDays: 30, receivingDays: 15, budget: 15000 };
+  const ok = budget(inp, TH, { cash: { pending: false, peak: 12000 } });
+  assert.equal(ok.basis, "cash"); assert.equal(ok.need, 12000); assert.equal(ok.needTwoBatches, 18000); assert.equal(ok.gap, 3000); assert.equal(ok.status, "ok");
+  assert.match(ok.quickScreen.budgetFit.text, /пик вложений/); assert.match(ok.quickScreen.budgetFit.detail, /пик вложений \$12.000, бюджет \$15.000 — запас \$3.000; справочно, две партии \+ реклама: \$18.000/);
+  assert.equal(budget(inp, TH, { cash: { pending: false, peak: 16500 } }).status, "warn", "дефицит в пределах 15 % от потребности");
+  assert.equal(budget(inp, TH, { cash: { pending: false, peak: 25000 } }).quickScreen.budgetFit.status, "fail");
+  const noBudget = budget({ ...inp, budget: null }, TH, { cash: { pending: false, peak: 12000 } }); assert.equal(noBudget.status, "unknown"); assert.match(noBudget.quickScreen.budgetFit.detail, /нужно \$12.000 на пике вложений/);
+  const fallback = budget(inp, TH, { cash: { pending: true, peak: null } }); assert.equal(fallback.basis, "two_batches"); assert.equal(fallback.need, 18000); assert.match(fallback.quickScreen.budgetFit.text, /две партии/);
+});

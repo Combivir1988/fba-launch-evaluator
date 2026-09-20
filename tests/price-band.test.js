@@ -49,11 +49,11 @@ test("applyPriceBand: счётчики, выручка и доля, исходн
 });
 
 test("SC-002 совместимость: без диапазона результаты те же, что до появления фильтра", () => {
-  assert.equal(resultsHash(fixtureAnalysis().results), "c5e5835d0ca04abf");
+  assert.equal(resultsHash(fixtureAnalysis().results), "1d212554e8f27864");
   const poeOnly = newAnalysis({ niche: "u", coreKeyword: "urinal screen deodorizer" }); poeOnly.aggregates = { poe: parsePoe(readJson(POE)) }; Object.assign(poeOnly.inputs, { price: 24.99, cogs: 4.37 });
-  assert.equal(resultsHash(compute(poeOnly)), "70d98ba4bdd7f192");
-  assert.equal(resultsHash(compute(newAnalysis({ niche: "e" }))), "47b1f0d226c7d485");
-  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "c5e5835d0ca04abf", "некорректный диапазон не применяется");
+  assert.equal(resultsHash(compute(poeOnly)), "baab2bb0a4b0603a");
+  assert.equal(resultsHash(compute(newAnalysis({ niche: "e" }))), "f7d8ba418d69fc3c");
+  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "1d212554e8f27864", "некорректный диапазон не применяется");
   assert.equal(bad.results.priceBand.valid, false); assert.equal(bad.results.priceBand.active, false);
   const old = migrate({ schemaVersion: 1, id: "x", niche: "старый", inputs: { cogs: 3 } }); assert.equal(old.inputs.priceMin, null); assert.equal(old.inputs.priceMax, null);
 });

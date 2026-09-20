@@ -226,3 +226,7 @@ input.invalid { border-color: var(--fail) !important; }
 .login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 .google-btn { display: flex; align-items: center; justify-content: center; gap: .6rem; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: #1f1f1f; font-weight: 600; text-decoration: none; }
 .google-btn:hover { background: #f6f7f9; } .google-btn:focus-visible { outline: 2px solid var(--pending); outline-offset: 2px; }
+
+/* spec 005: таблица «Деньги по месяцам» — числа не переносим, узкий экран прокручивает таблицу внутри .tablewrap */
+.cashtable th, .cashtable td { white-space: nowrap; }
+.cashtable td small { font-size: .72rem; }

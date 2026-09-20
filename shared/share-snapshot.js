@@ -5,7 +5,7 @@
 
 export const SNAPSHOT_VERSION = 1;
 export const HIDDEN_NOTE = "экономика скрыта автором";
-const ECON_INPUTS = ["cogs", "cogsConfirmed", "shippingPerUnit", "referralPct", "fbaFee", "cvr", "ppcShare", "targetAcos", "unitsPerDay", "productionDays", "shippingDays", "receivingDays", "adsReserve", "budget", "manualOverrides"];
+const ECON_INPUTS = ["cogs", "cogsConfirmed", "shippingPerUnit", "referralPct", "fbaFee", "cvr", "ppcShare", "targetAcos", "unitsPerDay", "productionDays", "shippingDays", "receivingDays", "adsReserve", "budget", "manualOverrides", "horizonMonths", "rampMonths", "startSalesMonthly", "firstBatchUnits", "startupCosts"];
 // Лексика закупочной экономики: предложение AI с таким словом удаляется целиком.
 const ECON_WORDS = /себестоим|cogs|марж|прибыл|\broi\b|окупаем|бюджет|закуп|парти[ийяею]|\bacos\b|\btacos\b|юнит.?эконом|unit.?econom|\bnet\b|наценк|landed|лендед|fba.?fee|комисси/i;
 const ECON_GATE = /^(gate1|gate2|budget)$|gate ?1|gate ?2|критери[йя] ?2|критери[йя] ?6|эконом|бюджет/i;
@@ -23,7 +23,10 @@ export function collectEconomicsValues(analysis) {
   const addM = (v) => { if (isNum(v) && Math.abs(v) >= 0.01) money.add(Math.abs(v)); };
   const addR = (v) => { if (isNum(v) && Math.abs(v) >= 0.001) ratio.add(Math.abs(v)); };
   [inp.cogs, inp.shippingPerUnit, inp.fbaFee, inp.adsReserve, inp.budget].forEach(addM);
-  [e.cogs, e.gate1?.net0, e.gate1?.landed, e.gate1?.condProfit, b.landed, b.batchCost, b.twoBatches, b.adsReserve, b.need, b.budget, b.gap].forEach(addM);
+  [e.cogs, e.gate1?.net0, e.gate1?.landed, e.gate1?.condProfit, b.landed, b.batchCost, b.twoBatches, b.adsReserve, b.need, b.needTwoBatches, b.budget, b.gap, inp.startupCosts].forEach(addM);
+  const cf = analysis?.results?.cashflow || {}; // помесячные деньги (spec 005): пик, итоги и строки сценария
+  [cf.peak, cf.endCum, cf.stockValueEnd, cf.landed].forEach(addM);
+  for (const row of cf.rows || []) [row.orderCost, row.payout, row.ads, row.net, row.cum].forEach(addM);
   [e.gate1?.margin0, e.gate1?.roi, e.gate1?.condMargin, e.roi, e.marginNoAds, e.marginWithAds, b.markup].forEach(addR);
   for (const row of e.gate2?.byCvr || []) for (const [k, v] of Object.entries(row || {})) { if (/net|profit|spend|cost|ads/i.test(k)) addM(v); if (/margin|roi|acos/i.test(k)) addR(v); }
   for (const [k, v] of Object.entries(e.gate2?.atCvr || {})) { if (/net|profit|spend|cost|ads/i.test(k)) addM(v); if (/margin|roi|acos/i.test(k)) addR(v); }
@@ -78,7 +81,8 @@ function redactEconomics(a, source) {
   let redactions = 0;
   for (const k of ECON_INPUTS) delete a.inputs?.[k];
   const R = a.results || {};
-  delete R.economics; delete R.budget;
+  delete R.economics; delete R.budget; delete R.cashflow; // помесячные деньги — тоже закупочная экономика
+  if (R.borderline?.items) R.borderline.items = R.borderline.items.filter((i) => !i.economic);
   if (R.effective) R.effective = { price: R.effective.price, cpc: R.effective.cpc, cpcFromCerebro: R.effective.cpcFromCerebro, cpcSource: R.effective.cpcSource, priceFromMedian: R.effective.priceFromMedian };
   if (R.scorecard?.axes?.economics) R.scorecard.axes.economics.note = HIDDEN_NOTE;
   for (const k of ["2", "6"]) { const it = R.challenger?.items?.[k]; if (it) { it.note = HIDDEN_NOTE; it.value = null; } }
@@ -108,7 +112,7 @@ export function buildSnapshot(analysis, { mode = "full", preparedBy = "", snapsh
   if (a.aggregates?.cerebro?.keywords) { a.aggregates.cerebro.keywordCount = a.aggregates.cerebro.keywords.length; delete a.aggregates.cerebro.keywords; } // до 4 MB, дашборду не нужны
   a.id = "share"; delete a.status;
   let redactions = 0; const hidden = [];
-  if (mode === "no_economics") { redactions = redactEconomics(a, analysis); hidden.push("economics", "budget"); }
+  if (mode === "no_economics") { redactions = redactEconomics(a, analysis); hidden.push("economics", "budget", "cashflow"); }
   return { type: "fba-launch-evaluator/share", schemaVersion: SNAPSHOT_VERSION, mode, preparedBy: String(preparedBy || "").slice(0, 80), snapshotAt, analysisUpdatedAt: analysisUpdatedAt || analysis.updatedAt || null, hidden, redactions, analysis: a };
 }
 

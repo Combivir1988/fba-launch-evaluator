@@ -1,7 +1,7 @@
 // Пороги методологии (SKILL.md fba-launch-evaluator + курс «Выбор товара на Amazon»).
 // Это ДАННЫЕ, не код: редактируются в UI (панель «Пороги») и сохраняются в анализе.
 
-export const METHODOLOGY_VERSION = "2026-09-19"; // + ценовой диапазон анализа (spec 003)
+export const METHODOLOGY_VERSION = "2026-09-20"; // + вход в нишу: трафик, когорта новичков, отзывы, деньги по месяцам (spec 005); стоп-вопрос о бюджете — по пику вложений
 
 export const DEFAULT_THRESHOLDS = {
   criterion1: {
@@ -41,6 +41,10 @@ export const DEFAULT_THRESHOLDS = {
   },
   reconciliation: { noise: 0.10, borderline: 0.30 }, // сверка источников
   checklist: { designTestMin: 30, lifecycleMonthsMin: 25, listingsHigh: 3000 },
+  // Вход в нишу (spec 005). Пороги достижимости — предварительные, на вердикт не влияют.
+  entry: { minOverlap: 5, cohortMinAgeMonths: 2, cohortMaxAgeMonths: 24, minCohort: 3, inheritedReviewRate: 0.10, reachOkPct: 75, reachWarnPct: 90, reachOkProducts: 5, dateGapDays: 90, clickPriceGap: 0.15 },
+  cashflow: { horizonMonths: 12, rampMonths: 6, reviewRate: 0.02, vineReviews: 30, newListingCvrFactor: 0.7 },
+  borderline: { pct: 0.15 },
   priceBand: { smallSample: 15, minSample: 5 }, // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
 };
 

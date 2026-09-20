@@ -11,6 +11,10 @@ import { challenger } from "./challenger.js";
 import { scorecard } from "./scorecard.js";
 import { gate0, verdictCeiling } from "./verdict-rules.js";
 import { relDelta } from "./num.js";
+import { entryFeasibility, clickWeightedPrice, poeDataNotes } from "./entry.js";
+import { cashflow } from "./cashflow.js";
+import { borderline } from "./borderline.js";
+import { regulatoryTriggers } from "./regulatory.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -41,7 +45,12 @@ export function compute(analysis) {
   const cpcFromCerebro = inputs.cpc === null || inputs.cpc === undefined || inputs.cpc === "";
   const cpc = cpcFromCerebro ? p.traffic.cpcCore : inputs.cpc;
   p.economics = economics({ ...inputs, price, cpc }, th, { priceMedian: p.criterion1.items["1b"].value, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null });
-  p.budget = budget({ ...inputs, price }, th, { roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value, revenueSource: p.criterion1.items["1a"].source });
+  // Вход в нишу (spec 005): трафик, новички и отзывы — по ВСЕЙ нише. Опорная дата возраста листингов — дата снятия POE (анализ, открытый через год, покажет те же возрасты).
+  const compWhole = band.active ? competition(whole) : p.competition;
+  const refDate = new Date(whole.poe?.meta?.capturedAt || analysis.createdAt || Date.now());
+  p.entry = entryFeasibility(whole, { refDate: Number.isNaN(refDate.getTime()) ? new Date() : refDate, nicheReviewMedian: compWhole.reviewBarrier?.median ?? null, leaderReviews: compWhole.reviewBarrier?.leaderReviews ?? null });
+  p.cashflow = cashflow({ ...inputs, price, cpc }, th, { cohortSalesMedian: p.entry.cohort.ok ? p.entry.cohort.salesMedian : null, reviewThreshold: p.entry.reviews.threshold });
+  p.budget = budget({ ...inputs, price }, th, { cash: p.cashflow, roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value, revenueSource: p.criterion1.items["1a"].source });
   p.challenger = challenger(p);
   p.scorecard = scorecard(p);
   const g0 = gate0(whole);
@@ -50,7 +59,12 @@ export function compute(analysis) {
     priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard,
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p),
+    entry: p.entry, cashflow: p.cashflow,
+    clickPrice: clickWeightedPrice(whole.poe, { priceMedian: (band.active ? band.whole?.priceMedian : null) ?? p.criterion1.items["1b"].value, myPrice: price, band }, th.entry),
+    regulatory: regulatoryTriggers({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, xray: whole.xray, poe: whole.poe, cerebro: whole.cerebro }),
+    dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
   };
+  results.borderline = borderline(results, th);
   // Подсказка CVR (клик → покупка): конверсия клика ниши из POE и/или SQP. Значение по умолчанию (10 %) — допущение; подсказка сама ничего не меняет.
   results.cvrHint = cvrHint({ sqp: whole.sqp, poe: whole.poe }, { coreKeyword: analysis.coreKeyword, clusterKeywords: inputs.clusterKeywords || [], realistic: th.economics.cvrRealistic });
   if (results.cvrHint) {

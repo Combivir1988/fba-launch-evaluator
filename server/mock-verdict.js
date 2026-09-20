@@ -22,7 +22,9 @@ export function mockVerdict(payload) {
       { priority: "med", title: "Сверить прокси POE по Xray/Cerebro", text: "Если 1a/1c помечены как прокси — загрузить Xray и Cerebro для точных значений." },
       { priority: "low", title: "Патентный поиск", text: "USPTO / Google Patents по ключевым конкурентам — закрыть Gate 4." },
     ],
-    risks: ["Это демонстрационный ответ (MOCK_AI=1), не аналитика модели."],
+    risks: ["Это демонстрационный ответ (MOCK_AI=1), не аналитика модели.", ...(payload?.regulatory?.triggers || []).map((t) => `${t.agency}: ${t.title} — проверить требования (подсказка по словам ниши, не юридический вывод).`),
+      ...(payload?.entry?.reach?.status === "fail" ? [`Нужная доля кликов ${Math.round((payload.entry.reach.requiredClickShare || 0) * 1000) / 10} % выше того, чего достигли новички ниши (оценка предварительная).`] : []),
+      ...(payload?.cashflow && payload.cashflow.paybackMonth === null ? ["По помесячному сценарию деньги на горизонте не возвращаются."] : [])],
     pricingPackComment: payload?.criterion1?.items?.["1b"]?.value ? `Медиана цены проверенных конкурентов $${payload.criterion1.items["1b"].value}.` : "Нет данных о цене.",
     nextSteps: ["Заполнить COGS/CPC и пересчитать Gate 1–2", "Загрузить недостающие файлы (Xray/Cerebro/POE)", "Провести патентный поиск"],
   };

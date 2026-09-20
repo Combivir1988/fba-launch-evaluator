@@ -35,7 +35,7 @@ test("полный режим: без сырых ключей Cerebro и вну�
 test("no_economics: закупочные данные удалены из входов и результатов", () => {
   const a = analysisWithAi();
   const s = buildSnapshot(a, { mode: "no_economics", preparedBy: "Анна" });
-  assert.deepEqual(s.hidden, ["economics", "budget"]); assert.ok(s.redactions > 0);
+  assert.deepEqual(s.hidden, ["economics", "budget", "cashflow"]); assert.ok(s.redactions > 0);
   const A = s.analysis;
   for (const k of ["cogs", "shippingPerUnit", "fbaFee", "referralPct", "budget", "adsReserve", "cvr", "ppcShare", "unitsPerDay", "manualOverrides"]) assert.equal(k in A.inputs, false, "inputs." + k);
   assert.equal(A.inputs.price, a.inputs.price, "цена — рыночная величина, остаётся");

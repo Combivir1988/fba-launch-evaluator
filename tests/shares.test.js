@@ -46,7 +46,7 @@ test("снимок неизменяем до «Обновить ссылку»; 
 test("режим без закупочной экономики: данных нет в снимке", async () => {
   const s = await SH.create({ analysisId: doc.id, mode: "no_economics", expiresInDays: 7 }, anna);
   const snap = await SH.getPublic(s.path.slice(3));
-  assert.equal(snap.mode, "no_economics"); assert.deepEqual(snap.hidden, ["economics", "budget"]);
+  assert.equal(snap.mode, "no_economics"); assert.deepEqual(snap.hidden, ["economics", "budget", "cashflow"]);
   assert.equal(snap.analysis.results.economics, undefined); assert.equal("cogs" in snap.analysis.inputs, false);
   const { aggregates, ...rest } = snap.analysis; assert.equal(JSON.stringify(rest).includes("4.37"), false);
 });

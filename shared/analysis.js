@@ -13,6 +13,8 @@ export function defaultInputs() {
     price: null, cogs: null, cogsConfirmed: false, shippingPerUnit: 0, referralPct: 0.15, fbaFee: 0, cpc: null,
     cvr: 0.10, ppcShare: 0.70, targetAcos: 0.30, unitsPerDay: 10, productionDays: 30, shippingDays: 30, receivingDays: 15,
     priceMin: null, priceMax: null, // ценовой диапазон анализа (spec 003): null — вся ниша
+    // помесячный сценарий и барьер отзывов (spec 005): null — значение по умолчанию из порогов / из данных ниши
+    horizonMonths: null, rampMonths: null, startSalesMonthly: null, firstBatchUnits: null, startupCosts: 0, reviewRate: null, vineReviews: null,
     adsReserve: 0, budget: null, canDifferentiate: "unknown", myAsins: [], myBrand: "", evaluateAsNewEntrant: true,
     excludedBrands: [], clusterKeywords: [], clusterMinSv: null, clusterMinCompetitors: null, manualOverrides: {}, challenger: {}, patentFeature: "",
     checklist: { gatedCategory: false, dangerousGoods: false, certificates: "none", patentSearch: "none", trademarkSearch: "none",

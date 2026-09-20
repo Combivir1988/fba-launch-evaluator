@@ -98,7 +98,7 @@
       ${t("Выручка ниши", fmtK(c["1a"].value) + "/мес", (SRC_LABEL[c["1a"].source] || "нет данных") + (bandOf(R) ? ` · в диапазоне ${isNum(c["1a"].bandValue) ? fmtK(c["1a"].bandValue) + " (" + fmtPct(c["1a"].bandShare) + ")" : fmtPct(c["1a"].bandShare) + " кликов"}` : ""), c["1a"].status)}
       ${t("Средняя цена" + bandChip(R, "band"), fmtMoney(c["1b"].value, 2), c["1b"].source === "xray" ? "медиана проверенных" : SRC_LABEL[c["1b"].source] || "", c["1b"].status)}
       ${t("Adj. SV" + bandChip(R, "whole"), fmtN(c["1c"].value) + "/мес", SRC_LABEL[c["1c"].source] || "", c["1c"].status)}
-      ${t("Отзывы (ср. / мед.)" + bandChip(R, "band"), `${fmtN(c["1d"].value)} / ${fmtN(c["1d"].median)}`, "барьер: " + (comp.reviewBarrier.tier === "moat" ? "непробиваем" : comp.reviewBarrier.tier === "medium" ? "средний" : comp.reviewBarrier.tier === "breakable" ? "пробиваем" : "—"), c["1d"].status)}
+      ${t("Отзывы (ср. / мед.)" + bandChip(R, "band"), `${fmtN(c["1d"].value)} / ${fmtN(c["1d"].median)}`, (c["1d"].source === "poe" ? "POE: только с текстом · " : "") + "барьер: " + (comp.reviewBarrier.tier === "moat" ? "непробиваем" : comp.reviewBarrier.tier === "medium" ? "средний" : comp.reviewBarrier.tier === "breakable" ? "пробиваем" : "—"), c["1d"].status)}
       ${t("Top brand" + bandChip(R, "band"), fmtPct(c["1e"].value), esc(comp.topBrand || ""), c["1e"].status)}
       ${t("Топ-5 брендов" + bandChip(R, "band"), fmtPct(c["1f"].value), comp.source === "xray" ? "доля выручки" : "click share", c["1f"].status)}
       ${poe ? t("SV ниши T360", fmtN(poe.nicheSummary.searchVolumeT360), "рост за год " + fmtPct(poe.nicheSummary.searchVolumeGrowthT360), "") : ""}
@@ -192,9 +192,9 @@
     const ans = { ok: "Да", warn: "Почти", fail: "Нет", na: "Нет данных" };
     const qs = Object.values(q).map((x) => `<div class="card ${esc(x.status)}"><div>${st(x.status)} <b>${ans[x.status] || ""}</b></div><div style="margin-top:.3rem">${esc(x.text)}</div>${x.detail ? `<div class="muted" style="font-size:.85rem">${esc(x.detail)}</div>` : ""}</div>`).join("");
     return `<h2>Бюджет первой закупки и стоп-вопросы <span class="chip ${b.status === "ok" ? "ok" : b.status === "fail" ? "fail" : b.status === "warn" ? "warn" : "na"}">${b.status === "pending" ? "нужен COGS" : b.status === "unknown" ? "укажите бюджет" : STATUS_LABEL[b.status]}</span></h2>
-      ${b.pending ? '<div class="notice info">Введите COGS — бюджет двух партий посчитается автоматически (урок 08).</div>' : `<div class="cards">
+      ${b.pending ? '<div class="notice info">Введите COGS — партия, помесячный сценарий и пик вложений посчитаются автоматически.</div>' : `<div class="cards">
         <div class="card"><h4>Партия</h4><div class="big">${fmtMoney(b.batchCost)}</div><div class="muted">${fmtMoney(b.landed, 2)} × ${fmtN(b.batchUnits)} шт (${b.leadDays} дн: производство + доставка + приёмка)</div></div>
-        <div class="card"><h4>Нужно всего</h4><div class="big">${fmtMoney(b.need)}</div><div class="muted">${b.batches} партии ${fmtMoney(b.twoBatches)} + реклама ${fmtMoney(b.adsReserve)}</div></div>
+        ${b.basis === "cash" ? `<div class="card"><h4>Пик вложений</h4><div class="big">${fmtMoney(b.need)}</div><div class="muted">по сценарию «Деньги по месяцам»; справочно, ${b.batches} партии ${fmtMoney(b.twoBatches)} + реклама ${fmtMoney(b.adsReserve)} = ${fmtMoney(b.needTwoBatches)}</div></div>` : `<div class="card"><h4>Нужно всего</h4><div class="big">${fmtMoney(b.need)}</div><div class="muted">${b.batches} партии ${fmtMoney(b.twoBatches)} + реклама ${fmtMoney(b.adsReserve)}</div></div>`}
         <div class="card ${b.status === "ok" ? "ok" : b.status === "fail" ? "fail" : b.status === "warn" ? "warn" : "na"}"><h4>Бюджет</h4><div class="big">${fmtMoney(b.budget)}</div><div class="muted">${isNum(b.gap) ? (b.gap >= 0 ? "запас " : "дефицит ") + fmtMoney(Math.abs(b.gap)) : "не указан"}</div></div>
         <div class="card"><h4>Наценка</h4><div class="big">${isNum(b.markup) ? b.markup.toFixed(1) + "×" : "—"}</div><div class="muted">дешёвый товар — 5×, дорогой — 3.3× (урок 08)</div></div></div>`}
       <h3 style="margin-top:.9rem">Четыре стоп-вопроса (урок 07)</h3><p class="muted" style="font-size:.85rem">Любой ответ «Нет» — дальше можно не анализировать (урок 07). Красная карточка = «Нет», жёлтая = на грани, серая = не хватает данных.</p><div class="cards">${qs}</div>`;
@@ -238,7 +238,7 @@
       rows = `<thead><tr><th>#</th><th>Бренд</th><th>ASIN / товар</th><th class="num">Цена</th><th class="num">Продажи</th><th class="num">Выручка</th><th class="num">Отзывы</th><th class="num">★</th><th>Создан</th></tr></thead><tbody>` +
         top.map((a, i) => `<tr class="${my.has(a.asin) || (myBrand && a.brand.toLowerCase() === myBrand) ? "mine" : ""} ${i === 0 ? "leader" : ""}"><td>${i + 1}</td><td>${esc(a.brand)}</td><td><a href="${esc(a.url)}" target="_blank" rel="noopener">${a.asin}</a><br><small class="muted">${esc(a.title.slice(0, 70))}</small></td><td class="num">${fmtMoney(a.price, 2)}</td><td class="num">${fmtN(a.asinSales)}</td><td class="num">${fmtK(a.asinRevenue)}</td><td class="num">${fmtN(a.reviews)}</td><td class="num">${isNum(a.rating) ? a.rating.toFixed(1) : "—"}</td><td>${esc(a.creationDate || "—")}</td></tr>`).join("") + "</tbody>";
     } else if (poe?.length) {
-      rows = `<thead><tr><th>#</th><th>Бренд</th><th>ASIN / товар</th><th class="num">Цена</th><th class="num">Click share</th><th class="num">Отзывы</th><th class="num">★</th><th>Запуск</th></tr></thead><tbody>` +
+      rows = `<thead><tr><th>#</th><th>Бренд</th><th>ASIN / товар</th><th class="num">Цена</th><th class="num">Click share</th><th class="num" title="POE считает только отзывы с текстом — в Xray (все оценки) число больше">Отзывы с текстом</th><th class="num">★</th><th title="В POE это может быть дата всей вариации, а не конкретного ASIN">Запуск (вариации)</th></tr></thead><tbody>` +
         poe.filter((a) => inBandR(a.price, bandOf(R))).slice(0, 20).map((a, i) => `<tr class="${my.has(a.asin) || (myBrand && a.brand.toLowerCase() === myBrand) ? "mine" : ""} ${i === 0 ? "leader" : ""}"><td>${i + 1}</td><td>${esc(a.brand)}</td><td><a href="https://www.amazon.com/dp/${a.asin}" target="_blank" rel="noopener">${a.asin}</a><br><small class="muted">${esc(a.title.slice(0, 70))}</small></td><td class="num">${fmtMoney(a.price, 2)}</td><td class="num">${fmtPct(a.clickShareT360, 1)}</td><td class="num">${fmtN(a.reviews)}</td><td class="num">${isNum(a.rating) ? a.rating.toFixed(1) : "—"}</td><td>${esc(a.launchDate || "—")}</td></tr>`).join("") + "</tbody>";
     }
     const rb = comp.reviewBarrier;
@@ -269,10 +269,24 @@
       options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => fmtN(c.parsed.x, 1) + " %" } } }, scales: { x: { grid, ticks: { callback: (v) => v + " %" } }, y: { grid: { display: false } } } } });
   }
 
+  function clickPriceBlock(R) {
+    const cp = R.clickPrice; if (!cp) return "";
+    const gap = (v) => (isNum(v) ? `${v > 0 ? "+" : "−"}${fmtPct(Math.abs(v))}` : "—"); const hot = (f) => (cp.flags.includes(f) ? "warn" : "");
+    const warn = [];
+    if (cp.flags.includes("avg")) warn.push(`обычная средняя ${fmtMoney(cp.simpleAvg, 2)} отличается на ${gap(cp.avgGap)}: её тянут товары, на которые почти не кликают`);
+    if (cp.flags.includes("myPrice")) warn.push(`ваша цена ${fmtMoney(cp.myPrice, 2)} ${cp.myPriceGap > 0 ? "выше" : "ниже"} на ${fmtPct(Math.abs(cp.myPriceGap))} — проверьте, что это осознанное позиционирование`);
+    if (cp.flags.includes("band")) warn.push(`выбранный ценовой диапазон ${cp.band.label} не включает цену, по которой кликают покупатели`);
+    return `<div class="tiles" style="margin-bottom:.7rem">
+      <div class="tile"><div class="k">Цена по кликам покупателей</div><div class="v">${fmtMoney(cp.value, 2)}</div><div class="s">взвешена долей кликов, ${fmtN(cp.n)} товаров POE</div></div>
+      <div class="tile ${hot("avg")}"><div class="k">Обычная средняя / медиана</div><div class="v">${fmtMoney(cp.simpleAvg, 2)}</div><div class="s">медиана ${fmtMoney(cp.median, 2)} · средняя ${gap(cp.avgGap)} к цене по кликам</div></div>
+      ${isNum(cp.reference) ? `<div class="tile ${hot("reference")}"><div class="k">Медиана проверенных (1b)</div><div class="v">${fmtMoney(cp.reference, 2)}</div><div class="s">${gap(cp.referenceGap)} к цене по кликам</div></div>` : ""}
+      ${isNum(cp.myPrice) ? `<div class="tile ${hot("myPrice")}"><div class="k">Ваша цена</div><div class="v">${fmtMoney(cp.myPrice, 2)}</div><div class="s">${gap(cp.myPriceGap)} к цене по кликам</div></div>` : ""}
+    </div>${warn.length ? `<div class="notice" style="margin-bottom:.7rem">${esc(warn.join("; "))}.</div>` : ""}<p class="muted" style="font-size:.8rem;margin-top:-.3rem">Цены POE — средние за 360 дней, а не сегодняшние. Порог расхождения ${fmtPct(cp.gapLimit)}.</p>`;
+  }
   function secPricing(A, R, o) {
-    const ps = R.priceSegments; if (!ps) return "";
+    const ps = R.priceSegments; if (!ps) return R.clickPrice ? `<h2>Цена ниши</h2>${clickPriceBlock(R)}` : "";
     const pick = (sg) => (o?.static ? "" : ` <button type="button" class="seg-pick noprint" data-band-min="${sg.min}" data-band-max="${sg.max}" title="Считать конкурентов только в этом ценовом сегменте">выбрать</button>`);
-    return `<h2>Ценовые сегменты${bandChip(R, "whole")}</h2><div class="two"><div class="chartbox short"><canvas id="ch-price"></canvas></div>
+    return `<h2>Ценовые сегменты${bandChip(R, "whole")}</h2>${clickPriceBlock(R)}<div class="two"><div class="chartbox short"><canvas id="ch-price"></canvas></div>
       <div class="tablewrap"><table><thead><tr><th>Сегмент</th><th class="num">Диапазон</th><th class="num">Доля товаров</th><th class="num">Доля ${ps.weightLabel === "revenue" ? "выручки" : "кликов"}</th></tr></thead><tbody>
       ${ps.segments.map((s) => `<tr class="${s.selected ? "seg-selected" : ""}"><td>${s.name}${s.selected ? ' <span class="chip band">выбран</span>' : ""}${pick(s)}</td><td class="num">${fmtMoney(s.min, 0)}–${fmtMoney(s.max, 0)}</td><td class="num">${fmtPct(s.itemsShare)}</td><td class="num">${fmtPct(s.weightShare)}</td></tr>`).join("")}</tbody></table>
       <p class="muted" style="font-size:.8rem">Сегмент с большой долей ${ps.weightLabel === "revenue" ? "выручки" : "кликов"} при малой доле товаров — недообслужен; проверяйте концентрацию бренда ВНУТРИ сегмента перед выбором цены${o?.static ? "" : " — кнопка «выбрать» сузит анализ конкурентов до этого сегмента"}.</p></div></div>`;
@@ -332,6 +346,88 @@
       { label: "Негатив, % упоминаний", data: labels.map((l) => -(nm[l] || 0)), backgroundColor: cssVar("--neg"), borderRadius: 4, stack: "s" },
       { label: "Позитив, % упоминаний", data: labels.map((l) => pm[l] || 0), backgroundColor: cssVar("--pos"), borderRadius: 4, stack: "s" }] },
       options: { indexAxis: "y", plugins: { tooltip: { callbacks: { label: (c) => c.dataset.label + ": " + fmtN(Math.abs(c.parsed.x), 1) + " %" } } }, scales: { x: { grid, stacked: true, ticks: { callback: (v) => Math.abs(v) + " %" } }, y: { stacked: true, grid: { display: false }, ticks: { autoSkip: false } } } } });
+  }
+
+
+  // ---------- вход в нишу: трафик, новички, отзывы (spec 005) ----------
+  const REACH_LABEL = { ok: "достижимо", warn: "на пределе", fail: "выше достигнутого", na: "нет данных" };
+  const months = (v) => (!isNum(v) ? "—" : v === 0 ? "сразу" : v < 1 ? "меньше месяца" : fmtN(v, 1) + " мес");
+  function secEntry(A, R) {
+    const E = R.entry; if (!E || !E.available) return "";
+    const per = E.salesPerClickPct, co = E.cohort, rc = E.reach, rv = E.reviews;
+    const tile = (k, v, s2, cls = "") => `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s2 || ""}</div></div>`;
+    const traffic = per.ok ? `<div class="tiles">
+        ${tile("Продаж на 1 % кликов ниши", fmtN(per.median) + " шт/мес", `середина ниши ${fmtN(per.p25)}–${fmtN(per.p75)} · по ${fmtN(per.n)} товарам из обоих отчётов`)}
+        ${rc.ok ? tile("Нужная доля кликов", fmtPct(rc.requiredShare, 1), `под цель ${fmtN(rc.targetMonthly)} шт/мес · разброс ${fmtPct(rc.requiredLow, 1)}–${fmtPct(rc.requiredHigh, 1)}`, rc.status) : tile("Нужная доля кликов", "—", esc(rc.reason || ""))}
+        ${rc.ok ? tile("Товаров с такой долей", `${fmtN(rc.productsWithShare)} из ${fmtN(rc.productsTotal)}`, `лидер ${fmtPct(rc.leaderShare, 1)}${isNum(rc.bestNewcomerShare) ? " · лучший новичок " + fmtPct(rc.bestNewcomerShare, 1) : ""}`) : ""}
+        ${rc.ok ? tile("Оценка", REACH_LABEL[rc.status], esc(rc.note) + (isNum(rc.okUpToPerDay) ? ` · «достижимо» до ${fmtN(rc.okUpToPerDay, 1)} шт/день${isNum(rc.warnUpToPerDay) ? `, «на пределе» до ${fmtN(rc.warnUpToPerDay, 1)}` : ""}` : ""), rc.status) : ""}
+      </div>${per.fallbackT360 ? `<p class="muted" style="font-size:.8rem">У ${fmtN(per.fallbackT360)} товар(ов) нет доли кликов за 90 дней — взята годовая.</p>` : ""}`
+      : `<div class="empty">Продажи на 1 % кликов не посчитаны: ${esc(per.reason || "нет данных")}.</div>`;
+    const ex = co.excluded || {}; const exParts = [[ex.tooOld, "старше " + co.maxAgeMonths + " мес"], [ex.lowShare, "доля ниже равномерной"], [ex.tooYoung, "моложе " + co.minAgeMonths + " мес"], [ex.inherited, "унаследованные отзывы"], [ex.noDate, "нет даты"]].filter(([n]) => n).map(([n, l]) => `${fmtN(n)} — ${l}`);
+    const revLabel = co.reviewsSource === "poe" ? "отзывов с текстом (POE)" : "всех оценок (Xray)";
+    const cohort = co.population ? `<h3 style="margin-top:1rem">Новые участники <span class="chip ${co.ok ? "ok" : "na"}">${fmtN(co.size)} из ${fmtN(co.population)} товаров</span></h3>
+      <p class="muted" style="font-size:.85rem">Кто вошёл в нишу за последние два года и уже заметен покупателям: возраст от ${co.minAgeMonths} до ${co.maxAgeMonths} месяцев и доля ${co.basis === "revenue" ? "выручки" : "кликов"} не ниже равномерной (${fmtPct(co.uniformShare, 1)}). Отсеяно: ${exParts.join("; ") || "никого"}.${co.ageFilterSkipped ? " Все листинги отчёта моложе ${co.minAgeMonths} месяцев — нижняя граница возраста не применялась." : ""}${co.ageFromPoe ? ` У ${fmtN(co.ageFromPoe)} товар(ов) возраст взят из POE — это может быть дата всей вариации.` : ""}${co.inheritedChecked ? "" : " Проверка на унаследованные отзывы не выполнена — нужны продажи из Xray."}</p>
+      ${co.ok ? `<div class="tiles">
+        ${tile("Продажи новичков", isNum(co.salesMedian) ? fmtN(co.salesMedian) + " шт/мес" : "—", isNum(co.salesMedian) ? `медиана; разброс ${fmtN(co.salesP25)}–${fmtN(co.salesP75)} · стартовый уровень для сценария` : "нужен Xray с продажами")}
+        ${tile("Отзывы новичков", fmtN(co.reviewsMedian), "медиана, " + revLabel)}
+        ${tile("Доля кликов новичков", fmtPct(co.shareMedian, 1), `медиана · у лучшего ${fmtPct(co.bestShare, 1)}`)}
+      </div>
+      <div class="tablewrap" style="margin-top:.6rem;max-height:320px;overflow:auto"><table><thead><tr><th>Бренд</th><th>ASIN</th><th class="num">Возраст</th><th class="num">Доля</th><th class="num">Продажи/мес</th><th class="num">Отзывы</th></tr></thead><tbody>
+        ${co.members.map((m) => `<tr><td>${esc(m.brand)}</td><td><a href="https://www.amazon.com/dp/${esc(m.asin)}" target="_blank" rel="noopener">${esc(m.asin)}</a></td><td class="num">${fmtN(m.ageMonths, 1)} мес${m.ageSource === "poe" ? ' <small class="muted" title="дата из POE — возможно, дата вариации">POE</small>' : ""}</td><td class="num">${fmtPct(m.share, 1)}</td><td class="num">${fmtN(m.sales)}</td><td class="num">${fmtN(m.reviews)}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="empty">${esc(co.reason || "")}</div>`}` : "";
+    const reviews = rv.ok ? `<h3 style="margin-top:1rem">Срок до планки отзывов</h3><div class="tiles">
+        ${tile("Планка", fmtN(rv.threshold), rv.thresholdFrom === "cohort" ? "медиана новичков, " + (rv.source === "poe" ? "отзывов с текстом" : "всех оценок") : "медиана ниши — когорты новичков нет")}
+        ${tile("У лидера", fmtN(rv.leaderReviews), "догонять нужно не его, а тех, кто недавно вошёл и продаёт")}
+        ${rv.vineOnly ? tile("Срок", "сразу", `планка закрывается программой Vine (${fmtN(rv.vineReviews)} отзывов)`, "ok") : `${tile("При целевых продажах", months(rv.atTarget?.months), isNum(rv.atTarget?.salesMonthly) ? fmtN(rv.atTarget.salesMonthly) + " шт/мес" : "цель не задана")}
+        ${tile("При продажах новичков", months(rv.atCohort?.months), isNum(rv.atCohort?.salesMonthly) ? fmtN(rv.atCohort.salesMonthly) + " шт/мес — реалистичнее на старте" : "нет продаж новичков (нужен Xray)")}`}
+      </div><p class="muted" style="font-size:.8rem">(планка − ${fmtN(rv.vineReviews)} отзывов Vine) ÷ ${fmtPct(rv.reviewRate, 1)} покупателей с отзывом ÷ продажи в месяц.${rv.reviewRateAssumed ? " Доля покупателей с отзывом — допущение, меняется в панели «Экономика»." : ""}</p>` : "";
+    const notes = (R.dataNotes || []).length ? `<details style="margin-top:.8rem"><summary class="muted">Особенности данных POE (${R.dataNotes.length})</summary><ul style="font-size:.85rem">${R.dataNotes.map((n) => `<li>${esc(n.text)}${n.items ? " " + n.items.map((g) => `<span class="chip" title="Xray ${esc(g.xray)} · POE ${esc(g.poe)}">${esc(g.asin)} · ${fmtN(g.days)} дн</span>`).join(" ") : ""}</li>`).join("")}</ul></details>` : "";
+    return `<h2>Вход в нишу: трафик, новички, отзывы${bandChip(R, "whole")} ${rc.ok ? `<span class="chip ${rc.status}">${REACH_LABEL[rc.status]}</span><span class="chip" title="Пороги оценки достижимости пока не откалиброваны на реальных нишах — на вердикт она не влияет">порог предварительный</span>` : ""}</h2>
+      <p class="muted" style="font-size:.85rem">Хватит ли внимания покупателей под вашу цель продаж и как живут те, кто зашёл сюда недавно. Считается по всем товарам отчётов, без ценового диапазона: клики покупателей по цене не делятся.</p>
+      ${traffic}${cohort}${reviews}${notes}`;
+  }
+
+  // ---------- деньги по месяцам (spec 005) ----------
+  function secCashflow(A, R) {
+    const c = R.cashflow; if (!c) return "";
+    if (c.pending) return `<h2>Деньги по месяцам <span class="chip pending">ожидает данных</span></h2><div class="notice info">${esc(c.reason || "")}.</div>`;
+    const bud = R.budget?.budget; const fit = isNum(bud) ? (bud >= c.peak ? "ok" : bud >= c.peak * 0.85 ? "warn" : "fail") : "";
+    const rows = c.rows.map((r) => `<tr class="${r.stockout ? "leader" : ""}"><td>${r.month}${r.sellingMonth ? ` <small class="muted">продажи ${r.sellingMonth}</small>` : ""}</td><td class="num">${r.ordered ? fmtN(r.ordered) : ""}${r.arrived ? ` <small class="muted">пришло ${fmtN(r.arrived)}</small>` : ""}</td><td class="num">${r.orderCost + r.startup ? fmtMoney(-(r.orderCost + r.startup)) : ""}</td><td class="num">${r.demand ? fmtN(r.sold) + (r.stockout ? ' <span class="chip fail">нет в наличии</span>' : "") : ""}</td><td class="num">${r.payout ? fmtMoney(r.payout) : ""}</td><td class="num">${r.ads ? fmtMoney(-r.ads) : ""}</td><td class="num">${fmtMoney(r.net)}</td><td class="num" style="color:${r.cum >= 0 ? "var(--ok)" : "var(--fail)"}"><b>${fmtMoney(r.cum)}</b></td><td class="num">${fmtN(r.stockEnd)}</td><td class="num">${r.sellingMonth ? fmtN(r.reviews) : ""}</td></tr>`).join("");
+    return `<h2>Деньги по месяцам <span class="chip ${c.paybackMonth !== null ? "ok" : "fail"}">${c.paybackMonth !== null ? "возврат в месяце " + c.paybackMonth : "за " + (c.rows.length - 1) + " мес не возвращаются"}</span></h2>
+      <div class="cards">
+        <div class="card ${fit}"><h4>Пик вложений</h4><div class="big">${fmtMoney(c.peak)}</div><div class="muted">месяц ${c.peakMonth ?? 0}${isNum(bud) ? ` · бюджет ${fmtMoney(bud)}` : " · укажите бюджет в панели"}</div></div>
+        <div class="card"><h4>Партий / штук</h4><div class="big">${fmtN(c.batches)} / ${fmtN(c.unitsPurchased)}</div><div class="muted">первая ${fmtN(c.firstBatchUnits)} шт × ${fmtMoney(c.landed, 2)} · срок поставки ${fmtN(c.leadDays)} дн ≈ ${fmtN(c.leadMonths)} мес</div></div>
+        <div class="card ${c.paybackMonth !== null ? "ok" : "fail"}"><h4>Деньги вернулись</h4><div class="big">${c.paybackMonth !== null ? "месяц " + c.paybackMonth : "нет"}</div><div class="muted">${c.paybackMonth !== null ? "после него итог больше не уходит в минус" : "на горизонте сценария итог остаётся в минусе"}</div></div>
+        <div class="card"><h4>Итог на конец</h4><div class="big">${fmtMoney(c.endCum)}</div><div class="muted">плюс товар на складе: ${fmtN(c.stockUnitsEnd)} шт на ${fmtMoney(c.stockValueEnd)} по себестоимости${c.stockoutMonths ? ` · месяцев без товара: ${c.stockoutMonths}` : ""}</div></div>
+      </div>
+      <div class="stack" style="margin-top:.8rem"><div class="chartbox"><canvas id="ch-cash"></canvas></div>
+      <div class="tablewrap" style="max-height:420px;overflow:auto"><table class="cashtable"><thead><tr><th>Месяц</th><th class="num">Заказ, шт</th><th class="num">Оплата партии</th><th class="num">Продано</th><th class="num">Поступления</th><th class="num">Реклама</th><th class="num">За месяц</th><th class="num">Итог</th><th class="num">Склад</th><th class="num">Отзывы</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+      <p class="muted" style="font-size:.8rem">Поступления — выручка минус комиссия Amazon и FBA. Себестоимость списывается один раз, при оплате партии, и с продаж повторно не вычитается. Допущения сценария: ${esc(c.assumptions.join("; "))}. Горизонт, разгон, первая партия и стартовые расходы задаются в панели «Экономика и бюджет».</p>`;
+  }
+  function drawCashflow(container, R) {
+    const c = R.cashflow; if (!c || c.pending) return; const [s1, s2] = series();
+    mkChart(container, "ch-cash", { type: "bar", data: { labels: c.rows.map((r) => "мес " + r.month), datasets: [
+      { type: "line", label: "Итог нарастающим", data: c.rows.map((r) => r.cum), borderColor: s2, backgroundColor: s2, borderWidth: 2, pointRadius: 2, tension: .2 },
+      { type: "bar", label: "За месяц", data: c.rows.map((r) => r.net), backgroundColor: s1, borderRadius: 4, barPercentage: .7 }] },
+      options: { plugins: { tooltip: { callbacks: { label: tooltipMoney(0) } } }, scales: { x: { grid: { display: false } }, y: { grid, ticks: { callback: (v) => fmtMoney(v) } } } } });
+  }
+
+  // ---------- пограничные значения (spec 005) ----------
+  function secBorderline(A, R) {
+    const b = R.borderline; if (!b) return "";
+    if (!b.items.length) return `<h2>Пограничные значения <span class="chip ok">нет</span></h2><p class="muted">Ни один показатель не подошёл к своему порогу ближе чем на ${fmtPct(b.limit)} — оценки устойчивы к погрешности данных.</p>`;
+    return `<h2>Пограничные значения <span class="chip warn">${b.items.length}</span></h2>
+      <p class="muted" style="font-size:.85rem">Показатели в пределах ${fmtPct(b.limit)} от порога. Порог режет резко, а данные — оценки с погрешностью: эти решения стоит перепроверить по второму источнику, прежде чем на них опираться.</p>
+      <div class="tablewrap"><table><tbody>${b.items.map((i) => `<tr><td>${st(i.side === "pass" ? "ok" : "warn")}</td><td><b>${esc(i.label)}</b></td><td>${esc(i.text)}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+
+  // ---------- регуляторные триггеры (spec 005) ----------
+  function regulatoryBlock(R) {
+    const g = R.regulatory; if (!g) return "";
+    const head = `<h3 style="margin-top:1rem">Регуляторные триггеры <span class="chip ${g.triggers.length ? "warn" : "na"}">${g.triggers.length ? g.triggers.length + " — проверить" : "не найдено"}</span><span class="chip warn" title="Подсказка по словам, не юридический вывод">допущение</span></h3>`;
+    if (!g.triggers.length) return `${head}<p class="muted" style="font-size:.85rem">По словам ниши, заголовкам (${fmtN(g.checked.titles)}) и запросам (${fmtN(g.checked.terms)}) триггеров не найдено. Это не значит, что рисков нет: проверьте требования категории Amazon вручную.</p>`;
+    const rows = g.triggers.map((t) => `<tr><td><b>${esc(t.agency)}</b><br><span class="chip ${t.kind === "claim" ? "pending" : "warn"}" title="${t.kind === "claim" ? "Требование следует из обещания в листинге — от обещания можно отказаться" : "Требование следует из самого типа товара"}">${t.kind === "claim" ? "обещание" : "тип товара"}</span></td><td><b>${esc(t.title)}</b><br><span class="muted" style="font-size:.85rem">${esc(t.meaning)}</span></td><td><small>${t.words.map((w) => `<span class="chip">${esc(w)}</span>`).join(" ")}<br><span class="muted">${[t.where.head ? "в названии ниши / главном ключе" : "", t.where.titles ? `в ${fmtN(t.where.titles)} заголовках (${fmtPct(t.where.titleShare)})` : "", t.where.terms ? `в ${fmtN(t.where.terms)} запросах` : ""].filter(Boolean).join(" · ")}</span></small></td></tr>`).join("");
+    return `${head}<div class="tablewrap"><table><thead><tr><th>Ведомство</th><th>Что это значит для входа</th><th>Где сработало</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted" style="font-size:.8rem">${esc(g.note)}</p>`;
   }
 
   function secChallenger(A, R) {
@@ -410,7 +506,7 @@
       <tr><td>Патенты / FTO (урок 13)</td><td>${esc({ none: "не проверял", clear: "не найдено", design_around: "design-around", unsure: "нужен юрист", conflict: "конфликт" }[c.patentSearch] || "—")}</td><td>Торговая марка</td><td>${esc({ none: "не проверял", free: "свободна", conflict: "занята" }[c.trademarkSearch] || "—")}</td></tr>
       <tr><td>Склейка отзывов (урок 14)</td><td>${yes(c.reviewMergingSuspected)}</td><td>Купоны/дилы (урок 11)</td><td>${esc(c.couponsDealsSaturation || "—")}</td></tr>
       <tr><td>Тест дизайна (урок 12)</td><td>${isNum(c.designTestScore) ? c.designTestScore + " % " + (c.designTestScore >= 30 ? "✓" : "✗ (< 30 %)") : "—"}</td><td>Жизненный цикл (урок 09)</td><td>${isNum(c.lifecycleMonths) ? c.lifecycleMonths + " мес " + (c.lifecycleMonths >= 25 ? "✓" : "✗ (< 25)") : "—"}</td></tr>
-      <tr><td>Листингов в выдаче (урок 05)</td><td>${isNum(c.listingsInSearch) ? fmtN(c.listingsInSearch) + (c.listingsInSearch > 3000 ? " — высокая конкуренция" : "") : "—"}</td><td></td><td></td></tr></tbody></table></div>`;
+      <tr><td>Листингов в выдаче (урок 05)</td><td>${isNum(c.listingsInSearch) ? fmtN(c.listingsInSearch) + (c.listingsInSearch > 3000 ? " — высокая конкуренция" : "") : "—"}</td><td></td><td></td></tr></tbody></table></div>${regulatoryBlock(R)}`;
   }
 
   function secConclusion(A, R) {
@@ -420,12 +516,12 @@
   }
 
   const SECTIONS = [
-    ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget],
-    ["traffic", secTraffic, drawTraffic], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
+    ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget], ["cashflow", secCashflow, drawCashflow],
+    ["traffic", secTraffic, drawTraffic], ["entry", secEntry], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
     ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)],
-    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["checklist", secChecklist], ["conclusion", secConclusion], ["ai", secAi],
+    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["conclusion", secConclusion], ["ai", secAi],
   ];
-  const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "challenger", "scorecard", "conclusion", "ai"];
+  const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "cashflow", "entry", "pricing", "borderline", "challenger", "scorecard", "conclusion", "ai"];
 
   function render(container, A, opts = {}) {
     chartDefaults();

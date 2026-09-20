@@ -99,7 +99,7 @@ test("снимок без закупочной экономики: секции 
   const snap = buildSnapshot(a, { mode: "no_economics", preparedBy: "Анна" });
   const el = w.document.getElementById("d");
   assert.doesNotThrow(() => w.FBARender.render(el, snap.analysis, { static: true, hidden: snap.hidden, snapshot: { preparedBy: snap.preparedBy, snapshotAt: snap.snapshotAt, mode: snap.mode } }));
-  for (const id of ["economics", "budget"]) { const s = el.querySelector("#sec-" + id); assert.ok(s.classList.contains("hidden"), id); assert.equal(s.innerHTML, ""); }
+  for (const id of ["economics", "budget", "cashflow"]) { const s = el.querySelector("#sec-" + id); assert.ok(s.classList.contains("hidden"), id); assert.equal(s.innerHTML, ""); }
   for (const id of ["hero", "overview", "criterion1", "traffic", "competitors", "challenger", "scorecard", "conclusion"]) assert.ok(el.querySelector("#sec-" + id).textContent.length > 20, id);
   assert.match(el.querySelector("#sec-hero").textContent, /закупочная экономика скрыта автором/);
   assert.match(el.querySelector("#sec-challenger").textContent, /экономика скрыта автором/);

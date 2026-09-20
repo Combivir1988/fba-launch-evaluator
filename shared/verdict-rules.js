@@ -59,7 +59,7 @@ export function gateStatuses(r) {
     gate4: { status: gate4, fact: p8?.note || "патенты не проверены" },
     criterion1: { status: c1?.pass ? "pass" : "fail", fact: `${c1?.okCount ?? "?"} из 8 при пороге ${c1?.passCount ?? 6}${c1?.redItems?.length ? "; красные: " + c1.redItems.join(", ") : ""}` },
     traffic: { status: three(tr?.status), fact: tr?.source ? `${tr.source}: Adj. SV ${Math.round(tr.adjSv ?? 0)}, топ-2 ${pct(tr.top2Share)}, релевантных ${tr.relevantCount ?? "—"}, групп ${tr.groups ?? "—"}` : "нет Cerebro/POE" },
-    budget: { status: b?.status === "ok" ? "pass" : b?.status === "warn" ? "rework" : b?.status === "fail" ? "fail" : "insufficient_data", fact: b?.pending ? "COGS не введён" : b?.status === "unknown" ? `нужно ${usd(b.need)} на две партии + рекламу — бюджет не указан` : `нужно ${usd(b?.need)}, бюджет ${usd(b?.budget)}, ${(b?.gap ?? 0) >= 0 ? "запас" : "дефицит"} ${usd(Math.abs(b?.gap ?? 0))}; стоп-вопросы: ${b?.quickScreenStatus ?? "—"}` },
+    budget: { status: b?.status === "ok" ? "pass" : b?.status === "warn" ? "rework" : b?.status === "fail" ? "fail" : "insufficient_data", fact: b?.pending ? "COGS не введён" : b?.status === "unknown" ? `${b.basis === "cash" ? "пик вложений" : "нужно на две партии + рекламу"} ${usd(b.need)} — бюджет не указан` : `${b?.basis === "cash" ? "пик вложений помесячного сценария" : "нужно"} ${usd(b?.need)}, бюджет ${usd(b?.budget)}, ${(b?.gap ?? 0) >= 0 ? "запас" : "дефицит"} ${usd(Math.abs(b?.gap ?? 0))}; стоп-вопросы: ${b?.quickScreenStatus ?? "—"}` },
     scorecard: { status: !sc?.band ? "insufficient_data" : sc.band === "no_go" ? "fail" : sc.band === "rework" ? "rework" : "pass", fact: sc?.total != null ? `${Math.round(sc.total)} %, слабая ось ${sc.weakest ?? "—"}` : "нет данных" },
   };
 }
