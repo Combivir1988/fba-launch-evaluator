@@ -68,8 +68,10 @@ label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: 
 @media (max-width: 480px) { .layout { padding: 12px; gap: 12px; } .grid2 { grid-template-columns: 1fr; } }
 
 /* Сворачиваемая панель ввода */
-.layout { transition: grid-template-columns .2s ease; }
-.side { transition: transform .2s ease, opacity .2s ease; }
+/* Двигаем только transform и opacity; колонки сетки не анимируются (см. setSide в app.js). */
+.side { transition: transform .22s ease, opacity .22s ease; will-change: transform; }
+.side.side-leaving { transform: translateX(-110%); opacity: 0; pointer-events: none; }
+.layout.side-animating { overflow-x: clip; }
 .layout.side-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
 .layout.side-collapsed .side { transform: translateX(-110%); opacity: 0; pointer-events: none; overflow: hidden; padding: 0; border: none; }
 /* Шапка панели закреплена сверху: кнопка «Свернуть» видна при любой прокрутке панели. */

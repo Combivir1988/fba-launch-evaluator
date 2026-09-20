@@ -31,15 +31,30 @@ $("#theme-toggle").addEventListener("click", () => {
 });
 
 // ---------- сворачиваемая панель ввода ----------
-function setSide(collapsed) {
-  $("#tab-analysis").classList.toggle("side-collapsed", collapsed);
-  $("#side-open").classList.toggle("hidden", !collapsed);
+// Анимация — только через transform (его рисует видеокарта). Ширину колонок меняем ОДИН раз, когда ничего не движется:
+// если анимировать саму сетку, браузер на каждом кадре заново раскладывает весь дашборд и перерисовывает все графики — отсюда рывки.
+const SIDE_MS = 220; let sideSeq = 0;
+function setSide(collapsed, instant = false) {
+  const layout = $("#tab-analysis"), side = $("#side"); const seq = ++sideSeq;
   localStorage.setItem("fba_side", collapsed ? "collapsed" : "open");
-  setTimeout(() => { for (const c of Object.values(dash.__charts || {})) { try { c.resize(); } catch {} } }, 230); // графики под новую ширину
+  if (layout.classList.contains("side-collapsed") === collapsed && !side.classList.contains("side-leaving")) { $("#side-open").classList.toggle("hidden", !collapsed); return; }
+  const apply = () => { layout.classList.toggle("side-collapsed", collapsed); $("#side-open").classList.toggle("hidden", !collapsed);
+    setTimeout(() => { for (const c of Object.values(dash.__charts || {})) { try { c.resize(); } catch {} } }, SIDE_MS + 40); }; // графики под новую ширину — после движения
+  const still = instant || layout.classList.contains("hidden") || innerWidth <= 980 || matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (still) { side.classList.remove("side-leaving"); return apply(); }
+  const slideDash = (from) => { const dx = from - dash.getBoundingClientRect().left; if (!dx) { side.classList.remove("side-leaving"); return; } layout.classList.add("side-animating");
+    dash.style.transition = "none"; dash.style.transform = `translateX(${dx}px)`; // стартовое положение — там, где дашборд был до смены раскладки
+    // Движение запускаем через два кадра: первый кадр браузер тратит на новую раскладку, и анимация не должна «съесть» своё начало.
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (seq !== sideSeq) return; side.classList.remove("side-leaving");
+      dash.style.transition = `transform ${SIDE_MS}ms ease`; dash.style.transform = "translateX(0)";
+      setTimeout(() => { if (seq !== sideSeq) return; dash.style.transition = ""; dash.style.transform = ""; layout.classList.remove("side-animating"); }, SIDE_MS + 30); })); };
+  const from = dash.getBoundingClientRect().left;
+  if (collapsed) { side.classList.add("side-leaving"); setTimeout(() => { if (seq !== sideSeq) return; apply(); slideDash(from); }, SIDE_MS); } // панель уехала → смена раскладки → дашборд плавно занимает место
+  else { side.classList.add("side-leaving"); apply(); slideDash(from); } // раскладка сразу (панель пока за краем), затем панель и дашборд едут вместе
 }
 $("#side-toggle").addEventListener("click", () => setSide(true));
 $("#side-open").addEventListener("click", () => setSide(false));
-if (localStorage.getItem("fba_side") === "collapsed") setSide(true);
+if (localStorage.getItem("fba_side") === "collapsed") setSide(true, true); // при загрузке — без анимации
 
 // ---------- tabs ----------
 $$(".topbar nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
