@@ -57,7 +57,6 @@ label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: 
 .side { align-self: start; position: sticky; top: 58px; max-height: calc(100vh - 74px); overflow: auto; padding: .8rem; }
 .side details { border-top: 1px solid var(--border); padding: .45rem 0; }
 .side details:first-of-type { border-top: none; }
-.side > details:first-of-type > summary { padding-right: 2rem; }
 .side summary { cursor: pointer; font-weight: 600; padding: .25rem 0; list-style: none; display: flex; justify-content: space-between; align-items: center; }
 .side summary::-webkit-details-marker { display: none; }
 .side summary::after { content: "▸"; color: var(--muted); transition: transform .15s; }
@@ -73,10 +72,19 @@ label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: 
 .side { transition: transform .2s ease, opacity .2s ease; }
 .layout.side-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
 .layout.side-collapsed .side { transform: translateX(-110%); opacity: 0; pointer-events: none; overflow: hidden; padding: 0; border: none; }
-.side-toggle { position: absolute; top: .45rem; right: .45rem; width: 28px; height: 28px; padding: 0; border-radius: 6px; line-height: 1; font-size: 14px; z-index: 2; }
+/* Шапка панели закреплена сверху: кнопка «Свернуть» видна при любой прокрутке панели. */
+.side-head { position: sticky; top: -.8rem; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: -.8rem -.8rem .35rem; padding: .5rem .8rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.side-title { font-weight: 700; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.side-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .35rem; padding: .28rem .6rem; border-radius: 999px; font-size: .8rem; font-weight: 600; line-height: 1.2; color: var(--accent); border-color: var(--accent); background: transparent; }
+.side-toggle:hover { background: var(--accent); color: var(--accent-ink); }
 .side { position: sticky; }
-.side-open { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 30; width: 26px; height: 64px; padding: 0; border-radius: 0 8px 8px 0; border-left: none; background: var(--accent); color: var(--accent-ink); font-size: 16px; box-shadow: var(--shadow); }
-.side-open:hover { border-color: var(--accent); }
+/* Свёрнутая панель: заметная вкладка с подписью у левого края — понятно, что и где открыть. */
+.side-open { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 30; display: flex; flex-direction: column; align-items: center; gap: .45rem; width: 34px; height: auto; padding: .7rem 0; border-radius: 0 10px 10px 0; border: none;
+  background: var(--accent); color: var(--accent-ink); font-size: .8rem; font-weight: 700; letter-spacing: .03em; box-shadow: 0 4px 16px rgba(0,0,0,.28); cursor: pointer; transition: width .15s ease; }
+.side-open.hidden { display: none; }
+.side-open .arr { font-size: 1.05rem; line-height: 1; }
+.side-open .lbl { writing-mode: vertical-rl; transform: rotate(180deg); }
+.side-open:hover, .side-open:focus-visible { width: 42px; }
 @media (max-width: 980px) { .layout.side-collapsed { grid-template-columns: 1fr; } .layout.side-collapsed .side { display: none; } }
 
 /* Dropzone / files */
@@ -245,3 +253,9 @@ input.invalid { border-color: var(--fail) !important; }
 .textcol > h4 { margin: .95rem 0 .3rem; } .textcol > h4:first-child { margin-top: 0; }
 .textcol > ol, .textcol > ul { margin: 0; padding-left: 1.5rem; } .textcol > p { margin: 0; padding-left: 1.5rem; }
 .textcol li + li { margin-top: .25rem; }
+
+/* Галочка с длинной подписью: флажок слева, текст рядом (раньше флажок занимал всю строку, а текст уезжал под него). */
+label.row { flex-wrap: nowrap; align-items: flex-start; } label.row > input[type="checkbox"], label.row > input[type="radio"] { flex: 0 0 auto; margin-top: .2rem; }
+@media print { .side-open { display: none !important; } }
+/* Свёрнутая панель: место под вкладку «Параметры», чтобы она не налегала на край дашборда. */
+.layout.side-collapsed { padding-left: 30px; } @media (max-width: 980px) { .layout.side-collapsed { padding-left: 42px; } }
