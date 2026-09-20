@@ -576,8 +576,14 @@ $("#set-shares-list").addEventListener("click", (e) => shareAction(e, loadAllSha
 // ---------- подсказка CVR из SQP ----------
 function renderCvrHint() {
   const box = $("#cvr-hint"); if (!box) return; const h = S.a.results?.cvrHint;
-  if (!h) { box.classList.add("hidden"); box.innerHTML = ""; return; }
   const pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %"; const cur = S.a.inputs.cvr;
+  if (!h) {
+    // Без SQP честного источника конверсии «клик → покупка» нет — говорим об этом прямо, а не оставляем пустое место.
+    const sc = S.a.results?.traffic?.poeConcentration?.searchConv; const be = S.a.results?.economics?.breakEvenCvr;
+    const hasFiles = Object.values(S.a.aggregates || {}).some(Boolean);
+    box.innerHTML = `<b>${pc(cur)} — допущение, не данные.</b> ${hasFiles ? "В загруженных файлах конверсии «клик → покупка» нет: Xray, Cerebro и POE её не содержат." : ""} Подсказка из данных появится после загрузки <b>SQP</b> (Brand Analytics → Search Query Performance) — отчёт доступен только бренду, который уже продаёт по этим запросам; для новой ниши его нет.${typeof sc === "number" ? `<br>Для ориентира POE: ${pc(sc)} поисков в нише заканчиваются покупкой. Это <b>не</b> CVR клика — он всегда выше, потому что кликают не после каждого поиска.` : ""}${typeof be === "number" && be > 0 ? `<br>Безубыточный CVR для вашей экономики: <b>${pc(be)}</b> — ниже него реклама съедает всю прибыль с единицы.` : ""}`;
+    box.classList.remove("hidden"); return;
+  }
   const part = (label, x, key) => (x ? `${label}: <b>${pc(x.cvr)}</b> <span title="${x.purchases} покупок на ${x.clicks} кликов, запросов: ${x.queries}">(${x.clicks.toLocaleString("ru-RU")} кликов${x.smallSample ? ", мало данных" : ""})</span> <button type="button" data-cvr-set="${x.cvr}" style="padding:.1rem .45rem;font-size:.75rem">подставить</button>` : "");
   const notes = [];
   if (h.aboveRealistic) notes.push("выше 15 % — для нового листинга без отзывов это оптимистично");

@@ -16,11 +16,12 @@ try {
   await page.evaluate(() => document.querySelector("#s-cvr").closest("details").setAttribute("open", ""));
   for (const [sel, v] of [["#f-cogs", "4.37"], ["#f-cpc", "1.27"]]) { await page.fill(sel, v); await page.dispatchEvent(sel, "change"); }
   await page.waitForTimeout(600);
-  ok(await page.$eval("#cvr-hint", (e) => e.classList.contains("hidden")), "без SQP подсказки нет, CVR по умолчанию " + (await page.inputValue("#s-cvr")) + " %");
+  const noSqp = (await page.textContent("#cvr-hint")).replace(/\s+/g, " ").trim();
+  ok(/допущение, не данные/.test(noSqp) && /SQP/.test(noSqp) && /POE: \d+,\d % поисков/.test(noSqp) && /Безубыточный CVR/.test(noSqp) && (await page.$$("#cvr-hint [data-cvr-set]")).length === 0, "без SQP — пояснение вместо пустого места: " + noSqp.slice(0, 150) + "…");
   const netBefore = await page.evaluate(() => document.querySelector("#sec-economics")?.textContent.replace(/\s+/g, " ").slice(0, 4000));
 
   await page.setInputFiles("#file-input", ["tests/fixtures/SQP_synthetic_urinal_screen.csv"]);
-  await page.waitForFunction(() => !document.querySelector("#cvr-hint").classList.contains("hidden"), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector("#cvr-hint [data-cvr-set]"), null, { timeout: 15000 });
   const hint = (await page.textContent("#cvr-hint")).replace(/\s+/g, " ").trim();
   ok(/рынок: 1[0-9],[0-9] %/.test(hint) && /ваш ASIN: 1[0-9],[0-9] %/.test(hint), "подсказка под ползунком: " + hint.slice(0, 170));
   ok((await page.inputValue("#s-cvr")) === "10", "сама подсказка CVR не меняет — в расчёте по-прежнему 10 %");
@@ -34,7 +35,7 @@ try {
   ok(netAfter !== netBefore, "экономика пересчитана с новой конверсией");
   await page.waitForFunction(() => document.querySelector("#save-state")?.textContent.includes("сохранено в общую"), null, { timeout: 20000 });
   await page.reload({ waitUntil: "networkidle" });
-  await page.waitForFunction(() => !document.querySelector("#cvr-hint").classList.contains("hidden"), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector("#cvr-hint [data-cvr-set]"), null, { timeout: 15000 });
   ok((await page.inputValue("#s-cvr")) === v, "после F5 CVR " + v + " % и подсказка на месте");
   console.log("console:", logs.join("\n") || "(чисто)"); if (logs.length) process.exitCode = 1;
 } catch (e) { console.error("PROBE FAILED:", e.message.split("\n")[0]); console.log("console:", logs.join("\n")); process.exitCode = 1; }
