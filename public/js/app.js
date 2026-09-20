@@ -740,6 +740,7 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
 
 // ---------- init ----------
 (async function init() {
+  try { R().initTips(); R().annotateInputs($(".side")); } catch (e) { console.warn("tips", e); } // подсказки у полей панели (spec 006)
   $("#help-ver").textContent = METHODOLOGY_VERSION;
   try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; } catch {}
   if (!window.Chart) toast("Chart.js не загрузился — графики не будут отрисованы. Проверьте блокировщик скриптов.", 10000);

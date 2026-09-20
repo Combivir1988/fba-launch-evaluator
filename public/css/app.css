@@ -230,3 +230,12 @@ input.invalid { border-color: var(--fail) !important; }
 /* spec 005: таблица «Деньги по месяцам» — числа не переносим, узкий экран прокручивает таблицу внутри .tablewrap */
 .cashtable th, .cashtable td { white-space: nowrap; }
 .cashtable td small { font-size: .72rem; }
+
+/* spec 006: подсказки при наведении. Пометка — пунктирное подчёркивание названия; сама подсказка одна на страницу (position: fixed — таблицы её не обрезают). */
+.has-tip { text-decoration: underline dotted; text-decoration-color: var(--muted); text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: help; }
+.chip.has-tip, .status.has-tip, summary .has-tip { text-decoration: none; }
+.has-tip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.tipbox { position: fixed; z-index: 1000; max-width: 340px; padding: .5rem .65rem; border-radius: 8px; background: #20242c; color: #fff; border: 1px solid rgba(255,255,255,.12);
+  font: 400 .82rem/1.4 var(--font); text-align: left; text-transform: none; letter-spacing: normal; white-space: normal; box-shadow: 0 6px 24px rgba(0,0,0,.28); pointer-events: none; }
+.tipbox[hidden] { display: none; }
+@media print { .tipbox { display: none !important; } .has-tip { text-decoration: none; } }
