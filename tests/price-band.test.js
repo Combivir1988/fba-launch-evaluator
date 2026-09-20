@@ -113,3 +113,12 @@ test("только POE: фильтр по ценам листингов POE, д�
   const base = newAnalysis({ niche: "u", coreKeyword: "urinal screen deodorizer" }); base.aggregates = { poe }; const B = compute(base);
   assert.deepEqual(R.traffic, B.traffic); assert.deepEqual(R.criterion1.items["1h"], B.criterion1.items["1h"]); assert.equal(R.criterion1.items["1a"].value, B.criterion1.items["1a"].value);
 });
+
+test("кнопка «выбрать» у сегмента подсвечивает ровно этот сегмент: общая граница соседей ($30 — конец Mid и начало Premium) пересечением не считается", () => {
+  const segs = fixtureAnalysis().results.priceSegments.segments; const names = (r) => r.priceSegments.segments.filter((s) => s.selected).map((s) => s.name);
+  for (const sg of segs) assert.deepEqual(names(withBand(sg.min, sg.max).results), [sg.name], `${sg.name} ${sg.min}–${sg.max}`);
+  assert.deepEqual(names(withBand(segs[0].min, segs[1].max).results), ["Entry", "Mid"]); assert.deepEqual(names(withBand(null, null).results), []);
+  assert.deepEqual(names(withBand(segs[1].min + 0.01, segs[2].min + 0.01).results), ["Mid", "Premium"], "диапазон заходит в Premium хотя бы на цент — подсвечены оба");
+  assert.deepEqual(names(withBand(segs[2].min, null).results), ["Premium"]); assert.deepEqual(names(withBand(null, segs[0].max).results), ["Entry"]);
+  assert.equal(names(withBand(segs[1].max, segs[1].max).results).length >= 1, true, "диапазон-точка на границе не остаётся без подсветки");
+});

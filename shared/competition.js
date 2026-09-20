@@ -120,6 +120,11 @@ export function priceSegments(p) {
     s.items++; s.weight += it.weight;
   }
   const band = p.priceBand?.active ? p.priceBand : null; // сегмент пересекается с выбранным коридором цен
-  const hit = (sg) => Boolean(band) && (band.max === null || sg.min <= band.max) && (band.min === null || sg.max >= band.min);
+  // Соседние сегменты делят границу ($30 — конец Mid и начало Premium): касание в одной точке пересечением не считаем,
+  // иначе выбор Premium подсвечивал бы и Mid. Нестрогая проверка остаётся запасной — для диапазона-точки и вырожденных сегментов.
+  const strict = (sg) => (band.max === null || sg.min < band.max) && (band.min === null || sg.max > band.min);
+  const loose = (sg) => (band.max === null || sg.min <= band.max) && (band.min === null || sg.max >= band.min);
+  const anyStrict = Boolean(band) && segs.some(strict);
+  const hit = (sg) => Boolean(band) && (anyStrict ? strict(sg) : loose(sg));
   return { weightLabel: p.xray?.asins?.length ? "revenue" : "clicks", segments: segs.map((s) => ({ ...s, selected: hit(s), itemsShare: s.items / items.length, weightShare: s.weight / totalW })) };
 }
