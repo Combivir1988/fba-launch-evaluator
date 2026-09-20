@@ -6,10 +6,10 @@ import { testDb } from "./db.js";
 export const fakeHasher = { hashPassword: async (p) => "fake:" + p, verifyPassword: async (p, h) => h === "fake:" + p, dummyVerify: async () => false };
 export const JSON_H = { "content-type": "application/json", "x-requested-with": "fba" };
 
-export async function startApp(env = {}) {
+export async function startApp(env = {}, deps = {}) {
   const db = await testDb();
   const cfg = configFromEnv({ MOCK_AI: "1", DB_MEMORY: "1", LOGIN_RATE_LIMIT: "1000", ...env });
-  const app = createApp(cfg, { db, usersOpts: { hasher: fakeHasher } });
+  const app = createApp(cfg, { db, usersOpts: { hasher: fakeHasher }, ...deps });
   const server = app.listen(0);
   await new Promise((r) => server.once("listening", r));
   const base = `http://127.0.0.1:${server.address().port}`;

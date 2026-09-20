@@ -13,7 +13,18 @@ export const LOCK_MS = 15 * 60 * 1000;
 const ROLES = new Set(["admin", "user"]);
 const INVALID = () => new UserError("invalid_credentials", "Неверный логин или пароль", 401);
 
+export const NO_PASSWORD = "!"; // вход только через Google: значение не разбирается как scrypt-хэш
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** "" | null | undefined → null; иначе нижний регистр без пробелов. Некорректная почта → UserError. */
+export function normEmail(email) {
+  if (email === null || email === undefined) return null;
+  const e = String(email).trim().toLowerCase(); if (!e) return null;
+  if (e.length > 200 || !EMAIL_RE.test(e)) throw new UserError("bad_email", "Некорректный адрес почты");
+  return e;
+}
+const localPart = (email) => email.split("@")[0];
 const pub = (r) => ({ id: r.id, login: r.login, name: r.name, role: r.role, active: r.active, mustChangePassword: r.must_change_password, settings: r.settings || {},
+  email: r.email || null, hasPassword: r.password_hash !== NO_PASSWORD, googleLinked: Boolean(r.google_sub),
   lastLoginAt: r.last_login_at || null, createdAt: r.created_at || null, lockedUntil: r.locked_until || null, ...(r.analyses !== undefined ? { analyses: Number(r.analyses) } : {}) });
 
 export function normLogin(login) { return String(login ?? "").trim().toLowerCase(); }
@@ -29,19 +40,38 @@ export function createUsers(db, sessions, opts = {}) {
     if (role !== undefined && !ROLES.has(role)) throw new UserError("bad_role", "Роль: admin или user");
   }
 
-  async function createUser({ login, name, role = "user", password }) {
-    login = normLogin(login); checkFields({ login, name, role });
-    const bad = validateNewPassword(password); if (bad) throw new UserError("bad_password", bad);
-    const hash = await H.hashPassword(password);
+  const isUnique = (e, what) => e.code === "23505" && String(e.constraint || e.message || "").includes(what);
+  /** Логин из почты: часть до @, только допустимые символы, уникальный (anna, anna2, anna3…). */
+  async function loginFromEmail(email) {
+    let base = localPart(email).replace(/[^a-z0-9._-]/g, "").slice(0, 36); if (base.length < 3) base = (base + "user").slice(0, 36);
+    for (let i = 1; i < 500; i++) { const cand = i === 1 ? base : base + i; if (!(await db.query("SELECT 1 FROM users WHERE login = $1", [cand])).rows.length) return cand; }
+    return base + randomUUID().slice(0, 6);
+  }
+
+  /** Два способа: с паролем (как раньше, почта необязательна) и приглашение только по почте — вход через Google, пароль не создаётся. */
+  async function createUser({ login, name, role = "user", password, email }) {
+    email = normEmail(email);
+    const invite = password === undefined || password === null || password === "";
+    if (invite && !email) throw new UserError("bad_password", "Задайте временный пароль или почту для входа через Google");
+    login = normLogin(login); if (!login && email) login = await loginFromEmail(email);
+    if ((name === undefined || name === null || !String(name).trim()) && email) name = localPart(email); // при первом входе заменится именем из Google
+    checkFields({ login, name, role });
+    let hash = NO_PASSWORD;
+    if (!invite) { const bad = validateNewPassword(password); if (bad) throw new UserError("bad_password", bad); hash = await H.hashPassword(password); }
     try {
-      const r = (await db.query("INSERT INTO users (id, login, name, role, password_hash, must_change_password) VALUES ($1,$2,$3,$4,$5,true) RETURNING *", [randomUUID(), login, name.trim(), role, hash])).rows[0];
+      const r = (await db.query("INSERT INTO users (id, login, name, role, password_hash, must_change_password, email) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *", [randomUUID(), login, name.trim(), role, hash, !invite, email])).rows[0];
       return pub(r);
-    } catch (e) { if (e.code === "23505") throw new UserError("login_taken", "Такой логин уже занят", 409); throw e; }
+    } catch (e) {
+      if (isUnique(e, "email")) throw new UserError("email_taken", "Эта почта уже назначена другому пользователю", 409);
+      if (e.code === "23505") throw new UserError("login_taken", "Такой логин уже занят", 409);
+      throw e;
+    }
   }
 
   /** Изменение имени, роли, активности. Нельзя оставить систему без активного администратора (FR-009). */
   async function updateUser(id, patch = {}) {
     const { name, role, active } = patch; checkFields({ name, role });
+    const setEmail = "email" in patch; const email = setEmail ? normEmail(patch.email) : undefined;
     if (active !== undefined && typeof active !== "boolean") throw new UserError("bad_active", "active: true или false");
     const out = await db.tx(async (t) => {
       const cur = (await t.query("SELECT * FROM users WHERE id = $1 FOR UPDATE", [id])).rows[0];
@@ -52,8 +82,9 @@ export function createUsers(db, sessions, opts = {}) {
         const others = (await t.query("SELECT count(*)::int AS n FROM users WHERE role = 'admin' AND active AND id <> $1", [id])).rows[0].n;
         if (others === 0) throw new UserError("last_admin", "Нужен хотя бы один активный администратор", 409);
       }
-      return (await t.query("UPDATE users SET name = $2, role = $3, active = $4 WHERE id = $1 RETURNING *", [id, next.name, next.role, next.active])).rows[0];
-    });
+      if (setEmail && !email && cur.password_hash === NO_PASSWORD) throw new UserError("email_required", "У пользователя нет пароля — без почты он не сможет войти. Сначала задайте пароль", 409);
+      return (await t.query("UPDATE users SET name = $2, role = $3, active = $4, email = $5 WHERE id = $1 RETURNING *", [id, next.name, next.role, next.active, setEmail ? email : cur.email])).rows[0];
+    }).catch((e) => { if (isUnique(e, "email")) throw new UserError("email_taken", "Эта почта уже назначена другому пользователю", 409); throw e; });
     if (active === false) await sessions.destroyUserSessions(id); else sessions.forgetUser(id);
     return pub(out);
   }
@@ -100,6 +131,7 @@ export function createUsers(db, sessions, opts = {}) {
   async function changePassword(userId, current, next, keepToken = null) {
     const u = (await db.query("SELECT * FROM users WHERE id = $1 AND active", [userId])).rows[0];
     if (!u) throw new UserError("not_found", "Пользователь не найден", 404);
+    if (u.password_hash === NO_PASSWORD) throw new UserError("no_password", "Вы входите через Google — пароля у учётной записи нет. При необходимости его задаст администратор", 409);
     if (typeof current !== "string" || !(await H.verifyPassword(current, u.password_hash))) throw new UserError("wrong_password", "Текущий пароль введён неверно", 403);
     const bad = validateNewPassword(next, current); if (bad) throw new UserError("bad_password", bad);
     await db.query("UPDATE users SET password_hash = $2, must_change_password = false WHERE id = $1", [userId, await H.hashPassword(next)]);
@@ -132,9 +164,28 @@ export function createUsers(db, sessions, opts = {}) {
     return { created: true, restored: false, login };
   }
 
+  /** Вход через Google (spec 004): только приглашённые. Сначала по постоянному идентификатору аккаунта, затем по почте (и тогда привязываем sub).
+   *  Неприглашённая почта и отключённый пользователь дают один и тот же отказ — чужому не видно, заведена ли учётная запись. */
+  async function findForGoogle({ sub, email, name }) {
+    const denied = () => new UserError("google_not_invited", "Этой почты нет в списке приглашённых", 403);
+    if (!sub) throw denied();
+    let u = (await db.query("SELECT * FROM users WHERE google_sub = $1", [String(sub)])).rows[0];
+    if (!u) {
+      const e = normEmail(email); if (!e) throw denied();
+      u = (await db.query("SELECT * FROM users WHERE lower(email) = $1", [e])).rows[0];
+      if (!u || !u.active) throw denied();
+      if (u.google_sub && u.google_sub !== String(sub)) throw denied(); // почта приглашена, но уже привязана к другому аккаунту Google
+      const autoName = u.name === localPart(e) && name && String(name).trim();
+      u = (await db.query("UPDATE users SET google_sub = $2, name = $3 WHERE id = $1 RETURNING *", [u.id, String(sub), autoName ? String(name).trim().slice(0, 80) : u.name])).rows[0];
+    }
+    if (!u.active) throw denied();
+    u = (await db.query("UPDATE users SET last_login_at = $2, failed_logins = 0 WHERE id = $1 RETURNING *", [u.id, new Date(now())])).rows[0];
+    return pub(u);
+  }
+
   const listUsers = async () => (await db.query(
     `SELECT u.*, (SELECT count(*) FROM analyses a WHERE a.created_by = u.id AND a.deleted_at IS NULL) AS analyses FROM users u ORDER BY u.active DESC, u.name`)).rows.map(pub);
   const listNames = async () => (await db.query("SELECT id, name FROM users ORDER BY name")).rows;
 
-  return { createUser, updateUser, resetPassword, authenticate, changePassword, updateSettings, bootstrapAdmin, listUsers, listNames };
+  return { createUser, updateUser, resetPassword, authenticate, changePassword, updateSettings, bootstrapAdmin, listUsers, listNames, findForGoogle };
 }

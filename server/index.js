@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { rateLimiter } from "./auth.js";
 import { connect, isStorageError } from "./db/index.js";
 import { migrate } from "./db/migrate.js";
-import { createSessions, csrfGuard } from "./sessions.js";
+import { createSessions, csrfGuard, readCookie } from "./sessions.js";
+import { createGoogleAuth, GoogleAuthError, OAUTH_COOKIE, STATE_TTL_MS } from "./google-auth.js";
 import { createUsers, UserError } from "./users.js";
 import { createAnalyses } from "./analyses.js";
 import { createShares } from "./shares.js";
@@ -26,6 +27,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const sessions = deps.sessions || createSessions(db, cfg);
   const users = deps.users || createUsers(db, sessions, deps.usersOpts || {});
   const analyses = deps.analyses || createAnalyses(db);
+  const google = deps.google || createGoogleAuth(cfg, deps.googleOpts || {});
   const shares = deps.shares || createShares(db, analyses, { publicUrl: cfg.publicUrl, ...(deps.sharesOpts || {}) });
   const app = express();
   app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses; app.locals.shares = shares;
@@ -42,7 +44,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   });
 
   app.get("/api/health", (req, res) => res.json({ ok: true, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model,
-    models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()), running: runningCount(), storage: db.kind })); // БД не трогаем — Neon должен спать при простое
+    models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()), running: runningCount(), storage: db.kind, googleLogin: google.enabled })); // БД не трогаем — Neon должен спать при простое
 
   // Лимиты тела — по роутам (contracts/api.md): 100 KB по умолчанию, 1 MB для AI-задач.
   const jsonSmall = express.json({ limit: "100kb" });
@@ -55,7 +57,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
 
   // ---------- вход и своя учётная запись ----------
   const loginLimiter = rateLimiter({ limit: cfg.loginRateLimit || 10, windowMs: 10 * 60 * 1000 });
-  const me = (u) => ({ user: { id: u.id, login: u.login, name: u.name, role: u.role, settings: u.settings || {} }, mustChangePassword: Boolean(u.mustChangePassword) });
+  const me = (u) => ({ user: { id: u.id, login: u.login, name: u.name, role: u.role, settings: u.settings || {}, email: u.email || null, hasPassword: u.hasPassword !== false }, mustChangePassword: Boolean(u.mustChangePassword) });
   app.post("/api/auth/login", loginLimiter, jsonSmall, async (req, res) => {
     const { login, password } = req.body || {};
     try {
@@ -69,6 +71,35 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
       throw e;
     }
   });
+  // ---------- вход через Google (spec 004): только приглашённые почты; сеанс после входа — обычный ----------
+  const callbackUrl = (req) => { const base = cfg.publicUrl ? (cfg.publicUrl.endsWith("/") ? cfg.publicUrl.slice(0, -1) : cfg.publicUrl) : `${req.protocol}://${req.get("host")}`; return base + "/api/auth/google/callback"; };
+  const oauthCookie = { httpOnly: true, secure: Boolean(cfg.production), sameSite: "lax", path: "/api/auth/google" };
+  app.get("/api/auth/google/start", loginLimiter, (req, res) => {
+    if (!google.enabled) return res.status(404).json({ error: "not_found", message: "Вход через Google не настроен" });
+    const { url, state } = google.begin({ redirectUri: callbackUrl(req), next: req.query.next });
+    res.cookie(OAUTH_COOKIE, state, { ...oauthCookie, maxAge: STATE_TTL_MS });
+    res.redirect(302, url);
+  });
+  app.get("/api/auth/google/callback", async (req, res) => {
+    const back = (code) => { res.clearCookie(OAUTH_COOKIE, oauthCookie); res.redirect(302, "/login.html?error=" + code); };
+    if (!google.enabled) return back("google_failed");
+    try {
+      if (req.query.error) { log("warn", "google login cancelled", { reason: String(req.query.error).slice(0, 40), ip: req.ip }); return back("google_cancelled"); }
+      const g = await google.finish({ code: req.query.code, state: req.query.state, cookieState: readCookie(req, OAUTH_COOKIE), redirectUri: callbackUrl(req) });
+      let u;
+      try { u = await users.findForGoogle(g); }
+      catch (e) { if (e instanceof UserError && e.code === "google_not_invited") { log("warn", "google login rejected", { email: g.email, reason: "not_invited", ip: req.ip }); return back("google_not_invited"); } throw e; }
+      const token = await sessions.createSession(u.id, req.get("user-agent") || "");
+      sessions.setCookie(res, token); res.clearCookie(OAUTH_COOKIE, oauthCookie);
+      log("info", "login ok", { login: u.login, via: "google", ip: req.ip });
+      res.redirect(302, g.next || "/");
+    } catch (e) {
+      if (e instanceof GoogleAuthError) { log("warn", "google login failed", { code: e.code, ip: req.ip }); return back(e.code === "state" ? "google_retry" : e.code === "cancelled" ? "google_cancelled" : "google_failed"); }
+      if (isStorageError(e)) { log("error", "storage unavailable", { path: req.path, code: e.code }); return back("google_failed"); }
+      log("error", "google login error", { message: e?.message }); back("google_failed");
+    }
+  });
+
   app.post("/api/auth/logout", async (req, res) => { await sessions.destroySession(req.sessionToken); sessions.clearCookie(res); res.status(204).end(); });
   app.get("/api/auth/me", requireUser, (req, res) => res.json(me(req.user)));
   app.post("/api/auth/password", requireUser, jsonSmall, async (req, res) => {

@@ -16,6 +16,11 @@
     <div class="field"><label for="login-pass">Пароль</label><input id="login-pass" name="password" type="password" autocomplete="current-password" required maxlength="200"></div>
     <div class="row"><button class="primary" type="submit" id="login-btn">Войти</button></div>
     <p id="login-msg" class="notice fail hidden" role="alert"></p>
+    <div id="google-box" class="hidden">
+      <div class="login-or"><span>или</span></div>
+      <a id="google-btn" class="google-btn" href="/api/auth/google/start"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.700 7.1-17.1z"/><path fill="#FBBC05" d="M10.500 28.600a14.500 14.500 0 0 1 0-9.200l-7.900-6.200a24 24 0 0 0 0 21.600l7.900-6.200z"/><path fill="#34A853" d="M24 48c6.500 0 11.900-2.100 15.900-5.800l-7.200-5.600c-2.100 1.400-4.900 2.300-8.700 2.300-6.300 0-11.600-4.200-13.500-10l-7.900 6.200C6.500 42.600 14.600 48 24 48z"/></svg><span>Войти через Google</span></a>
+      <p class="muted" style="font-size:.8rem;margin-top:.5rem">Войти может только тот, чью почту добавил администратор. Приложение получает от Google лишь адрес почты и имя.</p>
+    </div>
   </form>
 
   <form class="panel login hidden" id="change-form" autocomplete="on">

@@ -38,6 +38,7 @@ export function configFromEnv(env = process.env) {
     dbMemory: env.DB_MEMORY === "1",
     adminLogin: env.ADMIN_LOGIN || "",
     adminPassword: env.ADMIN_PASSWORD || "",
+    googleClientId: env.GOOGLE_OAUTH_CLIENT_ID || "", googleClientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET || "", // вход через Google (spec 004)
     maxJobs: Number(env.MAX_JOBS) || 4,
     publicRateLimit: Number(env.PUBLIC_RATE_LIMIT) || 60, // обращений к публичным ссылкам с одного IP за 10 минут
     loginRateLimit: Number(env.LOGIN_RATE_LIMIT) || 10, // попыток входа с одного IP за 10 минут

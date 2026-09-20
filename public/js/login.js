@@ -17,7 +17,21 @@ function mode(name, user) {
   else $("#login-name").focus();
 }
 
+const GOOGLE_ERRORS = {
+  google_not_invited: "Этой почты нет в списке приглашённых. Попросите администратора добавить её в «Настройки → Пользователи» — или выберите другой аккаунт Google.",
+  google_cancelled: "Вход через Google не завершён. Попробуйте ещё раз.",
+  google_retry: "Время на вход истекло или он был начат в другом окне. Нажмите «Войти через Google» ещё раз.",
+  google_failed: "Не удалось подтвердить вход через Google. Попробуйте ещё раз; если не помогает — войдите паролем или обратитесь к администратору.",
+};
+/** Кнопка показывается, только если на сервере настроен вход через Google; ошибка прошлой попытки приходит в ?error=. */
+async function initGoogle() {
+  const params = new URLSearchParams(location.search); const err = params.get("error");
+  if (err && GOOGLE_ERRORS[err]) { show($("#login-msg"), GOOGLE_ERRORS[err]); params.delete("error"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); }
+  try { const h = await fetch("/api/health").then((r) => r.json()); if (h.googleLogin) { $("#google-btn").href = "/api/auth/google/start?next=" + encodeURIComponent(nextUrl()); $("#google-box").classList.remove("hidden"); } } catch {}
+}
+
 async function init() {
+  initGoogle();
   try {
     const me = await api("GET", "/api/auth/me", undefined, { noRedirect: true });
     if (me.mustChangePassword) return mode("change", me.user);

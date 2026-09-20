@@ -53,6 +53,7 @@ npm start                 # http://localhost:3000
 | `ANTHROPIC_API_KEY` | ключ Claude напрямую (при `AI_PROVIDER=anthropic`) | — |
 | `DATABASE_URL` | строка подключения Postgres (Neon pooled). В production обязательна | — (локально PGlite) |
 | `ADMIN_LOGIN` / `ADMIN_PASSWORD` | первый администратор (пароль ≥ 10 символов, меняется при первом входе) | — |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | вход через Google (необязательно): OAuth-клиент Web application, адрес возврата `<PUBLIC_URL>/api/auth/google/callback`; войти могут только приглашённые почты | — |
 | `MAX_JOBS` | общий предел одновременных AI-задач | `4` |
 | `LOGIN_RATE_LIMIT` | попыток входа с одного IP за 10 минут | `10` |
 | `CLAUDE_MODEL` | модель | `claude-opus-5` |

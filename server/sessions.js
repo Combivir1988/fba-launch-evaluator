@@ -19,7 +19,7 @@ export function readCookie(req, name = COOKIE) {
   return "";
 }
 
-const publicUser = (r) => ({ id: r.id, login: r.login, name: r.name, role: r.role, settings: r.settings || {}, mustChangePassword: r.must_change_password });
+const publicUser = (r) => ({ id: r.id, login: r.login, name: r.name, role: r.role, settings: r.settings || {}, mustChangePassword: r.must_change_password, email: r.email || null, hasPassword: r.password_hash !== "!" });
 
 export function createSessions(db, cfg = {}) {
   const cache = new Map(); // tokenHash → { user, at }
@@ -40,7 +40,7 @@ export function createSessions(db, cfg = {}) {
     const hit = cache.get(th);
     if (hit && now() - hit.at < CACHE_MS) return { user: hit.user, renewed: false };
     const r = (await db.query(
-      `SELECT s.expires_at, s.last_seen_at, u.id, u.login, u.name, u.role, u.active, u.settings, u.must_change_password
+      `SELECT s.expires_at, s.last_seen_at, u.id, u.login, u.name, u.role, u.active, u.settings, u.must_change_password, u.email, u.password_hash
          FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1`, [th])).rows[0];
     if (!r || !r.active || new Date(r.expires_at).getTime() <= now()) { cache.delete(th); return null; }
     let renewed = false;

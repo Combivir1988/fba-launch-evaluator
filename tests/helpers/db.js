@@ -10,9 +10,9 @@ export async function testDb() {
   await migrate(db);
   db.reset = () => db.exec(`TRUNCATE ${TABLES.join(", ")} CASCADE`);
   /** Пользователь напрямую в БД, без scrypt (быстро). Хэш заведомо невалидный — войти таким нельзя. */
-  db.makeUser = async ({ login = "u" + randomUUID().slice(0, 8), name = "Тест", role = "user", active = true, mustChange = false, hash = "x" } = {}) => {
+  db.makeUser = async ({ login = "u" + randomUUID().slice(0, 8), name = "Тест", role = "user", active = true, mustChange = false, hash = "x", email = null } = {}) => {
     const id = randomUUID();
-    await db.query("INSERT INTO users (id, login, name, role, active, password_hash, must_change_password) VALUES ($1,$2,$3,$4,$5,$6,$7)", [id, login, name, role, active, hash, mustChange]);
+    await db.query("INSERT INTO users (id, login, name, role, active, password_hash, must_change_password, email) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)", [id, login, name, role, active, hash, mustChange, email]);
     return { id, login, name, role, active };
   };
   return db;

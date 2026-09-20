@@ -452,6 +452,7 @@ function renderSettings() {
   $("#set-model-hint").textContent = `AI-вердикт: ${modelAi() || "—"} · патентный скан: ${modelPatents() || "—"}. ${FREE_HINT}`;
   $("#set-login-state").textContent = S.user ? `Вы вошли как ${S.user.name} (логин ${S.user.login}, ${S.user.role === "admin" ? "администратор" : "пользователь"}).` : "";
   $("#pw-user").value = S.user?.login || "";
+  api("GET", "/api/auth/me").then((me) => { const has = me.user.hasPassword !== false; $("#pw-form").classList.toggle("hidden", !has); if (!has) $("#set-login-state").textContent += " Вы входите через Google — пароля у учётной записи нет; при необходимости его задаст администратор."; }).catch(() => {});
   $("#set-users").classList.toggle("hidden", S.user?.role !== "admin");
   if (S.user?.role === "admin") renderUsers();
 }
@@ -472,19 +473,24 @@ async function copyText(t) { try { await navigator.clipboard.writeText(t); toast
 async function renderUsers() {
   if (!$("#un-pass").value) $("#un-pass").value = genPassword();
   let list = [];
-  try { list = await api("GET", "/api/users"); } catch (e) { $("#users-list").innerHTML = `<tr><td colspan="7" class="muted">Не удалось загрузить: ${esc(e.message)}</td></tr>`; return; }
+  try { list = await api("GET", "/api/users"); } catch (e) { $("#users-list").innerHTML = `<tr><td colspan="8" class="muted">Не удалось загрузить: ${esc(e.message)}</td></tr>`; return; }
   const fmt = (d) => (d ? new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "—");
   $("#users-list").innerHTML = list.map((u) => {
     const self = u.id === S.user.id; const lockedNow = u.lockedUntil && new Date(u.lockedUntil) > new Date();
     const status = !u.active ? '<span class="chip na">отключён</span>' : lockedNow ? '<span class="chip warn">заблокирован до ' + esc(fmt(u.lockedUntil)) + "</span>" : u.mustChangePassword ? '<span class="chip">временный пароль</span>' : '<span class="chip ok">активен</span>';
-    return `<tr class="${u.active ? "" : "off"}"><td>${esc(u.name)}${self ? ' <span class="muted">(вы)</span>' : ""}</td><td><code>${esc(u.login)}</code></td><td>${u.role === "admin" ? "администратор" : "пользователь"}</td><td>${status}</td><td>${esc(fmt(u.lastLoginAt))}</td><td>${u.analyses ?? 0}</td>
-      <td><div class="acts"><button data-uact="role" data-id="${u.id}" data-role="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Сделать пользователем" : "Сделать админом"}</button><button data-uact="reset" data-id="${u.id}" data-name="${esc(u.name)}">Сбросить пароль</button><button data-uact="toggle" data-id="${u.id}" data-active="${u.active ? "0" : "1"}" class="${u.active ? "danger" : ""}">${u.active ? "Отключить" : "Включить"}</button></div></td></tr>`;
-  }).join("") || '<tr><td colspan="7" class="muted">Пользователей нет</td></tr>';
+    const method = u.hasPassword && u.email ? "Google и пароль" : u.email ? (u.googleLinked ? "Google" : "Google · ещё не входил") : "пароль";
+    return `<tr class="${u.active ? "" : "off"}"><td>${esc(u.name)}${self ? ' <span class="muted">(вы)</span>' : ""}</td><td>${u.email ? esc(u.email) + "<br>" : ""}<small class="muted">логин: <code>${esc(u.login)}</code></small></td><td>${esc(method)}</td><td>${u.role === "admin" ? "администратор" : "пользователь"}</td><td>${status}</td><td>${esc(fmt(u.lastLoginAt))}</td><td>${u.analyses ?? 0}</td>
+      <td><div class="acts"><button data-uact="role" data-id="${u.id}" data-role="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Сделать пользователем" : "Сделать админом"}</button><button data-uact="email" data-id="${u.id}" data-email="${esc(u.email || "")}" data-name="${esc(u.name)}">Почта</button><button data-uact="reset" data-id="${u.id}" data-name="${esc(u.name)}">${u.hasPassword ? "Сбросить пароль" : "Задать пароль"}</button><button data-uact="toggle" data-id="${u.id}" data-active="${u.active ? "0" : "1"}" class="${u.active ? "danger" : ""}">${u.active ? "Отключить" : "Включить"}</button></div></td></tr>`;
+  }).join("") || '<tr><td colspan="8" class="muted">Пользователей нет</td></tr>';
 }
 $("#users-list").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-uact]"); if (!b) return;
   try {
     if (b.dataset.uact === "role") await api("PATCH", `/api/users/${b.dataset.id}`, { role: b.dataset.role });
+    if (b.dataset.uact === "email") {
+      const v = window.prompt(`Почта аккаунта Google для «${b.dataset.name}» (пусто — убрать вход через Google):`, b.dataset.email); if (v === null) return;
+      await api("PATCH", `/api/users/${b.dataset.id}`, { email: v.trim() }); toast(v.trim() ? "Почта сохранена — человек может входить через Google" : "Почта убрана");
+    }
     if (b.dataset.uact === "toggle") { if (b.dataset.active === "0" && !confirm("Отключить пользователя? Он потеряет доступ в течение минуты, его анализы останутся.")) return; await api("PATCH", `/api/users/${b.dataset.id}`, { active: b.dataset.active === "1" }); }
     if (b.dataset.uact === "reset") {
       if (!confirm(`Сбросить пароль пользователю «${b.dataset.name}»? Его текущие сеансы будут закрыты.`)) return;
@@ -496,15 +502,29 @@ $("#users-list").addEventListener("click", async (e) => {
 });
 $("#un-gen").addEventListener("click", () => { $("#un-pass").value = genPassword(); });
 $("#un-copy").addEventListener("click", () => copyText(`Логин: ${$("#un-login").value.trim().toLowerCase()}\nВременный пароль: ${$("#un-pass").value}\n${location.origin}`));
+function syncUserMode() {
+  const google = $("#un-mode").value === "google";
+  $$(".un-password-only").forEach((el) => el.classList.toggle("hidden", google)); $$(".un-google-only").forEach((el) => el.classList.toggle("hidden", !google));
+  $("#un-email").required = google; $("#un-login").required = !google; $("#un-pass").required = !google; $("#un-name").required = !google;
+  if (!google && !$("#un-pass").value) $("#un-pass").value = genPassword();
+}
+$("#un-mode").addEventListener("change", syncUserMode);
+fetch("/api/health").then((r) => r.json()).then((h) => {
+  if (!h.googleLogin) { $("#un-mode").value = "password"; $("#un-mode").querySelector('[value="google"]').disabled = true; $("#un-google-off").textContent = "Вход через Google на сервере не настроен (нет GOOGLE_OAUTH_CLIENT_ID / SECRET) — доступен только вход по паролю."; }
+  syncUserMode();
+}).catch(syncUserMode);
 $("#user-new").addEventListener("submit", async (e) => {
-  e.preventDefault(); const msg = $("#un-msg"); msg.textContent = "";
+  e.preventDefault(); const msg = $("#un-msg"); msg.textContent = ""; const google = $("#un-mode").value === "google";
   try {
-    const r = await api("POST", "/api/users", { name: $("#un-name").value, login: $("#un-login").value, role: $("#un-role").value, password: $("#un-pass").value });
-    msg.textContent = `Добавлен ${r.user.name} (${r.user.login}). Передайте ему логин и временный пароль.`;
-    await copyText(`Логин: ${r.user.login}\nВременный пароль: ${$("#un-pass").value}\n${location.origin}`);
-    $("#un-name").value = ""; $("#un-login").value = ""; $("#un-pass").value = genPassword(); renderUsers();
+    const body = { name: $("#un-name").value.trim(), role: $("#un-role").value, email: $("#un-email").value.trim() };
+    if (!google) { body.login = $("#un-login").value; body.password = $("#un-pass").value; }
+    const r = await api("POST", "/api/users", body);
+    if (google) { msg.textContent = `Добавлен ${r.user.email}. Человеку достаточно открыть сайт и нажать «Войти через Google».`; await copyText(`${location.origin}\nВход: кнопка «Войти через Google», аккаунт ${r.user.email}`); }
+    else { msg.textContent = `Добавлен ${r.user.name} (${r.user.login}). Передайте ему логин и временный пароль.`; await copyText(`Логин: ${r.user.login}\nВременный пароль: ${$("#un-pass").value}\n${location.origin}`); }
+    $("#un-name").value = ""; $("#un-login").value = ""; $("#un-email").value = ""; $("#un-pass").value = google ? "" : genPassword(); renderUsers();
   } catch (err) { msg.textContent = err.message; }
 });
+
 $("#set-theme").addEventListener("click", () => $("#theme-toggle").click());
 $("#set-side").addEventListener("click", () => { const c = $("#tab-analysis").classList.contains("side-collapsed"); setSide(!c); showTab("analysis"); });
 

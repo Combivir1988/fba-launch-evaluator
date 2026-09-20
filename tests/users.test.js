@@ -117,3 +117,43 @@ test("listUsers / listNames; настоящий scrypt end-to-end", async () => 
   assert.equal(list.length, 1); assert.equal(list[0].analyses, 0); assert.equal("password_hash" in list[0], false);
   assert.deepEqual(await U.listNames(), [{ id: u.id, name: "Реальный" }]);
 });
+
+// ---------- spec 004: приглашение по почте и вход через Google ----------
+test("приглашение по почте: без пароля, логин из почты, вход по паролю невозможен", async () => {
+  const u = await U.createUser({ email: "  Anna.Koval@Gmail.com ", role: "user" });
+  assert.equal(u.email, "anna.koval@gmail.com"); assert.equal(u.login, "anna.koval"); assert.equal(u.name, "anna.koval"); assert.equal(u.hasPassword, false); assert.equal(u.googleLinked, false); assert.equal(u.mustChangePassword, false);
+  const second = await U.createUser({ email: "anna.koval@ukr.net", name: "Анна Вторая" }); assert.equal(second.login, "anna.koval2", "логин занят — добавляется суффикс");
+  assert.equal((await U.createUser({ email: "я@пример.укр", name: "Кириллица" })).login, "user", "недопустимые символы убираются, короткий логин дополняется");
+  await assert.rejects(U.createUser({ email: "ANNA.KOVAL@gmail.com", name: "Дубль" }), code("email_taken"));
+  await assert.rejects(U.createUser({ name: "Никто" }), code("bad_password"));
+  await assert.rejects(U.createUser({ email: "not-an-email", name: "X" }), code("bad_email"));
+  for (const pw of ["!", "", "anything-at-all"]) await assert.rejects(U.authenticate("anna.koval", pw), code("invalid_credentials"));
+  await assert.rejects(U.changePassword(u.id, "x", "new-password-123"), code("no_password"));
+});
+
+test("findForGoogle: привязка при первом входе, затем опознание по sub; имя из Google; отказы неразличимы", async () => {
+  const u = await U.createUser({ email: "anna@gmail.com" });
+  const first = await U.findForGoogle({ sub: "g-111", email: "Anna@Gmail.com", name: "Анна Коваль" });
+  assert.equal(first.id, u.id); assert.equal(first.googleLinked, true); assert.equal(first.name, "Анна Коваль", "авто-имя заменено именем из Google"); assert.ok(first.lastLoginAt);
+  const renamed = await U.findForGoogle({ sub: "g-111", email: "anna.new@gmail.com", name: "Другое имя" });
+  assert.equal(renamed.id, u.id, "почта в Google сменилась — опознаём по sub"); assert.equal(renamed.name, "Анна Коваль", "имя больше не перезаписывается");
+  const named = await U.createUser({ email: "ivan@gmail.com", name: "Иван (закупки)" });
+  assert.equal((await U.findForGoogle({ sub: "g-222", email: "ivan@gmail.com", name: "Ivan Petrov" })).name, "Иван (закупки)", "имя, заданное администратором, сохраняется");
+  const errs = [];
+  for (const who of [{ sub: "g-999", email: "stranger@gmail.com" }, { sub: "g-333", email: "anna@gmail.com" }, { sub: "", email: "anna@gmail.com" }, { sub: "g-444", email: "" }]) await U.findForGoogle(who).catch((e) => errs.push([e.code, e.status, e.message]));
+  await U.updateUser(named.id, { active: false }); await U.findForGoogle({ sub: "g-222", email: "ivan@gmail.com" }).catch((e) => errs.push([e.code, e.status, e.message]));
+  assert.equal(errs.length, 5); for (const e of errs) assert.deepEqual(e, ["google_not_invited", 403, "Этой почты нет в списке приглашённых"]);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM users")).rows[0].n, 2, "учётные записи для чужих почт не создаются");
+});
+
+test("почта у пользователя с паролем: оба способа входа; смена и снятие почты", async () => {
+  const u = await U.createUser({ login: "petro", name: "Петро", password: "temp-password-1" });
+  assert.equal(u.hasPassword, true); assert.equal(u.email, null);
+  const withMail = await U.updateUser(u.id, { email: "Petro@Example.com" }); assert.equal(withMail.email, "petro@example.com");
+  assert.equal((await U.findForGoogle({ sub: "g-p", email: "petro@example.com" })).id, u.id); assert.ok(await U.authenticate("petro", "temp-password-1"));
+  const other = await U.createUser({ email: "olga@example.com" });
+  await assert.rejects(U.updateUser(other.id, { email: "petro@example.com" }), code("email_taken"));
+  await assert.rejects(U.updateUser(other.id, { email: "" }), code("email_required"));
+  assert.equal((await U.updateUser(u.id, { email: "" })).email, null, "у пользователя с паролем почту можно снять");
+  const list = await U.listUsers(); assert.ok(list.every((x) => "hasPassword" in x && "email" in x && !("password_hash" in x) && !("google_sub" in x)));
+});

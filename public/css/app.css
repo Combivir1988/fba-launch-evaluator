@@ -220,3 +220,9 @@ button.seg-pick { padding: .15rem .5rem; font-size: .78rem; }
 input.invalid { border-color: var(--fail) !important; }
 .bandcmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem; margin: .6rem 0; }
 .bandcmp .tile .s b { color: inherit; }
+
+/* spec 004: вход через Google */
+.login-or { display: flex; align-items: center; gap: .6rem; margin: 1rem 0 .7rem; color: var(--text-2); font-size: .8rem; }
+.login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.google-btn { display: flex; align-items: center; justify-content: center; gap: .6rem; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: #1f1f1f; font-weight: 600; text-decoration: none; }
+.google-btn:hover { background: #f6f7f9; } .google-btn:focus-visible { outline: 2px solid var(--pending); outline-offset: 2px; }
