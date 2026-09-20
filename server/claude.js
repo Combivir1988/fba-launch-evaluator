@@ -24,6 +24,7 @@ export function configFromEnv(env = process.env) {
   if (!openrouterModels.includes(openrouterModel)) openrouterModels.unshift(openrouterModel);
   return {
     provider, openrouterKey, openrouterModel, openrouterModels,
+    googleKey: env.GOOGLE_AI_STUDIO_KEY || "", // модели с префиксом aistudio/ идут напрямую в Google AI Studio
     openrouterReasoning: env.OPENROUTER_REASONING === "1",
     publicUrl: env.PUBLIC_URL || (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : ""),
     schema: VERDICT_SCHEMA,

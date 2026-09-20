@@ -48,6 +48,7 @@ npm start                 # http://localhost:3000
 | `AI_PROVIDER` | `openrouter` \| `anthropic` | `openrouter`, если задан `OPENROUTER_API_KEY` |
 | `OPENROUTER_API_KEY` | ключ OpenRouter (только сервер) | — |
 | `OPENROUTER_MODEL` / `OPENROUTER_MODELS` | модель по умолчанию / список для выбора в UI | `google/gemini-3.8-flash` / см. `.env.example` |
+| `GOOGLE_AI_STUDIO_KEY` | бесплатный ключ Google AI Studio; модели `aistudio/…` из `OPENROUTER_MODELS` идут напрямую в Google (например `aistudio/gemini-3.5-flash-lite` — вердикт за ~6 с) | — |
 | `OPENROUTER_REASONING` | запрашивать reasoning у модели | `0` |
 | `ANTHROPIC_API_KEY` | ключ Claude напрямую (при `AI_PROVIDER=anthropic`) | — |
 | `DATABASE_URL` | строка подключения Postgres (Neon pooled). В production обязательна | — (локально PGlite) |

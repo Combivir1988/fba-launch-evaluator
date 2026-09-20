@@ -28,7 +28,8 @@ export function createSessions(db, cfg = {}) {
 
   async function createSession(userId, ua = "") {
     const token = randomBytes(32).toString("base64url");
-    await db.query("INSERT INTO sessions (token_hash, user_id, expires_at, ua) VALUES ($1, $2, $3, $4)", [hashToken(token), userId, new Date(now() + SESSION_TTL_MS), String(ua).slice(0, 200)]);
+    // Все метки времени — из одного источника (now()), а не из DEFAULT now() базы: иначе расчёт «последней активности» зависит от расхождения часов.
+    await db.query("INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at, ua) VALUES ($1, $2, $3, $3, $4, $5)", [hashToken(token), userId, new Date(now()), new Date(now() + SESSION_TTL_MS), String(ua).slice(0, 200)]);
     return token;
   }
 
