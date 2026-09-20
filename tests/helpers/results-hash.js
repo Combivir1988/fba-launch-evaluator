@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 
 export function stripNew(results) {
   const r = JSON.parse(JSON.stringify(results));
-  delete r.computedAt; delete r.methodologyVersion; delete r.priceBand;
+  delete r.computedAt; delete r.methodologyVersion; delete r.priceBand; delete r.cvrHint;
   for (const s of r.priceSegments?.segments || []) delete s.selected;
   return r;
 }

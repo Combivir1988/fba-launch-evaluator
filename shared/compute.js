@@ -4,6 +4,7 @@ import { competition, priceSegments } from "./competition.js";
 import { traffic } from "./traffic.js";
 import { criterion1, summarizeCriterion1 } from "./criterion1.js";
 import { applyPriceBand, wholeNicheRef } from "./price-band.js";
+import { cvrHint } from "./cvr-hint.js";
 import { economics } from "./economics.js";
 import { budget } from "./budget.js";
 import { challenger } from "./challenger.js";
@@ -50,6 +51,12 @@ export function compute(analysis) {
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p),
   };
+  // Подсказка CVR из SQP (клик → покупка). Значение по умолчанию (10 %) — допущение; подсказка ничего не меняет сама, только предлагает.
+  results.cvrHint = cvrHint(whole.sqp, { coreKeyword: analysis.coreKeyword, clusterKeywords: inputs.clusterKeywords || [], realistic: th.economics.cvrRealistic });
+  if (results.cvrHint && results.economics?.criterion2?.["2c"]) {
+    const h = results.cvrHint, pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %";
+    results.economics.criterion2["2c"].note += `; по SQP (${h.scopeLabel}) клик→покупка: рынок ${h.market ? pc(h.market.cvr) : "—"}${h.mine ? `, ваш ASIN ${pc(h.mine.cvr)}` : ""}`;
+  }
   results.verdict = verdictCeiling(results);
   results.computedAt = new Date().toISOString();
   results.methodologyVersion = th.methodologyVersion || analysis.methodologyVersion;

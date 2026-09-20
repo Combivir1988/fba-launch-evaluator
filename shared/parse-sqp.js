@@ -15,13 +15,13 @@ export function parseSqp(rows) {
   const cQ = find(h, "search query"), cV = find(h, "search query volume"),
     cI = find(h, "impressions: total count"), cC = find(h, "clicks: total count"),
     cA = find(h, "cart adds: total count"), cP = find(h, "purchases: total count"),
-    cPr = find(h, "purchases: purchase rate %"), cPa = find(h, "purchases: asin count"), cScore = find(h, "search query score");
+    cPr = find(h, "purchases: purchase rate %"), cPa = find(h, "purchases: asin count"), cCa = find(h, "clicks: asin count"), cScore = find(h, "search query score");
   const out = rows.map((r) => {
     const volume = toNum(r[cV]); const purchases = toNum(r[cP]);
     return {
       query: String(r[cQ] || "").trim(), score: toNum(r[cScore]), volume,
       impressions: toNum(r[cI]), clicks: toNum(r[cC]), cartAdds: toNum(r[cA]), purchases,
-      purchasesAsin: toNum(r[cPa]),
+      purchasesAsin: toNum(r[cPa]), clicksAsin: cCa ? toNum(r[cCa]) : null,
       purchaseRate: cPr && toNum(r[cPr]) !== null ? toNum(r[cPr]) / 100 : safeDiv(purchases, volume),
     };
   }).filter((r) => r.query && r.volume !== null);

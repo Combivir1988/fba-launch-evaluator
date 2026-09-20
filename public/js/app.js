@@ -139,7 +139,7 @@ function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.
 
 // ---------- compute / render ----------
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
-function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); autosave(); }
+function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); renderCvrHint(); autosave(); }
 function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
 const scheduleFull = debounce(renderAll, 250);
 let rafId = 0; function scheduleEcon() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(renderEcon); }
@@ -572,6 +572,24 @@ async function loadAllShares() {
 }
 $("#set-shares-load").addEventListener("click", loadAllShares);
 $("#set-shares-list").addEventListener("click", (e) => shareAction(e, loadAllShares));
+
+// ---------- подсказка CVR из SQP ----------
+function renderCvrHint() {
+  const box = $("#cvr-hint"); if (!box) return; const h = S.a.results?.cvrHint;
+  if (!h) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  const pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %"; const cur = S.a.inputs.cvr;
+  const part = (label, x, key) => (x ? `${label}: <b>${pc(x.cvr)}</b> <span title="${x.purchases} покупок на ${x.clicks} кликов, запросов: ${x.queries}">(${x.clicks.toLocaleString("ru-RU")} кликов${x.smallSample ? ", мало данных" : ""})</span> <button type="button" data-cvr-set="${x.cvr}" style="padding:.1rem .45rem;font-size:.75rem">подставить</button>` : "");
+  const notes = [];
+  if (h.aboveRealistic) notes.push("выше 15 % — для нового листинга без отзывов это оптимистично");
+  if (Math.abs(cur - h.suggested) / h.suggested > 0.25) notes.push(`сейчас в расчёте ${pc(cur)}`);
+  box.innerHTML = `SQP, клик → покупка ${esc(h.scopeLabel)}. ${[part("рынок", h.market), part("ваш ASIN", h.mine)].filter(Boolean).join(" · ")}${notes.length ? `<br><span style="color:var(--warn)">${esc(notes.join("; "))}</span>` : ""}`;
+  box.classList.remove("hidden");
+}
+$("#cvr-hint").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-cvr-set]"); if (!b) return;
+  const v = Math.min(0.30, Math.max(0.03, Math.round(Number(b.dataset.cvrSet) * 200) / 200)); // шаг ползунка 0,5 %
+  S.a.inputs.cvr = v; markDirty(); renderAll(); toast(`CVR = ${(v * 100).toFixed(1).replace(".", ",")} % — из SQP`);
+});
 
 // ---------- ценовой диапазон анализа (spec 003) ----------
 function setBand(min, max) {

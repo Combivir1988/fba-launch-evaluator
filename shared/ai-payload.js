@@ -34,6 +34,7 @@ export function buildAiPayload(analysis) {
       note: "criterion1 1b/1d/1e/1f, competition, challenger и topAsins посчитаны ТОЛЬКО по листингам этого ценового диапазона; 1a, 1c, 1g, 1h, traffic, priceSegments — по всей нише" } : null,
     wholeNiche: R.priceBand?.active && R.priceBand.whole ? { revenue: r2(R.priceBand.whole.revenue), topBrand: R.priceBand.whole.topBrand, topBrandShare: r3(R.priceBand.whole.topBrandShare), top5Share: r3(R.priceBand.whole.top5Share),
       priceMedian: r2(R.priceBand.whole.priceMedian), reviewsAvg: r2(R.priceBand.whole.reviewsAvg), reviewsMedian: r2(R.priceBand.whole.reviewsMedian) } : null,
+    cvrHint: R.cvrHint ? { note: "конверсия клик→покупка из SQP; inputs CVR по умолчанию 10 % — допущение", usedCvr: inp.cvr, scope: R.cvrHint.scopeLabel, market: R.cvrHint.market && { cvr: r3(R.cvrHint.market.cvr), clicks: R.cvrHint.market.clicks, smallSample: R.cvrHint.market.smallSample }, mine: R.cvrHint.mine && { cvr: r3(R.cvrHint.mine.cvr), clicks: R.cvrHint.mine.clicks, smallSample: R.cvrHint.mine.smallSample } } : null,
     topAsins: topAsins(agg, inp, R.priceBand),
     challenger: { active: R.challenger.active, greenCount: R.challenger.greenCount, mandatoryOk: R.challenger.mandatoryOk, pass: R.challenger.pass, gate4Discussed: R.challenger.gate4Discussed,
       items: Object.fromEntries(Object.entries(R.challenger.items).map(([k, v]) => [k, { title: v.title, status: v.status, kind: v.kind, note: v.note }])) },

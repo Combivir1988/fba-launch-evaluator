@@ -93,3 +93,8 @@ MVP = Phase 1–3 (US1) + T021–T023 (US2, ползунки — явное тр
 
 - [x] `server/openrouter.js`: `endpointFor(model, cfg)` — модели с префиксом `aistudio/` идут напрямую в Google AI Studio (OpenAI-совместимый эндпоинт, ключ `GOOGLE_AI_STUDIO_KEY`), без шага strict-схемы (Google отвечает 400) и без полей `usage`/`reasoning`; понятные сообщения для 429 (лимит) и 503 (перегрузка). Причина: OpenRouter снял бесплатный DeepSeek, а общий бесплатный пул Gemma/Qwen/Nemotron на нашем запросе отвечал 429/503/таймаутом (замеры 2026-09-20). Результат замера: `aistudio/gemini-3.5-flash-lite` — вердикт за 5–6 с (3 из 3), патентный скан за 22 с; Gemma 4 и старшие Flash на бесплатном уровне — 429/503.
 - [x] `tests/aistudio.test.js` (5 тестов); подпись в «Настройках»: «бесплатно, Google AI Studio (быстро)».
+
+## Дополнение 2026-09-20 — подсказка CVR из SQP
+
+- [x] `shared/cvr-hint.js`: конверсия «клик → покупка» из Search Query Performance (покупки / клики, взвешенно по кликам) — по рынку и по ASIN продавца; отбор запросов: кластер → главный ключ → весь отчёт; пометка малой выборки (< 200 кликов рынка, < 50 своих). CVR по умолчанию остаётся 10 % (допущение курса); подсказка сама ничего не меняет — кнопка «подставить» под ползунком. «Purchase rate %» из SQP и «конверсия поиска» POE не используются: это покупки на объём поиска.
+- [x] `shared/parse-sqp.js` читает `Clicks: ASIN Count`; `compute.js` → `results.cvrHint` + сверка в примечании 2c; `ai-payload.js` → `cvrHint`; панель `#cvr-hint`; справка; `tests/cvr-hint.test.js` (4), фикстура `SQP_synthetic_urinal_screen.csv` (синтетическая), проба `scripts/ui-probe10.mjs`.
