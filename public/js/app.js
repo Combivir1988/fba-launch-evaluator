@@ -31,26 +31,30 @@ $("#theme-toggle").addEventListener("click", () => {
 });
 
 // ---------- сворачиваемая панель ввода ----------
-// Анимация — только через transform (его рисует видеокарта). Ширину колонок меняем ОДИН раз, когда ничего не движется:
+// Анимация — только через transform (его рисует видеокарта). Ширину колонок меняем ОДИН раз, до начала движения:
 // если анимировать саму сетку, браузер на каждом кадре заново раскладывает весь дашборд и перерисовывает все графики — отсюда рывки.
-const SIDE_MS = 220; let sideSeq = 0;
+// Панель и дашборд едут ОДНОВРЕМЕННО: при сворачивании панель на время движения «прикалывается» поверх раскладки (position: absolute с прежними размерами).
+const SIDE_MS = 180; let sideSeq = 0;
 function setSide(collapsed, instant = false) {
   const layout = $("#tab-analysis"), side = $("#side"); const seq = ++sideSeq;
   localStorage.setItem("fba_side", collapsed ? "collapsed" : "open");
-  if (layout.classList.contains("side-collapsed") === collapsed && !side.classList.contains("side-leaving")) { $("#side-open").classList.toggle("hidden", !collapsed); return; }
+  const cleanup = () => { dash.style.transition = ""; dash.style.transform = ""; layout.classList.remove("side-animating"); side.classList.remove("side-pinned", "side-leaving"); for (const k of ["left", "top", "width", "height"]) side.style[k] = ""; };
+  cleanup(); // прерванная предыдущая анимация (быстрый двойной клик) не оставляет следов
   const apply = () => { layout.classList.toggle("side-collapsed", collapsed); $("#side-open").classList.toggle("hidden", !collapsed);
-    setTimeout(() => { for (const c of Object.values(dash.__charts || {})) { try { c.resize(); } catch {} } }, SIDE_MS + 40); }; // графики под новую ширину — после движения
-  const still = instant || layout.classList.contains("hidden") || innerWidth <= 980 || matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (still) { side.classList.remove("side-leaving"); return apply(); }
-  const slideDash = (from) => { const dx = from - dash.getBoundingClientRect().left; if (!dx) { side.classList.remove("side-leaving"); return; } layout.classList.add("side-animating");
-    dash.style.transition = "none"; dash.style.transform = `translateX(${dx}px)`; // стартовое положение — там, где дашборд был до смены раскладки
-    // Движение запускаем через два кадра: первый кадр браузер тратит на новую раскладку, и анимация не должна «съесть» своё начало.
-    requestAnimationFrame(() => requestAnimationFrame(() => { if (seq !== sideSeq) return; side.classList.remove("side-leaving");
-      dash.style.transition = `transform ${SIDE_MS}ms ease`; dash.style.transform = "translateX(0)";
-      setTimeout(() => { if (seq !== sideSeq) return; dash.style.transition = ""; dash.style.transform = ""; layout.classList.remove("side-animating"); }, SIDE_MS + 30); })); };
+    setTimeout(() => { for (const c of Object.values(dash.__charts || {})) { try { c.resize(); } catch {} } }, SIDE_MS + 60); }; // графики под новую ширину — после движения
+  if (layout.classList.contains("side-collapsed") === collapsed) { $("#side-open").classList.toggle("hidden", !collapsed); return; }
+  if (instant || layout.classList.contains("hidden") || innerWidth <= 980 || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
   const from = dash.getBoundingClientRect().left;
-  if (collapsed) { side.classList.add("side-leaving"); setTimeout(() => { if (seq !== sideSeq) return; apply(); slideDash(from); }, SIDE_MS); } // панель уехала → смена раскладки → дашборд плавно занимает место
-  else { side.classList.add("side-leaving"); apply(); slideDash(from); } // раскладка сразу (панель пока за краем), затем панель и дашборд едут вместе
+  if (collapsed) { const r = side.getBoundingClientRect(), lr = layout.getBoundingClientRect(); // панель остаётся на месте, пока раскладка под ней меняется
+    side.style.left = r.left - lr.left + "px"; side.style.top = r.top - lr.top + "px"; side.style.width = r.width + "px"; side.style.height = r.height + "px"; side.classList.add("side-pinned"); }
+  else side.classList.add("side-leaving"); // панель ждёт за краем экрана
+  layout.classList.add("side-animating"); apply();
+  const dx = from - dash.getBoundingClientRect().left;
+  dash.style.transition = "none"; dash.style.transform = `translateX(${dx}px)`; // дашборд визуально остаётся там, где был
+  // Движение — через два кадра: первый кадр браузер тратит на новую раскладку, анимация не должна «съесть» своё начало.
+  requestAnimationFrame(() => requestAnimationFrame(() => { if (seq !== sideSeq) return;
+    side.classList.toggle("side-leaving", collapsed); dash.style.transition = `transform ${SIDE_MS}ms ease-out`; dash.style.transform = "translateX(0)";
+    setTimeout(() => { if (seq === sideSeq) cleanup(); }, SIDE_MS + 40); }));
 }
 $("#side-toggle").addEventListener("click", () => setSide(true));
 $("#side-open").addEventListener("click", () => setSide(false));

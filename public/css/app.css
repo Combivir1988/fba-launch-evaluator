@@ -69,11 +69,14 @@ label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: 
 
 /* Сворачиваемая панель ввода */
 /* Двигаем только transform и opacity; колонки сетки не анимируются (см. setSide в app.js). */
-.side { transition: transform .22s ease, opacity .22s ease; will-change: transform; }
+.side { transition: transform .18s ease-out, opacity .18s ease-out; will-change: transform; }
 .side.side-leaving { transform: translateX(-110%); opacity: 0; pointer-events: none; }
-.layout.side-animating { overflow-x: clip; }
+.side.side-pinned { position: absolute; z-index: 5; margin: 0; max-height: none; }
+.layout.side-animating { position: relative; overflow-x: clip; }
+/* Места в сетке заданы явно: пока панель «приколота» (вне потока), дашборд не должен перескочить в её колонку. */
+@media (min-width: 981px) { #tab-analysis > .side { grid-column: 1; } #tab-analysis > .main { grid-column: 2; } }
 .layout.side-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
-.layout.side-collapsed .side { transform: translateX(-110%); opacity: 0; pointer-events: none; overflow: hidden; padding: 0; border: none; }
+.layout.side-collapsed .side:not(.side-pinned) { transform: translateX(-110%); opacity: 0; pointer-events: none; overflow: hidden; padding: 0; border: none; }
 /* Шапка панели закреплена сверху: кнопка «Свернуть» видна при любой прокрутке панели. */
 .side-head { position: sticky; top: -.8rem; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: -.8rem -.8rem .35rem; padding: .5rem .8rem; background: var(--surface); border-bottom: 1px solid var(--border); }
 .side-title { font-weight: 700; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
