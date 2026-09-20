@@ -24,7 +24,7 @@ export function verdictCeiling(r) {
   if (eco?.gate2?.status === "no_go") { v = "no_go"; decisive ??= "Gate 2"; reasons.push("Gate 2 провален: Net after ads < 0 даже при CVR 15 %"); }
   if (ch?.active && ch.items["6"]?.status === "fail") { v = "no_go"; decisive ??= "Критерий 6"; reasons.push("Критерий 6 (запас экономики) красный — обязательный"); }
   if (ch?.items["8"]?.status === "fail") { v = "no_go"; decisive ??= "Критерий 8"; reasons.push(ch.items["8"].kind === "assumed" ? "Критерий 8: AI-скан нашёл патент с высоким риском пересечения — до проверки поверенным входить нельзя" : "Критерий 8 (патент/FTO) красный — обязательный"); }
-  if (r.budget?.quickScreenStatus === "fail") { v = lower(v, "no_go"); decisive ??= "Стоп-вопросы (урок 07)"; reasons.push("Один из четырёх стоп-вопросов урока 07 — «нет»"); }
+  if (r.budget?.quickScreenStatus === "fail") { v = lower(v, "no_go"); decisive ??= "Стоп-вопросы"; reasons.push("Один из четырёх стоп-вопросов — «нет»"); }
 
   if (r.gate0?.level === "none") { v = lower(v, "rework"); decisive ??= "Gate 0"; reasons.push("Gate 0: данных нет"); }
   if (r.gate0?.level === "poe_only" || r.gate0?.level === "partial") { v = lower(v, "rework"); decisive ??= "Gate 0"; reasons.push("Gate 0: недостаточно данных для точных Gate 1–2 (нужны Xray + Cerebro)"); }

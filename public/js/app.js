@@ -678,7 +678,7 @@ async function openLastIfEmpty() {
 $("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
 
 // ---------- thresholds tab ----------
-const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет (урок 08)", traffic: "Трафик по ключам (урок 09) и Cerebro", poe: "POE / концентрация (урок 11)", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения" };
+const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет", traffic: "Трафик по ключам и Cerebro", poe: "POE / концентрация", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения" };
 // Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
 const THR_LABELS = {
   "criterion1.passCount": ["Минимум зелёных подпунктов из 8", "шт (порог прохождения Критерия 1)"],
@@ -697,7 +697,7 @@ const THR_LABELS = {
   "economics.roiOk": ["ROI норма от", "1.5 = 150 %"], "economics.roiLoss": ["ROI убыток ниже", "1.0 = 100 %"], "economics.roiSuspicious": ["ROI «перепроверь данные» выше", "2.0 = 200 %"],
   "economics.c2PassCount": ["Критерий 2 — минимум OK из 11", "шт"], "economics.roiAdsMin": ["2j — ROI с рекламой, минимум", "доля"], "economics.marginAdsMin": ["2k — маржинальность с рекламой, минимум", "доля"],
   "economics.cvrRealistic": ["2c — реалистичный CVR нового листинга", "от, до"], "economics.ppcShareRealistic": ["2e — реалистичная доля PPC на старте", "от, до"], "economics.periodDays": ["Горизонт расчёта 2g–2k", "дней"],
-  "budget.receivingDays": ["Приёмка Amazon", "дней (добавляется к сроку партии)"], "budget.batches": ["Партий в бюджете", "шт (урок 08: две)"],
+  "budget.receivingDays": ["Приёмка Amazon", "дней (добавляется к сроку партии)"], "budget.batches": ["Партий в бюджете", "шт (по умолчанию две)"],
   "traffic.top2ShareMax": ["Доля топ-2 ключей, НЕ OK выше", "доля"], "traffic.relevantMin": ["Релевантных ключей, минимум", "шт"], "traffic.minSv": ["Значимый ключ — SV от", "запросов/мес"], "traffic.groupsMin": ["Групп ключей, минимум", "шт"],
   "traffic.minCompetitors": ["Cerebro multi-ASIN — конкурентов в топе от", "шт (фраза релевантна)"], "traffic.clusterLimit": ["Авто-кластер — максимум фраз", "шт"],
   "poe.searchConvLow": ["Конверсия поиска — «спрос не удовлетворён» ниже", "доля"], "poe.sponsoredHigh": ["Спонсорских товаров — «рекламная война» выше", "доля"], "poe.top20ProductsHigh": ["Топ-20 продуктов click share — концентрация выше", "доля"],

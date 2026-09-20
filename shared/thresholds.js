@@ -20,14 +20,14 @@ export const DEFAULT_THRESHOLDS = {
   economics: {
     marginMin: 0.30, profitMin: 15, cheapPrice: 25, cheapMarginMin: 0.40, // Gate 1
     cvrGrid: [0.08, 0.10, 0.12, 0.15], cvrPassMax: 0.12,                   // Gate 2
-    roiOk: 1.5, roiLoss: 1.0, roiSuspicious: 2.0,                           // урок 07/10
+    roiOk: 1.5, roiLoss: 1.0, roiSuspicious: 2.0,                           // ROI
     c2PassCount: 8, roiAdsMin: 0.20, marginAdsMin: 0.25,                    // 2j / 2k
     cvrRealistic: [0.08, 0.15], ppcShareRealistic: [0.5, 0.9],             // 2c / 2e
     periodDays: 90,                                                         // горизонт 2g–2k
   },
-  budget: { receivingDays: 15, batches: 2 },                                // урок 08
-  traffic: { top2ShareMax: 0.80, relevantMin: 30, minSv: 100, groupsMin: 3, minCompetitors: 3, clusterLimit: 40 }, // урок 09 + Cerebro multi-ASIN
-  poe: { searchConvLow: 0.01, sponsoredHigh: 0.80, top20ProductsHigh: 0.70 },  // урок 11
+  budget: { receivingDays: 15, batches: 2 },                                // бюджет первой закупки
+  traffic: { top2ShareMax: 0.80, relevantMin: 30, minSv: 100, groupsMin: 3, minCompetitors: 3, clusterLimit: 40 }, // трафик по ключам + Cerebro multi-ASIN
+  poe: { searchConvLow: 0.01, sponsoredHigh: 0.80, top20ProductsHigh: 0.70 },  // концентрация по POE
   challenger: {
     activateTopBrand: 0.25, passCount: 6,
     loyaltyOk: 0.05, loyaltyFail: 0.15,             // критерий 3

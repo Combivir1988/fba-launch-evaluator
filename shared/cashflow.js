@@ -45,7 +45,7 @@ export function cashflow(inputs, th, ctx = {}) {
   const demandSum = (from, to) => { let s = 0; for (let j = from; j <= to; j++) s += demand(j); return s; };
 
   const firstIn = num(inputs.firstBatchUnits);
-  out.firstBatchUnits = Math.max(1, Math.round(isNum(firstIn) && firstIn > 0 ? firstIn : perDay * leadDays)); // по умолчанию — партия урока 08: продажи за срок поставки
+  out.firstBatchUnits = Math.max(1, Math.round(isNum(firstIn) && firstIn > 0 ? firstIn : perDay * leadDays)); // по умолчанию — продажи за срок поставки
 
   let stock = 0, cum = 0, minCum = 0, cumSold = 0; const arrivals = new Map();
   const order = (m, qty) => { arrivals.set(m + L, (arrivals.get(m + L) || 0) + qty); out.batches++; out.unitsPurchased += qty; return qty * landed; };

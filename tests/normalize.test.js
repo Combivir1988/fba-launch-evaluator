@@ -5,7 +5,7 @@ import { validateVerdict } from "../shared/validate-verdict.js";
 import { VERDICT_SCHEMA } from "../server/claude.js";
 
 const payload = {
-  rulesVerdict: { ceiling: "no_go", decisiveGate: "Стоп-вопросы (урок 07)", reasons: ["Один из четырёх стоп-вопросов урока 07 — «нет»"] },
+  rulesVerdict: { ceiling: "no_go", decisiveGate: "Стоп-вопросы", reasons: ["Один из четырёх стоп-вопросов — «нет»"] },
   criterion1: { okCount: 4, redItems: ["1b", "1e", "1g"] },
   gateStatuses: { gate0: { status: "pass", fact: "Xray + Cerebro" }, gate1: { status: "rework", fact: "маржа 37 %" }, gate2: { status: "pass", fact: "net $8.20" }, gate3: { status: "fail", fact: "4/8" }, gate4: { status: "insufficient_data", fact: "патенты не проверены" }, criterion1: { status: "fail", fact: "4 из 8" }, traffic: { status: "pass", fact: "Adj. SV 12000" }, budget: { status: "fail", fact: "дефицит $2300" }, scorecard: { status: "pass", fact: "61 %" } },
 };

@@ -153,7 +153,7 @@
         <div class="card ${g1.status === "pass" ? "ok" : g1.status === "rework" ? "warn" : "fail"}"><h4>Gate 1 — без рекламы</h4><div class="big">${fmtMoney(g1.net0, 2)}/юнит</div>
           <div>маржа <b>${fmtPct(g1.margin0, 1)}</b> ${g1.condMargin ? "✓" : "✗"} · профит ${g1.condProfit ? "✓" : "✗"}</div><div class="muted">${esc(g1.note || `порог: маржа > 30 % и профит > $15`)}</div></div>
         <div class="card ${e.roiHint === "ok" ? "ok" : e.roiHint === "suspicious" || e.roiHint === "low" ? "warn" : "fail"}"><h4>ROI (net / landed COGS)</h4><div class="big">${fmtPct(e.roi)}</div>
-          <div class="muted">${{ ok: "≥ 150 % — норма (урок 07)", low: "100–150 % — ниже порога 150 %", loss: "< 100 % — убыток", suspicious: "> 200 % — перепроверь данные (урок 10)" }[e.roiHint] || ""}</div></div>
+          <div class="muted">${{ ok: "≥ 150 % — норма", low: "100–150 % — ниже порога 150 %", loss: "< 100 % — убыток", suspicious: "> 200 % — перепроверь данные" }[e.roiHint] || ""}</div></div>
         <div class="card ${g2.status === "pass" ? "ok" : g2.status === "rework" ? "warn" : g2.status === "pending" ? "pending" : "fail"}"><h4>Gate 2 — стресс-тест рекламы</h4>
           <div class="big">${g2.atCvr ? fmtMoney(g2.atCvr.net, 2) : "—"}/юнит</div><div>при CVR ${fmtPct(inp.cvr, 1)}, CPC ${fmtMoney(g2.cpc, 2)}, PPC ${fmtPct(g2.ppcShare)} · ACOS ${g2.atCvr ? fmtPct(g2.atCvr.acos) : "—"}</div>
           <div class="muted">безубыточный CVR: <b>${fmtPct(e.breakEvenCvr, 1)}</b> · PASS если Net > 0 при CVR ≤ 12 %</div></div>
@@ -163,7 +163,7 @@
         <div><h4>Net after ads по CVR</h4><div class="chartbox short"><canvas id="ch-gate2"></canvas></div></div>
         <div class="tablewrap"><table><thead><tr><th>CVR</th><th class="num">Ad cost/юнит</th><th class="num">Net after ads</th><th class="num">ACOS</th></tr></thead><tbody>
           ${g2.byCvr.map((r) => `<tr><td>${fmtPct(r.cvr)}</td><td class="num">${fmtMoney(r.adCost * g2.ppcShare, 2)}</td><td class="num" style="color:${r.net > 0 ? "var(--ok)" : "var(--fail)"}"><b>${fmtMoney(r.net, 2)}</b></td><td class="num">${fmtPct(r.acos)}</td></tr>`).join("")}</tbody></table>
-          <p class="muted" style="font-size:.8rem">Ad cost = CPC / CVR × доля PPC. Урок Jitsu: в дешёвых сегментах критичен абсолютный доллар профита.</p></div>
+          <p class="muted" style="font-size:.8rem">Ad cost = CPC / CVR × доля PPC. Кейс Jitsu: в дешёвых сегментах критичен абсолютный доллар профита.</p></div>
       </div>
       <h3 style="margin-top:1rem">Критерий 2 — детальная экономика <span class="chip ${s2.pass ? "ok" : s2.pending ? "pending" : "fail"}">${s2.okCount} из 11 · 2f/2j/2k ${s2.mandatoryOk ? "OK" : "не все OK"}</span></h3>
       <div class="tablewrap"><table><thead><tr><th>Показатель</th><th class="num">Значение</th><th>Статус</th><th>Примечание</th></tr></thead><tbody>${c2rows}</tbody></table></div>
@@ -196,8 +196,8 @@
         <div class="card"><h4>Партия</h4><div class="big">${fmtMoney(b.batchCost)}</div><div class="muted">${fmtMoney(b.landed, 2)} × ${fmtN(b.batchUnits)} шт (${b.leadDays} дн: производство + доставка + приёмка)</div></div>
         ${b.basis === "cash" ? `<div class="card"><h4>Пик вложений</h4><div class="big">${fmtMoney(b.need)}</div><div class="muted">по сценарию «Деньги по месяцам»; справочно, ${b.batches} партии ${fmtMoney(b.twoBatches)} + реклама ${fmtMoney(b.adsReserve)} = ${fmtMoney(b.needTwoBatches)}</div></div>` : `<div class="card"><h4>Нужно всего</h4><div class="big">${fmtMoney(b.need)}</div><div class="muted">${b.batches} партии ${fmtMoney(b.twoBatches)} + реклама ${fmtMoney(b.adsReserve)}</div></div>`}
         <div class="card ${b.status === "ok" ? "ok" : b.status === "fail" ? "fail" : b.status === "warn" ? "warn" : "na"}"><h4>Бюджет</h4><div class="big">${fmtMoney(b.budget)}</div><div class="muted">${isNum(b.gap) ? (b.gap >= 0 ? "запас " : "дефицит ") + fmtMoney(Math.abs(b.gap)) : "не указан"}</div></div>
-        <div class="card"><h4>Наценка</h4><div class="big">${isNum(b.markup) ? b.markup.toFixed(1) + "×" : "—"}</div><div class="muted">дешёвый товар — 5×, дорогой — 3.3× (урок 08)</div></div></div>`}
-      <h3 style="margin-top:.9rem">Четыре стоп-вопроса (урок 07)</h3><p class="muted" style="font-size:.85rem">Любой ответ «Нет» — дальше можно не анализировать (урок 07). Красная карточка = «Нет», жёлтая = на грани, серая = не хватает данных.</p><div class="cards">${qs}</div>`;
+        <div class="card"><h4>Наценка</h4><div class="big">${isNum(b.markup) ? b.markup.toFixed(1) + "×" : "—"}</div><div class="muted">дешёвый товар — 5×, дорогой — 3.3×</div></div></div>`}
+      <h3 style="margin-top:.9rem">Четыре стоп-вопроса</h3><p class="muted" style="font-size:.85rem">Любой ответ «Нет» — дальше можно не анализировать. Красная карточка = «Нет», жёлтая = на грани, серая = не хватает данных.</p><div class="cards">${qs}</div>`;
   }
 
   function secTraffic(A, R) {
@@ -205,18 +205,18 @@
     const multi = Boolean(tr.multiAsin); const hasSales = tr.cluster.some((k) => isNum(k.keywordSales));
     const rows = tr.cluster.slice(0, 25).map((k) => `<tr><td>${esc(k.phrase)}</td><td class="num">${fmtN(k.sv)}</td>${hasSales ? `<td class="num">${fmtN(k.keywordSales)}</td>` : ""}${multi ? `<td class="num">${isNum(k.rankingCompetitors) ? k.rankingCompetitors : "—"}${isNum(k.competitorRankAvg) ? ` <small class="muted">(ср. ${fmtN(k.competitorRankAvg)})</small>` : ""}</td>` : ""}<td class="num">${isNum(k.svTrend) ? (k.svTrend > 0 ? "+" : "") + fmtN(k.svTrend) + " %" : "—"}</td><td class="num">${isNum(k.bid) ? fmtMoney(k.bid, 2) : "—"}</td><td class="num">${isNum(k.competingProducts) ? (k.competingIsBound ? ">" : "") + fmtN(k.competingProducts) : "—"}</td><td class="num">${isNum(k.abaClickShare) ? fmtN(k.abaClickShare, 1) + (tr.source === "poe" ? "" : " %") : "—"}</td></tr>`).join("");
     const pc = tr.poeConcentration;
-    return `<h2>Трафик по ключам (урок 09)${bandChip(R, "whole")} <span class="chip ${tr.status === "ok" ? "ok" : tr.status === "fail" ? "fail" : "warn"}">${tr.source === "cerebro" ? "Cerebro" : "POE"} · ${STATUS_LABEL[tr.status]}</span></h2>
+    return `<h2>Трафик по ключам${bandChip(R, "whole")} <span class="chip ${tr.status === "ok" ? "ok" : tr.status === "fail" ? "fail" : "warn"}">${tr.source === "cerebro" ? "Cerebro" : "POE"} · ${STATUS_LABEL[tr.status]}</span></h2>
       <div class="tiles">
         <div class="tile"><div class="k">SV core</div><div class="v">${fmtN(tr.svCore)}</div><div class="s">/мес</div></div>
         <div class="tile"><div class="k">Adj. SV</div><div class="v">${fmtN(tr.adjSv)}</div><div class="s">core + 0.4 × Σ кластера (${tr.clusterCount})</div></div>
         <div class="tile ${tr.top2Share > 0.8 ? "fail" : "ok"}"><div class="k">Доля топ-2 ключей</div><div class="v">${fmtPct(tr.top2Share)}</div><div class="s">> 80 % — плохо</div></div>
         <div class="tile ${isNum(tr.relevantCount) && tr.relevantCount >= 30 ? "ok" : "warn"}"><div class="k">Релевантных ключей</div><div class="v">${fmtN(tr.relevantCount)}</div><div class="s">нужно ≥ 30 (SV ≥ ${fmtN(tr.minSv ?? 100)})</div></div>
-        ${isNum(tr.clusterSales) && tr.clusterSales > 0 ? `<div class="tile"><div class="k">Продаж по кластеру</div><div class="v">${fmtN(tr.clusterSales)}</div><div class="s">Keyword Sales, шт/мес (урок 15)</div></div>` : ""}
+        ${isNum(tr.clusterSales) && tr.clusterSales > 0 ? `<div class="tile"><div class="k">Продаж по кластеру</div><div class="v">${fmtN(tr.clusterSales)}</div><div class="s">Keyword Sales, шт/мес</div></div>` : ""}
         ${isNum(tr.groups) ? `<div class="tile ${tr.groups >= 3 ? "ok" : "warn"}"><div class="k">Групп ключей</div><div class="v">${tr.groups}</div><div class="s">нужно ≥ 3</div></div>` : ""}
         ${pc ? `<div class="tile ${pc.flags.top20Heavy ? "warn" : ""}"><div class="k">Топ-20 продуктов (клики)</div><div class="v">${fmtPct(pc.top20Products)}</div><div class="s">топ-5 продуктов ${fmtPct(pc.top5Products)}</div></div>` : ""}
       </div>
       <div class="stack" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-kw"></canvas></div>
-      <div class="tablewrap"><table class="kwtable"><thead><tr><th>Запрос</th><th class="num">SV/мес</th>${hasSales ? '<th class="num" title="Keyword Sales — продаж/мес по ключу (урок 15: продают ключи, не объём)">Продаж/мес</th>' : ""}${multi ? '<th class="num" title="Сколько из заданных в Cerebro конкурентов ранжируются по фразе">Конкур. в топе</th>' : ""}<th class="num">Тренд</th><th class="num">Bid</th><th class="num">Конкур. товаров</th><th class="num">${tr.source === "poe" ? "Click share" : "ABA click %"}</th></tr></thead><tbody>${rows}</tbody></table>${multi ? `<p class="muted" style="font-size:.8rem">Cerebro по нескольким ASIN: в кластер автоматически попадают фразы, по которым ранжируются ≥ ${esc(String(A.inputs.clusterMinCompetitors ?? 3))} конкурентов (правило курса), SV ≥ ${fmtN(tr.minSv)}.</p>` : ""}</div></div>`;
+      <div class="tablewrap"><table class="kwtable"><thead><tr><th>Запрос</th><th class="num">SV/мес</th>${hasSales ? '<th class="num" title="Keyword Sales — продаж/мес по ключу (продают ключи, не объём)">Продаж/мес</th>' : ""}${multi ? '<th class="num" title="Сколько из заданных в Cerebro конкурентов ранжируются по фразе">Конкур. в топе</th>' : ""}<th class="num">Тренд</th><th class="num">Bid</th><th class="num">Конкур. товаров</th><th class="num">${tr.source === "poe" ? "Click share" : "ABA click %"}</th></tr></thead><tbody>${rows}</tbody></table>${multi ? `<p class="muted" style="font-size:.8rem">Cerebro по нескольким ASIN: в кластер автоматически попадают фразы, по которым ранжируются ≥ ${esc(String(A.inputs.clusterMinCompetitors ?? 3))} конкурентов (правило отбора), SV ≥ ${fmtN(tr.minSv)}.</p>` : ""}</div></div>`;
   }
   function drawTraffic(container, R) {
     const tr = R.traffic; if (!tr.cluster?.length) return;
@@ -501,12 +501,12 @@
     const c = A.inputs.checklist || {};
     const yes = (b) => (b ? '<span class="status fail">да</span>' : '<span class="status ok">нет</span>');
     return `<h2>Чеклист рисков и compliance</h2><div class="tablewrap"><table><tbody>
-      <tr><td>Закрытая категория (урок 03)</td><td>${yes(c.gatedCategory)}</td><td>Опасные товары</td><td>${yes(c.dangerousGoods)}</td></tr>
+      <tr><td>Закрытая категория</td><td>${yes(c.gatedCategory)}</td><td>Опасные товары</td><td>${yes(c.dangerousGoods)}</td></tr>
       <tr><td>Сертификаты</td><td>${esc(c.certificates || "—")}</td><td>Amazon продаёт сам</td><td>${yes(R.competition.amazonSells)} <small class="muted">${R.competition.amazonSellsSource === "user" ? "вручную" : R.competition.amazonSellsSource === "xray" ? "по Xray (Seller)" : "авто"}</small></td></tr>
-      <tr><td>Патенты / FTO (урок 13)</td><td>${esc({ none: "не проверял", clear: "не найдено", design_around: "design-around", unsure: "нужен юрист", conflict: "конфликт" }[c.patentSearch] || "—")}</td><td>Торговая марка</td><td>${esc({ none: "не проверял", free: "свободна", conflict: "занята" }[c.trademarkSearch] || "—")}</td></tr>
-      <tr><td>Склейка отзывов (урок 14)</td><td>${yes(c.reviewMergingSuspected)}</td><td>Купоны/дилы (урок 11)</td><td>${esc(c.couponsDealsSaturation || "—")}</td></tr>
-      <tr><td>Тест дизайна (урок 12)</td><td>${isNum(c.designTestScore) ? c.designTestScore + " % " + (c.designTestScore >= 30 ? "✓" : "✗ (< 30 %)") : "—"}</td><td>Жизненный цикл (урок 09)</td><td>${isNum(c.lifecycleMonths) ? c.lifecycleMonths + " мес " + (c.lifecycleMonths >= 25 ? "✓" : "✗ (< 25)") : "—"}</td></tr>
-      <tr><td>Листингов в выдаче (урок 05)</td><td>${isNum(c.listingsInSearch) ? fmtN(c.listingsInSearch) + (c.listingsInSearch > 3000 ? " — высокая конкуренция" : "") : "—"}</td><td></td><td></td></tr></tbody></table></div>${regulatoryBlock(R)}`;
+      <tr><td>Патенты / FTO</td><td>${esc({ none: "не проверял", clear: "не найдено", design_around: "design-around", unsure: "нужен юрист", conflict: "конфликт" }[c.patentSearch] || "—")}</td><td>Торговая марка</td><td>${esc({ none: "не проверял", free: "свободна", conflict: "занята" }[c.trademarkSearch] || "—")}</td></tr>
+      <tr><td>Склейка отзывов</td><td>${yes(c.reviewMergingSuspected)}</td><td>Купоны/дилы</td><td>${esc(c.couponsDealsSaturation || "—")}</td></tr>
+      <tr><td>Тест дизайна</td><td>${isNum(c.designTestScore) ? c.designTestScore + " % " + (c.designTestScore >= 30 ? "✓" : "✗ (< 30 %)") : "—"}</td><td>Жизненный цикл</td><td>${isNum(c.lifecycleMonths) ? c.lifecycleMonths + " мес " + (c.lifecycleMonths >= 25 ? "✓" : "✗ (< 25)") : "—"}</td></tr>
+      <tr><td>Листингов в выдаче</td><td>${isNum(c.listingsInSearch) ? fmtN(c.listingsInSearch) + (c.listingsInSearch > 3000 ? " — высокая конкуренция" : "") : "—"}</td><td></td><td></td></tr></tbody></table></div>${regulatoryBlock(R)}`;
   }
 
   function secConclusion(A, R) {
@@ -547,7 +547,7 @@
     "AI-вердикт и рекомендации": "AI получает только итоговые цифры дашборда (не файлы) и объясняет картину словами: вердикт, гейты, гипотезы отличия, следующие шаги.",
     // заголовки внутри секций
     "Критерий 2 — детальная экономика": "Одиннадцать показателей экономики на горизонте 90 дней. Нужно 8 «OK», при этом прибыль на юнит, ROI и маржа с рекламой обязательны.",
-    "Четыре стоп-вопроса": "Быстрый отсев из курса: бюджет, ROI ≥ 150 %, выручка первой страницы ≥ $500 тыс. в месяц, возможность отличиться. Любое «нет» — дальше можно не анализировать.",
+    "Четыре стоп-вопроса": "Быстрый отсев: бюджет, ROI ≥ 150 %, выручка первой страницы ≥ $500 тыс. в месяц, возможность отличиться. Любое «нет» — дальше можно не анализировать.",
     "Новые участники": "Листинги возрастом от 2 до 24 месяцев, которые уже заметны покупателям. Их продажи и отзывы — реалистичный ориентир для вашего старта.",
     "Срок до планки отзывов": "Сколько месяцев уйдёт, чтобы набрать столько отзывов, сколько у недавних новичков: (планка − отзывы Vine) ÷ доля покупателей с отзывом ÷ продажи в месяц.",
     "Регуляторные триггеры": "Слова в названии ниши, заголовках и запросах, за которыми стоят требования ведомств США. Подсказка, что проверить до заказа партии, — не юридический вывод.",
@@ -557,10 +557,10 @@
     "Маржа без / с рекламой": "Две разные цифры: маржа из калькулятора Amazon и маржа после реальных расходов на рекламу. Решения принимают по второй.",
     "Net after ads по CVR": "Прибыль с одной штуки после рекламы при разной конверсии. Точка — ваша текущая конверсия.",
     "Партия": "Сколько штук и денег нужно на одну партию: продажи в день × срок поставки (производство + доставка + приёмка Amazon).",
-    "Нужно всего": "Две партии плюс резерв на рекламу — правило курса, чтобы не остаться без товара после запуска.",
+    "Нужно всего": "Две партии плюс резерв на рекламу — правило методики, чтобы не остаться без товара после запуска.",
     "Пик вложений": "Максимальная сумма, которая одновременно будет вложена в товар и рекламу до того, как продажи начнут её возвращать. С ней сравнивается ваш бюджет.",
     "Бюджет": "Ваши деньги на запуск. Дефицит до 15 % от потребности считается допустимым («почти»).",
-    "Наценка": "Цена продажи, делённая на полную себестоимость. Ориентир курса: дешёвому товару нужна наценка около 5×, дорогому хватает 3,3×.",
+    "Наценка": "Цена продажи, делённая на полную себестоимость. Ориентир: дешёвому товару нужна наценка около 5×, дорогому хватает 3,3×.",
     "Партий / штук": "Сколько партий сценарий закупил за горизонт и сколько штук всего. Партии дозаказываются заранее, чтобы товар не закончился.",
     "Деньги вернулись": "Первый месяц, после которого накопленный итог больше не уходит в минус — даже в месяцы оплаты следующих партий.",
     "Итог на конец": "Накопленный денежный результат в последний месяц сценария. Товар, оставшийся на складе, в него не входит и показан отдельно по себестоимости.",
@@ -756,11 +756,11 @@
     horizonMonths: "Сколько месяцев продаж просчитывать в сценарии «Деньги по месяцам». По умолчанию 12.",
     rampMonths: "За сколько месяцев продажи вырастут от стартового уровня до цели. По умолчанию 6.",
     startSalesMonthly: "С каких продаж стартует новый листинг. Пусто — медиана продаж новичков ниши, а без данных — разгон с нуля.",
-    firstBatchUnits: "Размер первой партии. Пусто — продажи за срок поставки, как советует курс.",
+    firstBatchUnits: "Размер первой партии. Пусто — продажи за срок поставки, как принято в методике.",
     startupCosts: "Всё, что платится до первой продажи: фото, образцы, инспекция, Vine, регистрация марки.",
     reviewRate: "Какая доля покупателей оставляет отзыв. 2 % — допущение; если знаете по своим товарам — впишите.",
     vineReviews: "Сколько отзывов даст программа Amazon Vine в первый месяц. Максимум 30.",
-    canDifferentiate: "Стоп-вопрос курса: есть ли у вас измеримое отличие от конкурентов. «Нет» означает No-Go.",
+    canDifferentiate: "Стоп-вопрос: есть ли у вас измеримое отличие от конкурентов. «Нет» означает No-Go.",
     gatedCategory: "Категория, где для продажи нужно одобрение Amazon.",
     dangerousGoods: "Товар попадает под правила опасных грузов (батареи, аэрозоли, горючее) — дороже хранение и доставка.",
     amazonSells: "Если в нише продаёт сам Amazon, конкурировать с ним почти невозможно. «Авто» определяет это по колонке Seller в Xray.",

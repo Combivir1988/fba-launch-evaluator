@@ -16,7 +16,7 @@ test("SC-003: оплаты партий = закупленные штуки × �
   for (const r of c.rows) { near(r.payout, r.sold * (40 - 6 - 6)); near(r.revenue, r.sold * 40); near(r.net, r.payout - r.ads - r.orderCost - r.startup); }
   near(c.endCum, sum(c.rows, "payout") - sum(c.rows, "ads") - c.unitsPurchased * 10); near(c.rows.at(-1).cum, c.endCum);
   near(c.unitsSold, sum(c.rows, "sold")); near(c.stockUnitsEnd, c.unitsPurchased - c.unitsSold); near(c.stockValueEnd, c.stockUnitsEnd * 10);
-  assert.equal(c.rows[0].ordered, 750, "первая партия по умолчанию — продажи за срок поставки (урок 08)"); assert.equal(c.rows[0].orderCost, 7500); assert.equal(c.rows[3].arrived, 750);
+  assert.equal(c.rows[0].ordered, 750, "первая партия по умолчанию — продажи за срок поставки"); assert.equal(c.rows[0].orderCost, 7500); assert.equal(c.rows[3].arrived, 750);
 });
 
 test("разгон: от медианы новичков до цели за rampMonths; без данных о новичках — с нуля; ручной стартовый уровень важнее", () => {

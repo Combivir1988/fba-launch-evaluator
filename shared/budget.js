@@ -1,4 +1,4 @@
-// Бюджет первой закупки (урок 08) и четыре стоп-вопроса (урок 07).
+// Бюджет первой закупки и четыре стоп-вопроса.
 // С методики 2026-09-20 (spec 005) бюджет сравнивается с ПИКОМ ВЛОЖЕНИЙ помесячного сценария (ctx.cash); прежняя сумма «две партии + реклама» остаётся справочно.
 const num = (v) => (v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
 
@@ -21,7 +21,7 @@ export function budget(inputs, th, ctx = {}) {
     if (bud === null) out.status = "unknown";
     else { out.gap = bud - out.need; out.status = out.gap >= 0 ? "ok" : out.gap >= -0.15 * out.need ? "warn" : "fail"; }
   }
-  // Стоп-вопросы урока 07
+  // Четыре стоп-вопроса
   const roi = ctx.roi ?? null;
   const $ = (v) => (typeof v === "number" ? "$" + Math.round(v).toLocaleString("ru-RU") : "—");
   const pct = (v) => (typeof v === "number" ? Math.round(v * 100) + " %" : "—");

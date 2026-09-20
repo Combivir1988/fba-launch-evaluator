@@ -120,7 +120,7 @@ export const isMultiAsin = (keywords) => keywords.some((k) => typeof k.rankingCo
 
 /**
  * Автопредложение кластера.
- * Multi-ASIN Cerebro (правило курса): фраза релевантна, если по ней ранжируются ≥ minCompetitors из заданных
+ * Multi-ASIN Cerebro (правило отбора): фраза релевантна, если по ней ранжируются ≥ minCompetitors из заданных
  * конкурентов (по умолчанию 3) — и хотя бы одно слово core-ключа совпадает (страховка от мусора).
  * Single-ASIN: релевантность ≥ 2/3 токенов core-ключа (для core из 1–2 слов — все).
  * Всегда: не ASIN, не бренд, SV ≥ minSv. Возвращает фразы (≤ limit) по убыванию SV.

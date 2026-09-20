@@ -1,4 +1,4 @@
-// Распределение трафика (урок 09), Adj. SV (SKILL), концентрация кликов POE (урок 11).
+// Распределение трафика, Adj. SV (SKILL), концентрация кликов POE.
 import { sum, safeDiv, median } from "./num.js";
 import { tokens } from "./parse-cerebro.js";
 

@@ -72,7 +72,7 @@ export function economics(inputs, th, ctx = {}) {
   const anyPending = Object.values(c2).some((x) => x.status === "pending");
   out.criterion2 = c2;
   out.criterion2Summary = { okCount, total: 11, mandatoryOk, pass: !anyPending && okCount >= e.c2PassCount && mandatoryOk, pending: anyPending, period: { days, units, adSpend, revenue, totalProfit, roiAds, marginAds } };
-  // ROI-подсказки (уроки 07/10)
+  // ROI-подсказки
   out.roiHint = roi === null ? null : roi > e.roiSuspicious ? "suspicious" : roi >= e.roiOk ? "ok" : roi >= e.roiLoss ? "low" : "loss";
   return out;
 }
