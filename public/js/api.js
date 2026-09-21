@@ -9,10 +9,10 @@ const MESSAGES = {
   storage_unavailable: "Хранилище недоступно — изменения не сохранены. Работа во вкладке продолжается, на всякий случай скачайте JSON",
 };
 
-export function goLogin(hash = "") {
+export function goLogin(hash = "", reason = "") {
   if (location.pathname.endsWith("/login.html")) return;
   const next = location.pathname + location.search;
-  location.replace("/login.html?next=" + encodeURIComponent(next) + hash);
+  location.replace("/login.html?next=" + encodeURIComponent(next) + (reason ? "&reason=" + encodeURIComponent(reason) : "") + hash);
 }
 
 /** api("POST", "/api/…", body) → разобранный JSON (или null для 204). Бросает ApiError. opts.noRedirect — не уходить на вход при 401. */
@@ -25,7 +25,7 @@ export async function api(method, path, body, opts = {}) {
   const data = await res.json().catch(() => ({}));
   if (res.ok) return data;
   const err = new ApiError(res.status, data.error || "http_" + res.status, MESSAGES[data.error] || data.message, data);
-  if (res.status === 401 && !opts.noRedirect) goLogin();
+  if (res.status === 401 && !opts.noRedirect) goLogin("", data.reason || "");
   if (res.status === 403 && data.error === "password_change_required" && !opts.noRedirect) goLogin("#change");
   if (data.error === "storage_unavailable") window.dispatchEvent(new CustomEvent("storage-down"));
   throw err;

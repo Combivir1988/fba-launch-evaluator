@@ -7,6 +7,7 @@ export const COOKIE = "fba_sid";
 const DAY = 24 * 60 * 60 * 1000;
 export const SESSION_TTL_MS = 30 * DAY;
 const CACHE_MS = 60 * 1000;
+const TOUCH_MS = 60 * 1000; // при включённом правиле бездействия «последняя активность» пишется в БД не чаще раза в минуту
 
 export const hashToken = (token) => createHash("sha256").update(String(token)).digest("hex");
 
@@ -21,8 +22,14 @@ export function readCookie(req, name = COOKIE) {
 
 const publicUser = (r) => ({ id: r.id, login: r.login, name: r.name, role: r.role, settings: r.settings || {}, mustChangePassword: r.must_change_password, email: r.email || null, hasPassword: r.password_hash !== "!" });
 
+/**
+ * cfg.getPolicy — async () => { idleMinutes, maxDays } (spec 008, правила задаёт администратор; 0 — правило выключено).
+ * Без правил поведение прежнее: сеанс 30 дней, продлевается активностью не чаще раза в сутки.
+ */
 export function createSessions(db, cfg = {}) {
-  const cache = new Map(); // tokenHash → { user, at }
+  const cache = new Map(); // tokenHash → { user, at, createdAt, lastSeen, flushedAt }
+  const ended = new Map(); // tokenHash → { reason: "idle"|"max", at } — чтобы страница входа объяснила, почему сеанс закончился
+  const getPolicy = cfg.getPolicy || (async () => ({ idleMinutes: 0, maxDays: 0 }));
   const now = () => (cfg.now ? cfg.now() : Date.now());
   const secure = Boolean(cfg.production);
 
@@ -33,25 +40,51 @@ export function createSessions(db, cfg = {}) {
     return token;
   }
 
+  /** Проверка правил администратора. → "idle" | "max" | null */
+  function violates(policy, createdAt, lastSeen) {
+    if (policy.maxDays > 0 && now() - createdAt > policy.maxDays * DAY) return "max";
+    if (policy.idleMinutes > 0 && now() - lastSeen > policy.idleMinutes * 60 * 1000) return "idle";
+    return null;
+  }
+  async function endSession(th, reason) {
+    cache.delete(th); ended.set(th, { reason, at: now() });
+    if (ended.size > 500) for (const [k, v] of ended) if (now() - v.at > 10 * 60 * 1000) ended.delete(k);
+    await db.query("DELETE FROM sessions WHERE token_hash = $1", [th]);
+  }
+  /** Почему сеанс с этим токеном только что закончился (для ответа 401). */
+  function endedReason(token) { const e = token ? ended.get(hashToken(token)) : null; return e && now() - e.at < 10 * 60 * 1000 ? e.reason : null; }
+
   /** → { user, renewed } | null. renewed=true — срок продлён (не чаще раза в сутки), cookie стоит переустановить. */
   async function resolveSession(token) {
     if (!token || typeof token !== "string" || token.length > 100) return null;
     const th = hashToken(token);
+    const policy = await getPolicy();
     const hit = cache.get(th);
-    if (hit && now() - hit.at < CACHE_MS) return { user: hit.user, renewed: false };
+    if (hit && now() - hit.at < CACHE_MS) {
+      const why = violates(policy, hit.createdAt, hit.lastSeen); if (why) { await endSession(th, why); return null; }
+      await touch(th, hit, policy); return { user: hit.user, renewed: false };
+    }
     const r = (await db.query(
-      `SELECT s.expires_at, s.last_seen_at, u.id, u.login, u.name, u.role, u.active, u.settings, u.must_change_password, u.email, u.password_hash
+      `SELECT s.expires_at, s.last_seen_at, s.created_at, u.id, u.login, u.name, u.role, u.active, u.settings, u.must_change_password, u.email, u.password_hash
          FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1`, [th])).rows[0];
     if (!r || !r.active || new Date(r.expires_at).getTime() <= now()) { cache.delete(th); return null; }
+    const createdAt = new Date(r.created_at).getTime(), dbSeen = new Date(r.last_seen_at).getTime();
+    const lastSeen = Math.max(dbSeen, hit?.lastSeen ?? 0); // активность последней минуты может быть ещё только в памяти
+    const why = violates(policy, createdAt, lastSeen); if (why) { await endSession(th, why); return null; }
     let renewed = false;
-    if (now() - new Date(r.last_seen_at).getTime() > DAY) {
+    if (now() - dbSeen > DAY) {
       await db.query("UPDATE sessions SET last_seen_at = $2, expires_at = $3 WHERE token_hash = $1", [th, new Date(now()), new Date(now() + SESSION_TTL_MS)]);
       renewed = true;
     }
-    const user = publicUser(r);
-    cache.set(th, { user, at: now() });
+    const entry = { user: publicUser(r), at: now(), createdAt, lastSeen, flushedAt: renewed ? now() : dbSeen };
+    cache.set(th, entry); await touch(th, entry, policy);
     if (cache.size > 2000) for (const [k, v] of cache) if (now() - v.at >= CACHE_MS) cache.delete(k);
-    return { user, renewed };
+    return { user: entry.user, renewed };
+  }
+  /** Любой запрос с действующим сеансом — активность. В БД пишем редко и только когда правило бездействия включено (иначе базу будил бы каждый запрос). */
+  async function touch(th, entry, policy) {
+    entry.lastSeen = now();
+    if (policy.idleMinutes > 0 && now() - entry.flushedAt >= TOUCH_MS) { entry.flushedAt = now(); await db.query("UPDATE sessions SET last_seen_at = $2 WHERE token_hash = $1", [th, new Date(now())]); }
   }
 
   async function destroySession(token) {
@@ -88,16 +121,18 @@ export function createSessions(db, cfg = {}) {
       next(e);
     }
   }
-  const requireUser = (req, res, next) => (req.user ? next() : res.status(401).json({ error: "unauthorized", message: "Требуется вход" }));
+  const ENDED_MSG = { idle: "Сеанс завершён из-за бездействия", max: "Сеанс завершён: истёк максимальный срок" };
+  const deny401 = (req, res) => { const reason = endedReason(readCookie(req)); return res.status(401).json({ error: "unauthorized", message: ENDED_MSG[reason] || "Требуется вход", ...(reason ? { reason } : {}) }); };
+  const requireUser = (req, res, next) => (req.user ? next() : deny401(req, res));
   const requireAdmin = (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: "unauthorized", message: "Требуется вход" });
+    if (!req.user) return deny401(req, res);
     if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden", message: "Доступно только администратору" });
     next();
   };
   const requirePasswordChanged = (req, res, next) => (req.user?.mustChangePassword
     ? res.status(403).json({ error: "password_change_required", message: "Сначала смените временный пароль" }) : next());
 
-  return { createSession, resolveSession, destroySession, destroyUserSessions, forgetUser, purgeExpired, setCookie, clearCookie, attachUser, requireUser, requireAdmin, requirePasswordChanged };
+  return { createSession, resolveSession, endedReason, destroySession, destroyUserSessions, forgetUser, purgeExpired, setCookie, clearCookie, attachUser, requireUser, requireAdmin, requirePasswordChanged };
 }
 
 /** CSRF (research R5): изменяющие запросы — только JSON, с заголовком X-Requested-With: fba и с того же origin. */

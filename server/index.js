@@ -6,6 +6,7 @@ import { rateLimiter } from "./auth.js";
 import { connect, isStorageError } from "./db/index.js";
 import { migrate } from "./db/migrate.js";
 import { createSessions, csrfGuard, readCookie } from "./sessions.js";
+import { createAppSettings } from "./app-settings.js";
 import { createGoogleAuth, GoogleAuthError, OAUTH_COOKIE, STATE_TTL_MS } from "./google-auth.js";
 import { createUsers, UserError } from "./users.js";
 import { createAnalyses } from "./analyses.js";
@@ -24,7 +25,8 @@ export const inflight = { count: 0, draining: false };
 export function createApp(cfg = configFromEnv(), deps = {}) {
   const db = deps.db;
   if (!db) throw new Error("createApp: нужна БД (deps.db)");
-  const sessions = deps.sessions || createSessions(db, cfg);
+  const appSettings = deps.appSettings || createAppSettings(db, deps.appSettingsOpts || {});
+  const sessions = deps.sessions || createSessions(db, { ...cfg, getPolicy: appSettings.getSessionPolicy });
   const users = deps.users || createUsers(db, sessions, deps.usersOpts || {});
   const analyses = deps.analyses || createAnalyses(db);
   const google = deps.google || createGoogleAuth(cfg, deps.googleOpts || {});
@@ -101,13 +103,22 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   });
 
   app.post("/api/auth/logout", async (req, res) => { await sessions.destroySession(req.sessionToken); sessions.clearCookie(res); res.status(204).end(); });
-  app.get("/api/auth/me", requireUser, (req, res) => res.json(me(req.user)));
+  // Правила сеансов приложению нужны, чтобы самому выйти при бездействии и предупредить заранее (spec 008).
+  app.get("/api/auth/me", requireUser, async (req, res) => res.json({ ...me(req.user), sessionPolicy: await appSettings.getSessionPolicy() }));
   app.post("/api/auth/password", requireUser, jsonSmall, async (req, res) => {
     await users.changePassword(req.user.id, req.body?.current, req.body?.next, req.sessionToken);
     log("info", "password changed", { login: req.user.login });
     res.status(204).end();
   });
   app.patch("/api/auth/settings", authed, jsonSmall, async (req, res) => res.json({ settings: await users.updateSettings(req.user.id, req.body || {}) }));
+
+  // ---------- правила сеансов (admin, spec 008) ----------
+  app.get("/api/admin/session-policy", admin, async (req, res) => res.json(await appSettings.sessionPolicyInfo()));
+  app.put("/api/admin/session-policy", admin, jsonSmall, async (req, res) => {
+    const info = await appSettings.setSessionPolicy(req.body || {}, req.user.id);
+    log("info", "session policy changed", { by: req.user.login, ...info.policy });
+    res.json(info);
+  });
 
   // ---------- пользователи (admin) ----------
   app.get("/api/users/names", authed, async (req, res) => res.json(await users.listNames()));

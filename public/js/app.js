@@ -9,6 +9,7 @@ import { detectAndParse } from "./files.js";
 import { history, localHistory } from "./history.js";
 import { runAi, runPatentScan, pendingJob } from "./ai.js";
 import { api, goLogin } from "/js/api.js";
+import { startIdleWatch } from "./idle.js";
 import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./export.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -84,7 +85,12 @@ function showTab(name) {
 async function initUser() {
   const me = await api("GET", "/api/auth/me");
   if (me.mustChangePassword) { goLogin("#change"); throw new Error("password change required"); }
-  S.user = me.user;
+  S.user = me.user; S.sessionPolicy = me.sessionPolicy || { idleMinutes: 0, maxDays: 0 };
+  // Выход при бездействии (spec 008): правило приходит с сервера и обновляется при каждой сверке — менять его может только администратор.
+  if (!S.idleWatch) S.idleWatch = startIdleWatch({ dialog: $("#idle-dlg"), getIdleMinutes: () => S.sessionPolicy?.idleMinutes || 0,
+    ping: async () => { const m = await api("GET", "/api/auth/me"); if (m?.sessionPolicy) S.sessionPolicy = m.sessionPolicy; },
+    beforeLogout: async () => { if (S.dirty && !S.conflict) await saveNow(); },
+    logout: async (reason, o = {}) => { if (!o.alreadyLoggedOut) { try { await api("POST", "/api/auth/logout", undefined, { noRedirect: true }); } catch {} } S.leaving = true; goLogin("", reason); } });
   const st = me.user.settings || {}; const patch = {};
   for (const [key, ls, prop] of [["modelAi", "fba_model", "model"], ["modelPatents", "fba_model_patents", "modelPatents"]]) {
     const local = localStorage.getItem(ls);
@@ -225,7 +231,7 @@ async function persistJobResult(label) {
   S.a.updatedAt = new Date().toISOString();
   if (!(await saveNow())) toast(`${label}: результат получен, но не сохранён в общую историю — см. индикатор под кнопками`, 8000);
 }
-window.addEventListener("beforeunload", (e) => { if (S.dirty && hasContent()) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", (e) => { if (S.dirty && hasContent() && !S.leaving) { e.preventDefault(); e.returnValue = ""; } });
 window.addEventListener("storage-down", () => setSaveState("error", "хранилище недоступно, скачайте JSON на всякий случай"));
 
 // ---------- конфликт одновременного редактирования ----------
@@ -510,7 +516,7 @@ function renderSettings() {
   $("#pw-user").value = S.user?.login || "";
   api("GET", "/api/auth/me").then((me) => { const has = me.user.hasPassword !== false; $("#pw-form").classList.toggle("hidden", !has); if (!has) $("#set-login-state").textContent += " Вы входите через Google — пароля у учётной записи нет; при необходимости его задаст администратор."; }).catch(() => {});
   $("#set-users").classList.toggle("hidden", S.user?.role !== "admin");
-  if (S.user?.role === "admin") renderUsers();
+  if (S.user?.role === "admin") { renderUsers(); renderSessionPolicy(); }
 }
 $("#set-logout").addEventListener("click", logout);
 $("#pw-form").addEventListener("submit", async (e) => {
@@ -526,6 +532,23 @@ function genPassword(n = 14) {
   return Array.from(buf, (x) => abc[x % abc.length]).join("");
 }
 async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Скопировано"); } catch { window.prompt("Скопируйте вручную:", t); } }
+// ---------- правила сеансов (admin, spec 008) ----------
+const IDLE_LABEL = (m) => (m === 0 ? "выключено — сеанс не завершается сам" : m < 60 ? `${m} минут` : m === 60 ? "1 час" : m < 1440 ? `${m / 60} часа(ов)` : "24 часа");
+const MAXD_LABEL = (d) => (d === 0 ? "без ограничения — 30 дней, продлевается активностью" : d === 1 ? "1 день" : `${d} дней`);
+async function renderSessionPolicy() {
+  try {
+    const info = await api("GET", "/api/admin/session-policy"); const fill = (id, opts, cur, label) => { $(id).innerHTML = opts.map((v) => `<option value="${v}" ${v === cur ? "selected" : ""}>${esc(label(v))}</option>`).join(""); };
+    fill("#sp-idle", info.options.idleMinutes, info.policy.idleMinutes, IDLE_LABEL); fill("#sp-max", info.options.maxDays, info.policy.maxDays, MAXD_LABEL);
+    $("#sp-msg").textContent = info.updatedAt ? `Изменено: ${new Date(info.updatedAt).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" })}${info.updatedBy ? " · " + info.updatedBy : ""}` : "Правила не задавались — действует поведение по умолчанию.";
+  } catch (e) { $("#sp-msg").textContent = "Не удалось загрузить правила: " + e.message; }
+}
+async function saveSessionPolicy() {
+  try { const info = await api("PUT", "/api/admin/session-policy", { idleMinutes: Number($("#sp-idle").value), maxDays: Number($("#sp-max").value) }); S.sessionPolicy = info.policy; S.idleWatch?.check();
+    toast(info.policy.idleMinutes ? `Правила сохранены: выход после ${IDLE_LABEL(info.policy.idleMinutes)} бездействия — действует для всех сразу` : "Правила сохранены"); renderSessionPolicy();
+  } catch (e) { toast("Не удалось сохранить правила: " + e.message, 6000); renderSessionPolicy(); }
+}
+$("#sp-idle").addEventListener("change", saveSessionPolicy); $("#sp-max").addEventListener("change", saveSessionPolicy);
+
 async function renderUsers() {
   if (!$("#un-pass").value) $("#un-pass").value = genPassword();
   let list = [];

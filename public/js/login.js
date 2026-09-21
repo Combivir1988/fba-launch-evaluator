@@ -26,6 +26,9 @@ const GOOGLE_ERRORS = {
 /** Кнопка показывается, только если на сервере настроен вход через Google; ошибка прошлой попытки приходит в ?error=. */
 async function initGoogle() {
   const params = new URLSearchParams(location.search); const err = params.get("error");
+  const REASONS = { idle: "Сеанс завершён из-за бездействия — так настроил администратор. Изменения были сохранены; войдите снова, чтобы продолжить.", max: "Сеанс завершён: истёк максимальный срок, заданный администратором. Войдите снова." };
+  const reason = params.get("reason");
+  if (reason && REASONS[reason]) { show($("#login-msg"), REASONS[reason]); params.delete("reason"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); }
   if (err && GOOGLE_ERRORS[err]) { show($("#login-msg"), GOOGLE_ERRORS[err]); params.delete("error"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); }
   try { const h = await fetch("/api/health").then((r) => r.json()); if (h.googleLogin) { $("#google-btn").href = "/api/auth/google/start?next=" + encodeURIComponent(nextUrl()); $("#google-box").classList.remove("hidden"); } } catch {}
 }
