@@ -63,10 +63,11 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
     const lim = Math.min(Math.max(Number(limit) || 200, 1), 500), off = Math.max(Number(offset) || 0, 0);
     const rows = (await db.query(
       `SELECT ${SELECT_META}, a.niche, a.core_keyword, a.verdict, a.c1_score, a.score, a.sources, a.ai_done, a.patents_done,
-              (SELECT count(*)::int FROM shares s WHERE s.analysis_id = a.id AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > now())) AS shares
+              (SELECT count(*)::int FROM shares s WHERE s.analysis_id = a.id AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > now())) AS shares,
+              (SELECT count(*)::int FROM analysis_versions v WHERE v.analysis_id = a.id) AS versions
          FROM analyses a ${JOIN_USERS} WHERE ${w} ORDER BY a.updated_at DESC LIMIT ${lim} OFFSET ${off}`, params)).rows;
     return { total, items: rows.map((r) => ({ ...rowMeta(r), niche: r.niche, coreKeyword: r.core_keyword, verdict: r.verdict, c1: r.c1_score, score: r.score === null ? null : Number(r.score),
-      sources: r.sources || [], aiDone: r.ai_done, patentsDone: r.patents_done, shares: r.shares, runningJobs: [] })) };
+      sources: r.sources || [], aiDone: r.ai_done, patentsDone: r.patents_done, shares: r.shares, versions: r.versions, runningJobs: [] })) };
   }
 
   async function get(id) {

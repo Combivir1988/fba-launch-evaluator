@@ -253,21 +253,22 @@ $("#save-state").addEventListener("click", () => { if (S.conflict) showConflict(
 $("#conflict-later").addEventListener("click", () => $("#conflict-dlg").close());
 // ---------- история версий (spec 009) ----------
 const VLABEL_SHORT = { go: "Go", go_conditional: "Go, условно", rework: "Доработка", no_go: "No-Go" };
-async function openVersions() {
-  if (!S.meta?.version) return toast("Анализ ещё не сохранён — истории версий пока нет");
-  const dlg = $("#versions-dlg"), list = $("#versions-list"); dlg.showModal(); list.innerHTML = '<p class="muted">Загрузка…</p>';
+let versionsFor = null; // { id, niche } — чей список открыт: текущий анализ или карточка из истории
+async function openVersions(id = S.a.id, niche = S.a.niche) {
+  if (id === S.a.id && !S.meta?.version) return toast("Анализ ещё не сохранён — истории версий пока нет");
+  versionsFor = { id, niche }; const dlg = $("#versions-dlg"), list = $("#versions-list"); $("#versions-title").textContent = niche ? `Версии анализа «${niche}»` : "Версии анализа"; dlg.showModal(); list.innerHTML = '<p class="muted">Загрузка…</p>';
   try {
-    const { items } = await history.versions(S.a.id);
+    const { items } = await history.versions(id);
     const t = (d) => new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
     list.innerHTML = items.length ? `<table><thead><tr><th>Состояние на</th><th>Кто записал</th><th>Ниша</th><th>Вердикт</th><th>Отчёты</th><th></th></tr></thead><tbody>${items.map((v) => `<tr><td>${esc(t(v.stateAt))}<br><small class="muted">${v.reason === "restore" ? "до восстановления" : "до правок"} ${esc(v.archivedBy || "")}, ${esc(t(v.archivedAt))}</small></td><td>${esc(v.stateBy?.name || "—")}</td><td>${esc(v.niche || "—")}</td><td>${esc(VLABEL_SHORT[v.verdict] || "—")}${v.c1 != null ? ` · К1 ${v.c1}/8` : ""}</td><td>${v.hasAggregates ? '<span class="chip ok" title="Версия хранит и отчёты того момента">с отчётами</span>' : `<span class="chip na" title="Отчёты останутся текущие">${esc((v.sources || []).join(", ") || "—")}</span>`}</td><td><button data-restore="${esc(v.id)}">Восстановить</button></td></tr>`).join("")}</tbody></table>`
       : '<p class="muted">Прежних версий нет: анализ ещё не перезаписывали.</p>';
   } catch (e) { list.innerHTML = `<p class="muted">Не удалось загрузить версии: ${esc(e.message)}</p>`; }
 }
-$("#btn-versions").addEventListener("click", openVersions);
+$("#btn-versions").addEventListener("click", () => openVersions());
 $("#versions-close").addEventListener("click", () => $("#versions-dlg").close());
 $("#versions-list").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-restore]"); if (!b) return; b.disabled = true;
-  try { if (S.dirty && !S.conflict) await saveNow(); const r = await history.restore(S.a.id, b.dataset.restore); $("#versions-dlg").close(); loadAnalysis(r.doc, r.meta);
+  try { const id = versionsFor?.id || S.a.id; if (id === S.a.id && S.dirty && !S.conflict) await saveNow(); const r = await history.restore(id, b.dataset.restore); $("#versions-dlg").close(); loadAnalysis(r.doc, r.meta); updateHistCount();
     toast(r.aggregatesRestored ? "Версия восстановлена вместе с отчётами; прежнее состояние тоже сохранено в версиях" : "Версия восстановлена (отчёты остались текущие); прежнее состояние сохранено в версиях", 7000); }
   catch (err) { toast("Не удалось восстановить: " + err.message, 7000); b.disabled = false; }
 });
@@ -507,16 +508,17 @@ async function renderHistory() {
   box.innerHTML = data.items.map((h) => {
     const canDelete = h.createdBy.id === S.user.id || S.user.role === "admin";
     const who = h.updatedBy.id === h.createdBy.id ? `автор: <b>${esc(h.createdBy.name)}</b>` : `автор: <b>${esc(h.createdBy.name)}</b> · изменил: <b>${esc(h.updatedBy.name)}</b>`;
-    return `<div class="histrow"><div><div class="t">${esc(h.niche || "Без названия")} ${h.verdict && V[h.verdict] ? `<span class="status ${h.verdict}">${V[h.verdict]}</span>` : ""}${h.aiDone ? ' <span class="chip">AI</span>' : ""}${h.patentsDone ? ' <span class="chip">патенты</span>' : ""}${h.shares ? ` <span class="chip ok" title="Активных публичных ссылок: ${h.shares}">ссылка</span>` : ""}${h.id === S.a.id ? ' <span class="chip">открыт</span>' : ""}</div>
+    return `<div class="histrow"><div><div class="t">${esc(h.niche || "Без названия")} ${h.verdict && V[h.verdict] ? `<span class="status ${h.verdict}">${V[h.verdict]}</span>` : ""}${h.aiDone ? ' <span class="chip">AI</span>' : ""}${h.patentsDone ? ' <span class="chip">патенты</span>' : ""}${h.shares ? ` <span class="chip ok" title="Активных публичных ссылок: ${h.shares}">ссылка</span>` : ""}${h.versions ? ` <span class="chip" title="Прежних состояний в истории версий: ${h.versions}">версий: ${h.versions}</span>` : ""}${h.id === S.a.id ? ' <span class="chip">открыт</span>' : ""}</div>
     <div class="m who">${who} · ${esc(t(h.updatedAt))}</div>
     <div class="m">ключ: ${esc(h.coreKeyword || "—")} · Критерий 1: ${h.c1 ?? "—"}/8 · scorecard ${h.score != null ? Math.round(h.score) + " %" : "—"} · ${h.sources.join(", ") || "без файлов"}</div></div>
-    <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-share="${h.id}" data-niche="${esc(h.niche || "")}">🔗 Поделиться</button><button data-json="${h.id}">JSON</button>${canDelete ? `<button data-del="${h.id}" class="danger">Удалить</button>` : ""}</div></div>`;
+    <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-share="${h.id}" data-niche="${esc(h.niche || "")}">🔗 Поделиться</button><button data-json="${h.id}">JSON</button><button data-versions="${h.id}" data-niche="${esc(h.niche || "")}" title="Прежние состояния анализа — можно вернуть любое"${h.versions ? "" : " disabled"}>🕘 Версии</button>${canDelete ? `<button data-del="${h.id}" class="danger">Удалить</button>` : ""}</div></div>`;
   }).join("") || `<div class="empty">${$("#hist-search").value || $("#hist-mine").value === "1" ? "Ничего не найдено." : "История пуста. Анализы сохраняются сюда автоматически и видны всей команде."}</div>`;
   if (data.total > data.items.length) box.insertAdjacentHTML("beforeend", `<div class="muted" style="padding:.5rem">Показаны последние ${data.items.length} из ${data.total} — уточните поиск.</div>`);
 }
 $("#histlist").addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
   try {
+    if (b.dataset.versions) return openVersions(b.dataset.versions, b.dataset.niche);
     if (b.dataset.open) {
       if (b.dataset.open === S.a.id) return showTab("analysis");
       if (!(await leaveCurrent("Текущий анализ не сохранён. Открыть другой и потерять несохранённые изменения?"))) return;

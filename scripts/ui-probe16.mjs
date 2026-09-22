@@ -46,6 +46,14 @@ try {
   const rows2 = await page.$$eval("#versions-list tbody tr", (tr) => tr.map((r) => r.textContent.replace(/\s+/g, " ")));
   ok(/Urinal Deodorizer Tablets/.test(rows2[0]) && /до восстановления/.test(rows2[0]), "состояние до восстановления тоже в списке — шаг обратим");
   await page.click("#versions-close");
+  // из «Истории»: у карточки чип «версий: N» и своя кнопка «Версии»; восстановление оттуда открывает анализ
+  await page.evaluate(() => document.querySelector('[data-tab="history"]').click()); await page.waitForFunction((id) => document.querySelector(`[data-versions="${id}"]`), idA, { timeout: 10000 });
+  const card = await page.evaluate((id) => document.querySelector(`[data-open="${id}"]`).closest(".histrow").textContent.replace(/\s+/g, " "), idA); ok(/версий: \d+/.test(card), "карточка в истории показывает число версий: " + card.slice(0, 80));
+  await page.evaluate((id) => document.querySelector(`[data-versions="${id}"]`).click(), idA); await page.waitForFunction(() => document.querySelectorAll("#versions-list [data-restore]").length >= 2, null, { timeout: 10000 });
+  ok(/Amaranthus artificial flower/.test(await page.textContent("#versions-title")), "диалог из истории назван по нише карточки");
+  await page.evaluate(() => [...document.querySelectorAll("#versions-list tbody tr")].find((r) => /Urinal Deodorizer/.test(r.textContent)).querySelector("[data-restore]").click());
+  await page.waitForFunction(() => document.querySelector("#f-niche").value === "Urinal Deodorizer Tablets" && !document.querySelector("#tab-analysis").classList.contains("hidden"), null, { timeout: 15000 }); ok(true, "восстановление из истории открывает восстановленный анализ во вкладке «Анализ»");
+  ok((await page.$$eval(".filecard", (x) => x.length)) === 1, "восстановленный анализ открыт со своим отчётом");
   ok(logs.length === 0, "ошибок в консоли нет" + (logs.length ? ": " + logs.slice(0, 3).join(" | ") : ""));
 } catch (e) { console.error("✖ проба упала:", e.message); process.exitCode = 1; }
 finally { await browser.close(); srv.kill(); }
