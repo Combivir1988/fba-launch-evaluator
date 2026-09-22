@@ -169,8 +169,8 @@
       <div class="two" style="margin-top:.8rem">
         <div><h4>Net after ads по CVR</h4><div class="chartbox short"><canvas id="ch-gate2"></canvas></div></div>
         <div class="tablewrap"><table><thead><tr><th>CVR</th><th class="num">Ad cost/юнит</th><th class="num">Net after ads</th><th class="num">ACOS</th></tr></thead><tbody>
-          ${g2.byCvr.map((r) => `<tr><td>${fmtPct(r.cvr)}</td><td class="num">${fmtMoney(r.adCost * g2.ppcShare, 2)}</td><td class="num" style="color:${r.net > 0 ? "var(--ok)" : "var(--fail)"}"><b>${fmtMoney(r.net, 2)}</b></td><td class="num">${fmtPct(r.acos)}</td></tr>`).join("")}</tbody></table>
-          <p class="muted" style="font-size:.8rem">Ad cost = CPC / CVR × доля PPC. Кейс Jitsu: в дешёвых сегментах критичен абсолютный доллар профита.</p></div>
+          ${gate2Rows(g2).map((r) => `<tr class="${r.current ? "leader" : ""}"><td>${fmtPct(r.cvr, Number.isInteger(+(r.cvr * 100).toFixed(6)) ? 0 : 1)}${r.current ? ' <span class="chip band" title="Конверсия, заданная ползунком CVR">ваш</span>' : ""}</td><td class="num">${fmtMoney(r.adCost * g2.ppcShare, 2)}</td><td class="num" style="color:${r.net > 0 ? "var(--ok)" : "var(--fail)"}"><b>${fmtMoney(r.net, 2)}</b></td><td class="num">${fmtPct(r.acos)}</td></tr>`).join("")}</tbody></table>
+          <p class="muted" style="font-size:.8rem">Ad cost = CPC / CVR × доля PPC. Статус Gate 2 считается по сетке 8 / 10 / 12 / 15 % (PASS, если Net > 0 при 12 %); строка «ваш» — ваша текущая конверсия. Кейс Jitsu: в дешёвых сегментах критичен абсолютный доллар профита.</p></div>
       </div>
       <h3 style="margin-top:1rem">Критерий 2 — детальная экономика <span class="chip ${s2.pass ? "ok" : s2.pending ? "pending" : "fail"}">${s2.okCount} из 11 · 2f/2j/2k ${s2.mandatoryOk ? "OK" : "не все OK"}</span></h3>
       <div class="tablewrap"><table><thead><tr><th>Показатель</th><th class="num">Значение</th><th>Статус</th><th>Примечание</th></tr></thead><tbody>${c2rows}</tbody></table></div>
@@ -181,6 +181,12 @@
   function sl(key, label, val, min, max, step, fmt, scale = 1) {
     const v = isNum(val) ? val : min;
     return `<div class="slider"><label>${label}</label><input type="range" data-quick="${key}" data-scale="${scale}" min="${min * scale}" max="${max * scale}" step="${step * scale}" value="${v * scale}" aria-label="${label}"><output>${fmt(v)}</output></div>`;
+  }
+  /** Строки стресс-теста: сетка порогов + текущая конверсия (помечена), если её нет в сетке. */
+  function gate2Rows(g2) {
+    const rows = g2.byCvr.map((r) => ({ ...r, current: g2.atCvr && Math.abs(r.cvr - g2.atCvr.cvr) < 1e-9 }));
+    if (g2.atCvr && !rows.some((r) => r.current)) rows.push({ ...g2.atCvr, current: true });
+    return rows.sort((a, b) => a.cvr - b.cvr);
   }
   function drawEconomics(container, R) {
     const g2 = R.economics.gate2; if (!g2?.byCvr?.length) return;

@@ -106,3 +106,10 @@ test("график Gate 2: ось доходит до текущего CVR, то
     assert.ok(labels.includes("20 %") && labels[0] === "4 %", "базовый диапазон 4–20 % сохранён");
   }
 });
+
+test("таблица Gate 2: сетка 8/10/12/15 % плюс строка «ваш» с текущей конверсией; при совпадении с сеткой — только пометка", () => {
+  const rows = (cvr) => [...draw(entryFixture({ inputs: { cvr } })).querySelectorAll("#sec-economics .two tbody tr")].map((tr) => tr.textContent.replace(/\s+/g, " ").trim());
+  const r25 = rows(0.25); assert.equal(r25.length, 5); assert.match(r25[4], /^25 % ваш/); assert.match(r25[0], /^8 %/);
+  const r10 = rows(0.10); assert.equal(r10.length, 4); assert.match(r10[1], /^10 % ваш/);
+  const r135 = rows(0.135); assert.equal(r135.length, 5); assert.match(r135[3], /^13,5 % ваш/); assert.match(r135[4], /^15 %/);
+});
