@@ -1053,6 +1053,7 @@
     if (!container.querySelector("[data-section]")) return render(container, A, opts);
     const R = A.results; if (!R) return; container.__opts = { ...(container.__opts || {}), ...opts }; opts = container.__opts; container.__A = A;
     for (const id of ids) fill(container, id, A, R, opts);
+    if (ids.some((id) => STAGE2.has(id)) && !ids.includes("hero")) fill(container, "hero", A, R, opts); // строка «Этап 2 …» в шапке зависит от состояния этапа 2
     refreshStageTabs(container, A);
   }
   function destroy(container) { for (const c of Object.values(container.__charts || {})) { try { c.destroy(); } catch {} } container.__charts = {}; }

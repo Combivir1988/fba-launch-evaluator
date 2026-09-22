@@ -104,3 +104,11 @@ test("вкладки «Этап 1 / Этап 2» внутри дашборда: 
   assert.equal(draw(entryFixture({ withXray: false })).querySelector("[data-stagetabs]"), null, "без Xray этапа 2 нет — вкладок нет");
   assert.equal(draw(entryFixture({ withXray: false }), { stage: 2 }).dataset.stage, "1");
 });
+
+test("после составления ТЗ обновляются и бейдж вкладки, и строка «Этап 2 …» в шапке — без полного рендера", () => {
+  const a = withConfig(entryFixture(), { tz: false }); const el = draw(a);
+  assert.match(text(el, "#sec-hero [data-goto]"), /ТЗ не составлено/); assert.match(el.querySelector('[data-stagetabs] [data-stage="2"]').textContent, /извлечено/);
+  a.config.tz = { title: "ТЗ", summary: "s", rows: [{ section: "конструкция", param: "p", requirement: "r", rationale: "x", priority: "must", source: "s" }], openQuestions: [], generatedAt: "2026-09-22T00:00:00Z", model: "mock" };
+  el.__w.FBARender.update(el, a, {}, ["tz"]);
+  assert.match(text(el, "#sec-hero [data-goto]"), /ТЗ: 1 требований/); assert.match(el.querySelector('[data-stagetabs] [data-stage="2"]').textContent, /ТЗ готово/);
+});
