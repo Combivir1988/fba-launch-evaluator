@@ -57,7 +57,7 @@ export function economics(inputs, th, ctx = {}) {
   const c2 = {
     "2a": { value: price, status: priceFit === null ? "warn" : priceFit ? "ok" : "fail", note: medianPrice ? `медиана проверенных конкурентов $${round(medianPrice, 2)}` : "медиана ниши неизвестна" },
     "2b": { value: cogs, status: inputs.cogsConfirmed ? "ok" : "warn", note: inputs.cogsConfirmed ? "подтверждено поставщиком" : "оценка — подтвердите котировкой" },
-    "2c": { value: cvr, status: st3(cvr >= e.cvrRealistic[0] && cvr <= e.cvrRealistic[1], cvr < e.cvrRealistic[0]), note: "8–15 % реалистично для нового листинга" },
+    "2c": cvrItem(cvr, e, ctx),
     "2d": { value: cpc, status: cpc === null ? "pending" : ctx.cpcFromCerebro ? "ok" : "warn", note: ctx.cpcFromCerebro ? "из Cerebro (Sugg. Bid)" : "введено вручную" },
     "2e": { value: ppc, status: st3(ppc >= e.ppcShareRealistic[0] && ppc <= e.ppcShareRealistic[1], ppc < e.ppcShareRealistic[0] && ppc > 0.3), note: "70/30 в пользу PPC типично на старте" },
     "2f": { value: netUnitAds, status: cpc === null ? "pending" : netUnitAds > 0 ? "ok" : "fail", note: "чистая прибыль/юнит с рекламой (= Gate 2 при текущем CVR)" },
@@ -77,4 +77,13 @@ export function economics(inputs, th, ctx = {}) {
   return out;
 }
 
+/** 2c: 8–15 % — норма для нового листинга; ниже — осторожно; выше — оптимистично, но не ошибка: если данные ниши (POE / SQP) дают не меньше, статус OK. */
+function cvrItem(cvr, e, ctx) {
+  const [lo, hi] = e.cvrRealistic; const pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %";
+  if (cvr < lo) return { value: cvr, status: "warn", note: "8–15 % реалистично для нового листинга" };
+  if (cvr <= hi) return { value: cvr, status: "ok", note: "8–15 % реалистично для нового листинга" };
+  const data = typeof ctx.dataCvr === "number" && ctx.dataCvr > 0 ? ctx.dataCvr : null;
+  if (data !== null && data >= cvr * 0.8) return { value: cvr, status: "ok", note: `выше типичных 8–15 % для нового листинга, но подтверждено данными: ${ctx.dataCvrLabel || "конверсия ниши"} ${pc(data)}; у листинга без отзывов на старте обычно ниже` };
+  return { value: cvr, status: "warn", note: `выше типичных 8–15 % для нового листинга${data !== null ? ` и выше данных ниши (${pc(data)})` : " и данными не подтверждено"} — оптимистично, проверьте` };
+}
 function num(v) { return v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? null : Number(v); }

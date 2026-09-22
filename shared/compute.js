@@ -40,11 +40,20 @@ export function compute(analysis) {
     p.criterion1 = summarizeCriterion1(items, th.criterion1);
     band.whole = { ...wholeNicheRef(compAll, c1All.items["1b"].value), revenue: c1All.items["1a"].value };
   }
+  // Подсказка CVR (клик → покупка): конверсия клика ниши из POE и/или SQP. Значение по умолчанию (10 %) — допущение; подсказка сама ничего не меняет.
+  const hint = cvrHint({ sqp: whole.sqp, poe: whole.poe }, { coreKeyword: analysis.coreKeyword, clusterKeywords: inputs.clusterKeywords || [], realistic: th.economics.cvrRealistic });
+  if (hint) {
+    const h = hint, pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %"; const parts = [];
+    if (h.niche) parts.push(`конверсия клика ниши по POE ${pc(h.niche.cvr)}`);
+    if (h.market) parts.push(`SQP ${h.scopeLabel}: рынок ${pc(h.market.cvr)}${h.mine ? `, ваш ASIN ${pc(h.mine.cvr)}` : ""}`);
+    h.note = "по данным: " + parts.join("; ");
+  }
+  const dataCvr = hint?.market?.cvr ?? hint?.niche?.cvr ?? null, dataCvrLabel = hint?.market ? "рынок по SQP" : hint?.niche ? "конверсия клика ниши по POE" : null;
   // цена по умолчанию = медиана 1b, CPC по умолчанию = bid core-ключа
   const price = inputs.price ?? p.criterion1.items["1b"].value ?? null;
   const cpcFromCerebro = inputs.cpc === null || inputs.cpc === undefined || inputs.cpc === "";
   const cpc = cpcFromCerebro ? p.traffic.cpcCore : inputs.cpc;
-  p.economics = economics({ ...inputs, price, cpc }, th, { priceMedian: p.criterion1.items["1b"].value, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null });
+  p.economics = economics({ ...inputs, price, cpc }, th, { priceMedian: p.criterion1.items["1b"].value, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, dataCvr, dataCvrLabel });
   // Вход в нишу (spec 005): трафик, новички и отзывы — по ВСЕЙ нише. Опорная дата возраста листингов — дата снятия POE (анализ, открытый через год, покажет те же возрасты).
   const compWhole = band.active ? competition(whole) : p.competition;
   const refDate = new Date(whole.poe?.meta?.capturedAt || analysis.createdAt || Date.now());
@@ -58,21 +67,13 @@ export function compute(analysis) {
     gate0: g0, criterion1: p.criterion1, economics: p.economics, budget: p.budget, traffic: p.traffic, competition: p.competition,
     priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard,
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
-    reconciliation: reconciliation(p),
+    reconciliation: reconciliation(p), cvrHint: hint,
     entry: p.entry, cashflow: p.cashflow,
     clickPrice: clickWeightedPrice(whole.poe, { priceMedian: (band.active ? band.whole?.priceMedian : null) ?? p.criterion1.items["1b"].value, myPrice: price, band }, th.entry),
     regulatory: regulatoryTriggers({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, xray: whole.xray, poe: whole.poe, cerebro: whole.cerebro }),
     dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
   };
   results.borderline = borderline(results, th);
-  // Подсказка CVR (клик → покупка): конверсия клика ниши из POE и/или SQP. Значение по умолчанию (10 %) — допущение; подсказка сама ничего не меняет.
-  results.cvrHint = cvrHint({ sqp: whole.sqp, poe: whole.poe }, { coreKeyword: analysis.coreKeyword, clusterKeywords: inputs.clusterKeywords || [], realistic: th.economics.cvrRealistic });
-  if (results.cvrHint) {
-    const h = results.cvrHint, pc = (v) => (v * 100).toFixed(1).replace(".", ",") + " %"; const parts = [];
-    if (h.niche) parts.push(`конверсия клика ниши по POE ${pc(h.niche.cvr)}`);
-    if (h.market) parts.push(`SQP ${h.scopeLabel}: рынок ${pc(h.market.cvr)}${h.mine ? `, ваш ASIN ${pc(h.mine.cvr)}` : ""}`);
-    h.note = "по данным: " + parts.join("; ");
-  }
   results.verdict = verdictCeiling(results);
   results.computedAt = new Date().toISOString();
   results.methodologyVersion = th.methodologyVersion || analysis.methodologyVersion;

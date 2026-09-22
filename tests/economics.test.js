@@ -42,3 +42,13 @@ test("Gate 1: одно условие → ДОРАБОТКА, ни одного 
   const sus = economics({ ...base, price: 60, cogs: 8, fbaFee: 6 }, TH);
   assert.equal(sus.roiHint, "suspicious");
 });
+
+test("2c: CVR выше 15 % — не ошибка: подтверждён данными ниши → OK, без подтверждения → погранично; ниже 8 % — погранично", async () => {
+  const { economics } = await import("../shared/economics.js"); const { mergeThresholds } = await import("../shared/thresholds.js"); const TH = mergeThresholds();
+  const base = { price: 30, cogs: 8.4, shippingPerUnit: 1, fbaFee: 5, referralPct: 0.15, cpc: 1.5, ppcShare: 0.5, unitsPerDay: 10 };
+  const c2 = (cvr, ctx = {}) => economics({ ...base, cvr }, TH, ctx).criterion2["2c"];
+  assert.equal(c2(0.25, { dataCvr: 0.252, dataCvrLabel: "конверсия клика ниши по POE" }).status, "ok"); assert.match(c2(0.25, { dataCvr: 0.252, dataCvrLabel: "конверсия клика ниши по POE" }).note, /подтверждено данными: конверсия клика ниши по POE 25,2 %/);
+  assert.equal(c2(0.25).status, "warn"); assert.match(c2(0.25).note, /данными не подтверждено/); assert.equal(c2(0.25, { dataCvr: 0.12 }).status, "warn"); assert.match(c2(0.25, { dataCvr: 0.12 }).note, /выше данных ниши \(12,0 %\)/);
+  assert.equal(c2(0.10).status, "ok"); assert.equal(c2(0.05).status, "warn"); assert.equal(c2(0.15).status, "ok");
+  const { fixtureAnalysis } = await import("./helpers/fixture-analysis.js"); const a = fixtureAnalysis({ inputs: { cvr: 0.25 } }); assert.equal(a.results.economics.criterion2["2c"].status, "ok", "в расчёте: конверсия клика ниши по POE (30 %) подтверждает 25 %");
+});
