@@ -1,6 +1,6 @@
 # Feature Specification: История версий анализа и «последний анализ» для каждого пользователя
 
-**Feature Branch**: `009-versions-and-last-analysis` · **Created**: 2026-09-22 · **Status**: Approved 2026-09-22 (запрос владельца после того, как новый пользователь перезаписал его анализ)
+**Feature Branch**: `009-versions-and-last-analysis` · **Created**: 2026-09-22 · **Status**: Implemented 2026-09-22 · Approved 2026-09-22 (запрос владельца после того, как новый пользователь перезаписал его анализ)
 
 ## Проблема
 
