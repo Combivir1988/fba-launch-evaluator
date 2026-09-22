@@ -21,7 +21,7 @@ const R = () => window.FBARender;
 const S = { a: newAnalysis(), user: null, baseVersion: null, meta: null, sig: "", aggDirty: false, conflict: null, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: "", modelPatents: "" };
 const modelAi = () => (S.models.includes(S.model) ? S.model : S.models[0] || "");
 const modelPatents = () => (S.models.includes(S.modelPatents) ? S.modelPatents : modelAi());
-const renderOpts = () => ({ static: false, models: S.models, selectedModel: modelAi(), selectedPatentModel: modelPatents(), aiRunning: S.aiBusy, patentsRunning: S.patBusy, configRunning: S.cfgBusy || null, tzRunning: S.tzBusy || null, scrapfly: S.scrapfly });
+const renderOpts = () => ({ static: false, models: S.models, selectedModel: modelAi(), selectedPatentModel: modelPatents(), aiRunning: S.aiBusy, patentsRunning: S.patBusy, configRunning: S.cfgBusy || null, tzRunning: S.tzBusy || null, scrapfly: S.scrapfly, stage: S.stage, onStage: (n) => { S.stage = n; try { localStorage.setItem("fba_stage", String(n)); } catch {} } });
 const dash = $("#dashboard");
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const toast = (msg, ms = 3200) => { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), ms); };
@@ -180,19 +180,10 @@ function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.
 
 // ---------- compute / render ----------
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
-function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); renderCvrHint(); renderConfigSide(); autosave(); }
-// ---------- две вкладки дашборда: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) ----------
-const stageOf = () => (dash.dataset.stage === "2" ? 2 : 1);
-function setStage(n, { scroll = false } = {}) {
-  n = n === 2 ? 2 : 1; const changed = stageOf() !== n; dash.dataset.stage = String(n); try { localStorage.setItem("fba_stage", String(n)); } catch {}
-  $$("#stage-tabs [data-stage]").forEach((b) => b.classList.toggle("active", Number(b.dataset.stage) === n));
-  $("#stage2-empty").classList.toggle("hidden", !(n === 2 && !S.a.aggregates?.xray?.asins?.length));
-  if (changed && S.a.results) R().update(dash, S.a, renderOpts(), n === 2 ? ["hero", "config", "tz"] : SECTION_IDS()); // графики, нарисованные в скрытой вкладке, имеют нулевой размер — перерисовываем
-  if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
-}
-const SECTION_IDS = () => [...dash.querySelectorAll("[data-section]")].map((s) => s.dataset.section).filter((id) => id !== "config" && id !== "tz");
-$("#stage-tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-stage]"); if (b) setStage(Number(b.dataset.stage), { scroll: true }); });
-try { if (localStorage.getItem("fba_stage") === "2") setStage(2); } catch {}
+function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); renderCvrHint(); autosave(); }
+// Вкладки «Этап 1 / Этап 2» рисует render.js внутри дашборда; приложение лишь помнит выбор.
+try { S.stage = localStorage.getItem("fba_stage") === "2" ? 2 : 1; } catch { S.stage = 1; }
+const setStage = (n) => R().setStage(dash, S.a, n);
 function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
 const scheduleFull = debounce(renderAll, 250);
 let rafId = 0; function scheduleEcon() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(renderEcon); }
@@ -472,14 +463,7 @@ const cfgStatus = (id, t) => { const el = $(id); if (el) el.textContent = t; };
 const JSON_H = { "content-type": "application/json", "x-requested-with": "fba" };
 function mergeListings(listings) { if (!listings || !Object.keys(listings).length) return; S.a.aggregates.listings = { ...(S.a.aggregates.listings || {}), ...listings }; S.aggDirty = true; }
 function ensureConfig() { if (!S.a.config) S.a.config = {}; return S.a.config; }
-function renderConfig(ids = ["config", "tz"]) { recompute(); R().update(dash, S.a, renderOpts(), ids); renderConfigSide(); autosave(); }
-/** Бейдж состояния этапа 2 на вкладке дашборда. */
-function renderConfigSide() {
-  const C = S.a.config || {}; const hasX = Boolean(S.a.aggregates?.xray?.asins?.length);
-  const [cls, text] = !hasX ? ["na", "нужен Xray"] : C.tz ? ["ok", "ТЗ готово"] : C.table ? ["ok", "извлечено"] : C.schema ? ["warn", "схема есть"] : ["na", "не начат"];
-  const b = $("#stage2-badge"); if (b) { b.className = "chip " + cls; b.textContent = text; }
-  $("#stage2-empty").classList.toggle("hidden", !(stageOf() === 2 && !hasX));
-}
+function renderConfig(ids = ["config", "tz"]) { recompute(); R().update(dash, S.a, renderOpts(), ids); autosave(); }
 function gotoConfig(id = "sec-config") { showTab("analysis"); setStage(2); const el = document.getElementById(id); if (!el || el.classList.contains("hidden")) return toast("Секция появится после загрузки Xray"); el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
 dash.addEventListener("click", (e) => { const a = e.target.closest("[data-goto]"); if (a) { e.preventDefault(); gotoConfig(a.dataset.goto); } });
 function configAction(b) {
@@ -497,7 +481,7 @@ async function startConfigSchema(resumeJobId = null) {
   if (!S.a.results) renderAll();
   const th = cfgTh(); const top = topForSchema(configScope(S.a, th), th);
   if (top.length < 3) return toast("В области меньше трёх ASIN — проверьте Xray и исключённые бренды");
-  S.cfgBusy = { type: "schema", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); cfgStatus("#config-status", S.cfgBusy.text);
+  S.cfgBusy = { type: "schema", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); cfgStatus("#config-status", S.cfgBusy.text);
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
     const chosen = modelAi();
@@ -507,7 +491,7 @@ async function startConfigSchema(resumeJobId = null) {
     toast(`Схема полей: ${done.schema.fields.length} полей по ${done.schema.basedOn} листингам${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""} — проверьте и поправьте перед извлечением`, 7000);
     document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Схема полей: " + e.message, 8000); }
-  finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); }
+  finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
 async function startConfigExtract(resumeJobId = null) {
   if (S.cfgBusy) return; const C = S.a.config; if (!C?.schema?.fields?.length) return toast("Сначала предложите и утвердите схему полей (шаг 1)");
@@ -515,7 +499,7 @@ async function startConfigExtract(resumeJobId = null) {
   const th = cfgTh(); const scope = configScope(S.a, th); if (!scope.asins.length) return toast("Нет ASIN для извлечения");
   const cached = freshListings(S.a.aggregates.listings, scope.asins, th); const missing = scope.asins.length - Object.keys(cached).length;
   if (!resumeJobId && missing > 0 && !confirm(`Будет загружено ${missing} страниц листингов через Scrapfly (≈ ${missing * 30} кредитов; ${Object.keys(cached).length} уже в кэше) и выполнено извлечение по ${scope.asins.length} листингам${scope.capped ? ` (предел ${scope.asins.length} из ${scope.total} — см. «Пороги»)` : ""}. Продолжить?`)) return;
-  S.cfgBusy = { type: "extract", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); cfgStatus("#config-status", S.cfgBusy.text);
+  S.cfgBusy = { type: "extract", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); cfgStatus("#config-status", S.cfgBusy.text);
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
     const chosen = modelAi();
@@ -526,12 +510,12 @@ async function startConfigExtract(resumeJobId = null) {
     toast(`Извлечено: ${Object.keys(done.table.rows).length} листингов, среднее покрытие ${Math.round(avg * 100)} %${done.table.failed?.length ? `, не загружено ${done.table.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
     document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Извлечение: " + e.message, 8000); }
-  finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); }
+  finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
 async function startConfigTz(resumeJobId = null) {
   if (S.tzBusy) return; const C = S.a.config; if (!C?.table) return toast("Сначала извлеките характеристики (шаг 2)");
   if (!S.a.results) renderAll();
-  S.tzBusy = { text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["tz"]); renderConfigSide(); cfgStatus("#tz-status", S.tzBusy.text);
+  S.tzBusy = { text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["tz"]); cfgStatus("#tz-status", S.tzBusy.text);
   try {
     const chosen = modelAi();
     const done = await runConfigJob(S.a, "config_tz", "/api/config/tz", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, payload: buildTzPayload(S.a), options: chosen ? { model: chosen } : {} },
@@ -541,7 +525,7 @@ async function startConfigTz(resumeJobId = null) {
     toast(`ТЗ: ${done.tz.rows.length} требований${unv ? `, проверьте числа в ${unv} строках` : ""}`, 7000);
     document.getElementById("sec-tz")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) { console.error(e); if (e.code === "auth") goLogin(); toast("ТЗ: " + e.message, 8000); }
-  finally { S.tzBusy = null; R().update(dash, S.a, renderOpts(), ["tz"]); renderConfigSide(); }
+  finally { S.tzBusy = null; R().update(dash, S.a, renderOpts(), ["tz"]); }
 }
 async function downloadTzDocx() {
   const T = S.a.config?.tz; if (!T) return toast("Сначала составьте ТЗ");

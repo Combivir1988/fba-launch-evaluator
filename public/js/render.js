@@ -35,9 +35,21 @@
     const box = canvas.closest(".chartbox") || canvas.parentElement;
     if (box) box.innerHTML = `<div class="notice fail" style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center">${esc(msg)}</div>`;
   }
+  /** Подсказка при наведении на график: строка значения (как настроено графиком) + подвал «что это и как читать» (cfg.desc).
+   *  Для линий и столбцов подсказка появляется при наведении на любую точку колонки, не только на саму фигуру. */
+  function withChartTips(cfg) {
+    const desc = cfg.desc; delete cfg.desc; if (!desc) return cfg;
+    const o = (cfg.options = cfg.options || {}); const p = (o.plugins = o.plugins || {}); const t = (p.tooltip = p.tooltip || {}); const cb = (t.callbacks = t.callbacks || {});
+    const lines = []; let cur = ""; for (const w of String(desc).split(" ")) { if ((cur + " " + w).trim().length > 64) { lines.push(cur.trim()); cur = w; } else cur += " " + w; } if (cur.trim()) lines.push(cur.trim());
+    const prevFooter = cb.footer; cb.footer = (items) => { const own = typeof prevFooter === "function" ? prevFooter(items) : []; return [...(Array.isArray(own) ? own : own ? [own] : []), ...lines]; };
+    t.footerFont = t.footerFont || { weight: "normal", size: 11 }; t.footerColor = t.footerColor || cssVar("--text-2") || undefined; t.footerMarginTop = t.footerMarginTop ?? 6;
+    if (!o.interaction && (cfg.type === "line" || cfg.type === "bar")) o.interaction = { mode: "index", intersect: false };
+    if (!o.interaction && cfg.type === "radar") o.interaction = { mode: "nearest", intersect: false };
+    return cfg;
+  }
   function mkChart(container, id, cfg) {
     const canvas = container.querySelector(`#${id}`);
-    if (!canvas) return null;
+    if (!canvas) return null; cfg = withChartTips(cfg);
     if (!window.Chart) { chartFail(canvas, "Chart.js не загрузился (vendor/chart.umd.js) — проверьте блокировщик скриптов и консоль браузера (F12)"); return null; }
     container.__charts = container.__charts || {};
     if (container.__charts[id]) { try { container.__charts[id].destroy(); } catch {} }
@@ -203,7 +215,7 @@
     const net0 = R.economics.gate1.net0;
     const ys = xs.map((c) => net0 - (g2.cpc / c) * g2.ppcShare);
     const [s1, s2] = series();
-    mkChart(container, "ch-gate2", { type: "line", data: { labels: xs.map((c) => (Number.isInteger(+(c * 100).toFixed(6)) ? Math.round(c * 100) : (c * 100).toFixed(1).replace(".", ",")) + " %"), datasets: [
+    mkChart(container, "ch-gate2", { type: "line", desc: "Что это: прибыль на один проданный юнит после расходов на рекламу (Net after ads) при разной конверсии клика (CVR). Красный пунктир — конверсия безубыточности, серая линия — ноль прибыли. Значения в $ за юнит.", data: { labels: xs.map((c) => (Number.isInteger(+(c * 100).toFixed(6)) ? Math.round(c * 100) : (c * 100).toFixed(1).replace(".", ",")) + " %"), datasets: [
       { label: "Net after ads, $/юнит", data: ys, borderColor: s1, backgroundColor: s1, borderWidth: 2, pointRadius: 0, tension: .2 },
       { label: "Текущий CVR", data: xs.map((c) => (cur !== null && Math.abs(c - cur) < 1e-9 ? g2.atCvr.net : null)), borderColor: s2, backgroundColor: s2, pointRadius: 6, pointHoverRadius: 8, showLine: false },
     ] }, options: { plugins: { legend: { display: true }, tooltip: { callbacks: { label: tooltipMoney(2) } } }, scales: { x: { grid, title: { display: true, text: "CVR" } }, y: { grid, ticks: { callback: (v) => fmtMoney(v) } } } },
@@ -260,8 +272,8 @@
   function drawTraffic(container, R) {
     const tr = R.traffic; if (!tr.cluster?.length) return;
     const top = tr.cluster.slice(0, 15);
-    mkChart(container, "ch-kw", { type: "bar", data: { labels: top.map((k) => k.phrase), datasets: [{ label: "SV/мес", data: top.map((k) => k.sv), backgroundColor: series()[0], borderRadius: 4, barPercentage: .7 }] },
-      options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { grid, ticks: { callback: (v) => fmtN(v) } }, y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 11 } } } } } });
+    mkChart(container, "ch-kw", { type: "bar", desc: "Что это: поисковый объём ключей кластера — запросов в месяц по Cerebro. Чем длиннее столбец, тем больше спроса даёт ключ.", data: { labels: top.map((k) => k.phrase), datasets: [{ label: "SV/мес", data: top.map((k) => k.sv), backgroundColor: series()[0], borderRadius: 4, barPercentage: .7 }] },
+      options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => "SV: " + fmtN(c.parsed.x) + " запросов/мес" } } }, scales: { x: { grid, ticks: { callback: (v) => fmtN(v) } }, y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 11 } } } } } });
   }
 
   function secCompetitors(A, R) {
@@ -304,7 +316,7 @@
   function drawCompetitors(container, R) {
     const top = R.competition.brands.slice(0, 10); if (!top.length) return;
     const [s1, s2] = series();
-    mkChart(container, "ch-brands", { type: "bar", data: { labels: top.map((b) => b.brand), datasets: [{ label: R.competition.source === "xray" ? "Доля выручки" : "Click share", data: top.map((b) => b.share * 100), backgroundColor: top.map((b, i) => (i === 0 && R.competition.dominant ? s2 : s1)), borderRadius: 4, barPercentage: .7 }] },
+    mkChart(container, "ch-brands", { type: "bar", desc: "Что это: доля выручки ниши (по Xray) или доля кликов (по POE) у каждого бренда, в %. Выделенный столбец — доминирующий бренд, если его доля выше порога.", data: { labels: top.map((b) => b.brand), datasets: [{ label: R.competition.source === "xray" ? "Доля выручки" : "Click share", data: top.map((b) => b.share * 100), backgroundColor: top.map((b, i) => (i === 0 && R.competition.dominant ? s2 : s1)), borderRadius: 4, barPercentage: .7 }] },
       options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => fmtN(c.parsed.x, 1) + " %" } } }, scales: { x: { grid, ticks: { callback: (v) => v + " %" } }, y: { grid: { display: false } } } } });
   }
 
@@ -332,7 +344,7 @@
   }
   function drawPricing(container, R) {
     const ps = R.priceSegments; if (!ps) return; const [s1, s2] = series();
-    mkChart(container, "ch-price", { type: "bar", data: { labels: ps.segments.map((s) => `${s.name} (${fmtMoney(s.min)}–${fmtMoney(s.max)})`), datasets: [
+    mkChart(container, "ch-price", { type: "bar", desc: "Что это: ценовые сегменты ниши — доля товаров и доля выручки (или кликов) в каждом коридоре цен, в %. Доля выручки выше доли товаров — сегмент недообслужен.", data: { labels: ps.segments.map((s) => `${s.name} (${fmtMoney(s.min)}–${fmtMoney(s.max)})`), datasets: [
       { label: "Доля товаров", data: ps.segments.map((s) => s.itemsShare * 100), backgroundColor: s1, borderRadius: 4 },
       { label: ps.weightLabel === "revenue" ? "Доля выручки" : "Доля кликов", data: ps.segments.map((s) => s.weightShare * 100), backgroundColor: s2, borderRadius: 4 }] },
       options: { plugins: { tooltip: { callbacks: { label: (c) => c.dataset.label + ": " + fmtN(c.parsed.y, 1) + " %" } } }, scales: { x: { grid: { display: false } }, y: { grid, ticks: { callback: (v) => v + " %" } } } } });
@@ -350,11 +362,11 @@
   function drawTrend(container, A) {
     const tr = A.aggregates?.poe?.trends; if (!tr?.length) return; const [s1, s2, s3] = series();
     const labels = tr.map((t) => t.date.slice(2));
-    const line = (id, data, color, fmt) => mkChart(container, id, { type: "line", data: { labels, datasets: [{ data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, tension: .25 }] },
+    const line = (id, data, color, fmt, desc) => mkChart(container, id, { type: "line", desc, data: { labels, datasets: [{ data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, tension: .25 }] },
       options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => fmt(c.parsed.y) } } }, scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { grid, ticks: { callback: fmt } } } } });
-    line("ch-sv", tr.map((t) => t.sv), s1, (v) => fmtN(v));
-    line("ch-top5", tr.map((t) => (isNum(t.top5Brand) ? t.top5Brand * 100 : null)), s2, (v) => fmtN(v, 0) + " %");
-    line("ch-pr", tr.map((t) => t.price), s3, (v) => fmtMoney(v, 0));
+    line("ch-sv", tr.map((t) => t.sv), s1, (v) => fmtN(v), "Что это: поисковый объём ниши по неделям (POE) — запросов в неделю. Просадки показывают сезонность.");
+    line("ch-top5", tr.map((t) => (isNum(t.top5Brand) ? t.top5Brand * 100 : null)), s2, (v) => fmtN(v, 0) + " %", "Что это: доля кликов топ-5 брендов по неделям (POE), в %. Рост — ниша концентрируется у лидеров.");
+    line("ch-pr", tr.map((t) => t.price), s3, (v) => fmtMoney(v, 0), "Что это: средняя цена товаров ниши по неделям (POE), в $.");
   }
 
   function secStructure(A, R) {
@@ -381,7 +393,7 @@
     const neg = p.negative.slice(0, 8), pos = p.positive.slice(0, 8);
     const labels = [...new Set([...neg.map((t) => t.topic), ...pos.map((t) => t.topic)])];
     const nm = Object.fromEntries(neg.map((t) => [t.topic, t.pct])), pm = Object.fromEntries(pos.map((t) => [t.topic, t.pct]));
-    mkChart(container, "ch-rev", { type: "bar", data: { labels, datasets: [
+    mkChart(container, "ch-rev", { type: "bar", desc: "Что это: темы отзывов ниши по POE — доля упоминаний темы среди негативных (влево) и позитивных (вправо) отзывов, в %.", data: { labels, datasets: [
       { label: "Негатив, % упоминаний", data: labels.map((l) => -(nm[l] || 0)), backgroundColor: cssVar("--neg"), borderRadius: 4, stack: "s" },
       { label: "Позитив, % упоминаний", data: labels.map((l) => pm[l] || 0), backgroundColor: cssVar("--pos"), borderRadius: 4, stack: "s" }] },
       options: { indexAxis: "y", plugins: { tooltip: { callbacks: { label: (c) => c.dataset.label + ": " + fmtN(Math.abs(c.parsed.x), 1) + " %" } } }, scales: { x: { grid, stacked: true, ticks: { callback: (v) => Math.abs(v) + " %" } }, y: { stacked: true, grid: { display: false }, ticks: { autoSkip: false } } } } });
@@ -445,7 +457,7 @@
   }
   function drawCashflow(container, R) {
     const c = R.cashflow; if (!c || c.pending) return; const [s1, s2] = series();
-    mkChart(container, "ch-cash", { type: "bar", data: { labels: c.rows.map((r) => "мес " + r.month), datasets: [
+    mkChart(container, "ch-cash", { type: "bar", desc: "Что это: деньги по месяцам сценария запуска — оплата партий, выплаты Amazon, реклама и накопленный итог, в $. Самая низкая точка итога — пик вложений.", data: { labels: c.rows.map((r) => "мес " + r.month), datasets: [
       { type: "line", label: "Итог нарастающим", data: c.rows.map((r) => r.cum), borderColor: s2, backgroundColor: s2, borderWidth: 2, pointRadius: 2, tension: .2 },
       { type: "bar", label: "За месяц", data: c.rows.map((r) => r.net), backgroundColor: s1, borderRadius: 4, barPercentage: .7 }] },
       options: { plugins: { tooltip: { callbacks: { label: tooltipMoney(0) } } }, scales: { x: { grid: { display: false } }, y: { grid, ticks: { callback: (v) => fmtMoney(v) } } } } });
@@ -506,8 +518,8 @@
   }
   function drawScorecard(container, R) {
     const sc = R.scorecard; const keys = Object.keys(sc.axes); const s1 = series()[0];
-    mkChart(container, "ch-radar", { type: "radar", data: { labels: keys.map(axisName), datasets: [{ label: "Балл", data: keys.map((k) => sc.axes[k].score ?? 0), borderColor: s1, backgroundColor: s1 + "33", borderWidth: 2, pointRadius: 4, pointBackgroundColor: s1 }] },
-      options: { plugins: { legend: { display: false } }, scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, backdropColor: "transparent" }, grid, angleLines: grid, pointLabels: { color: cssVar("--text-2") } } } } });
+    mkChart(container, "ch-radar", { type: "radar", desc: "Что это: scorecard — балл 0–10 по пяти осям (рынок, конкуренция, экономика, бренд, операционный риск). Чем шире фигура, тем сильнее ниша.", data: { labels: keys.map(axisName), datasets: [{ label: "Балл", data: keys.map((k) => sc.axes[k].score ?? 0), borderColor: s1, backgroundColor: s1 + "33", borderWidth: 2, pointRadius: 4, pointBackgroundColor: s1 }] },
+      options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => "Балл: " + fmtN(c.parsed.r, 1) + " из 10" } } }, scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, backdropColor: "transparent" }, grid, angleLines: grid, pointLabels: { color: cssVar("--text-2") } } } } });
   }
 
   function secReconciliation(A, R) {
@@ -609,7 +621,7 @@
     const st = R.config; if (!st) return; const o = container.__opts || {}; const view = o.configView === "band" && st.band ? "band" : "whole"; const pal = series();
     for (const f of st[view].fields) {
       const rows = pieRows(f); if (!rows.length) continue;
-      mkChart(container, "ch-cfg-" + f.id, { type: "doughnut", data: { labels: rows.map((v) => v.label), datasets: [{ data: rows.map((v) => Math.round(v.share * 1000) / 10), backgroundColor: rows.map((v, i) => (v.noData ? cssVar("--na-bg") : v.other ? cssVar("--muted") : pal[i % pal.length])), borderWidth: 2, borderColor: cssVar("--surface") || "#fff" }] },
+      mkChart(container, "ch-cfg-" + f.id, { type: "doughnut", desc: `Что это: доля выручки ниши по значениям поля «${f.name}» — вес каждого листинга равен его выручке по Xray. Сектор «нет данных» — листинги, где значение в тексте не найдено; сумма секторов 100 %.`, data: { labels: rows.map((v) => v.label), datasets: [{ data: rows.map((v) => Math.round(v.share * 1000) / 10), backgroundColor: rows.map((v, i) => (v.noData ? cssVar("--na-bg") : v.other ? cssVar("--muted") : pal[i % pal.length])), borderWidth: 2, borderColor: cssVar("--surface") || "#fff" }] },
         options: { cutout: "55%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtN(c.parsed, 1)} % выручки · ${fmtN(rows[c.dataIndex].count)} лист.` } } } } });
     }
     // переключатель «вся ниша / диапазон» и раскрытие таблицы работают и в автономном HTML: состояние живёт на контейнере, секция перерисовывается
@@ -981,6 +993,36 @@
     doc.__fbaTipsHide = () => { if (cur && !doc.contains(cur)) hide(); };
   }
 
+  // ---------- две вкладки дашборда: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) ----------
+  // Живут внутри контейнера, поэтому есть и в приложении, и в публичной ссылке, и в автономном HTML. Состояние — container.__opts.stage.
+  const STAGE2 = new Set(["config", "tz"]);
+  const hasStage2 = (A) => Boolean(A.aggregates?.xray?.asins?.length);
+  function stageState(A) { const C = A.config || {}; return !hasStage2(A) ? ["na", "нужен Xray"] : C.tz ? ["ok", "ТЗ готово"] : C.table ? ["ok", "извлечено"] : C.schema ? ["warn", "схема есть"] : ["na", "не начат"]; }
+  const stageOf = (A, o) => (hasStage2(A) && o.stage === 2 ? 2 : 1);
+  function stageTabsHtml(A, o) {
+    if (o.stageTabs === false || !hasStage2(A)) return "";
+    const n = stageOf(A, o); const [cls, text] = stageState(A);
+    const tab = (k, label) => `<a href="#" role="tab" data-stage="${k}" class="${n === k ? "active" : ""}" aria-selected="${n === k}">${label}</a>`;
+    return `<nav class="stagetabs noprint" data-stagetabs role="tablist" aria-label="Этапы анализа">${tab(1, "Этап 1 · оценка ниши")}${tab(2, `Этап 2 · конфигурация продукта и ТЗ <span class="chip ${cls}">${esc(text)}</span>`)}</nav>`;
+  }
+  function refreshStageTabs(container, A) {
+    const o = container.__opts || {}; container.dataset.stage = String(stageOf(A, o));
+    const nav = container.querySelector("[data-stagetabs]"); const html = stageTabsHtml(A, o);
+    if (nav && html) nav.outerHTML = html; else if (nav) nav.remove(); else if (html) container.insertAdjacentHTML("afterbegin", html);
+  }
+  /** Переключить вкладку: графики, нарисованные в скрытой вкладке, имеют нулевой размер — секции показанного этапа перерисовываются. */
+  function setStage(container, A, n, { scroll = false } = {}) {
+    const R = A?.results; if (!R) return; const o = (container.__opts = { ...(container.__opts || {}), stage: n === 2 ? 2 : 1 });
+    const prev = container.dataset.stage; refreshStageTabs(container, A); const cur = container.dataset.stage;
+    if (cur !== prev) for (const [id] of SECTIONS) if (cur === "2" ? STAGE2.has(id) || id === "hero" : !STAGE2.has(id)) fill(container, id, A, R, o);
+    if (typeof o.onStage === "function") o.onStage(Number(cur));
+    if (scroll && typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function bindStageTabs(container) {
+    if (container.__stageBound) return; container.__stageBound = true;
+    container.addEventListener("click", (e) => { const a = e.target.closest("[data-stagetabs] [data-stage]"); if (!a || !container.contains(a)) return; e.preventDefault(); setStage(container, container.__A, Number(a.dataset.stage), { scroll: true }); });
+  }
+
   const SECTIONS = [
     ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget], ["cashflow", secCashflow, drawCashflow],
     ["traffic", secTraffic, drawTraffic], ["entry", secEntry], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
@@ -992,9 +1034,10 @@
   function render(container, A, opts = {}) {
     chartDefaults(); initTips(); container.__opts = { ...(container.__opts || {}), ...opts };
     const R = A.results; if (!R) { container.innerHTML = '<div class="panel section empty">Нет результатов — загрузите файлы или введите данные.</div>'; return; }
-    container.classList.add("dash");
-    container.innerHTML = SECTIONS.map(([id]) => `<section class="panel section" data-section="${id}" id="sec-${id}"></section>`).join("");
+    container.classList.add("dash"); container.__A = A; container.dataset.stage = String(stageOf(A, container.__opts));
+    container.innerHTML = stageTabsHtml(A, container.__opts) + SECTIONS.map(([id]) => `<section class="panel section" data-section="${id}" id="sec-${id}"></section>`).join("");
     for (const [id] of SECTIONS) fill(container, id, A, R, opts);
+    bindStageTabs(container);
   }
   function fill(container, id, A, R, opts) {
     const def = SECTIONS.find((s) => s[0] === id); if (!def) return;
@@ -1008,10 +1051,11 @@
   }
   function update(container, A, opts = {}, ids = ECON_DEPENDENT) {
     if (!container.querySelector("[data-section]")) return render(container, A, opts);
-    const R = A.results; if (!R) return; container.__opts = { ...(container.__opts || {}), ...opts }; opts = container.__opts;
+    const R = A.results; if (!R) return; container.__opts = { ...(container.__opts || {}), ...opts }; opts = container.__opts; container.__A = A;
     for (const id of ids) fill(container, id, A, R, opts);
+    refreshStageTabs(container, A);
   }
   function destroy(container) { for (const c of Object.values(container.__charts || {})) { try { c.destroy(); } catch {} } container.__charts = {}; }
 
-  window.FBARender = { render, update, destroy, fill, annotate, annotateInputs, initTips, tips: { TIPS, KEY_TIPS, INPUT_TIPS, SIDE_TIPS, used: usedTips }, ECON_DEPENDENT, fmt: { fmtN, fmtMoney, fmtK, fmtPct, fmtDate }, VLABEL };
+  window.FBARender = { render, update, destroy, setStage, fill, annotate, annotateInputs, initTips, tips: { TIPS, KEY_TIPS, INPUT_TIPS, SIDE_TIPS, used: usedTips }, ECON_DEPENDENT, fmt: { fmtN, fmtMoney, fmtK, fmtPct, fmtDate }, VLABEL };
 })();

@@ -75,3 +75,32 @@ test("снимок ссылки рендерится без ТЗ; секция �
   const a = withConfig(entryFixture()); const snap = buildSnapshot(a, { mode: "full" }); const el = draw(snap.analysis, { static: true, hidden: snap.hidden });
   assert.equal(el.querySelector("#sec-config").classList.contains("hidden"), false); assert.equal(el.querySelector("#sec-tz").classList.contains("hidden"), true);
 });
+
+test("подсказки графиков: у каждого графика в подвале подсказки Chart.js есть описание «что это», значения подписаны", () => {
+  const a = withConfig(entryFixture()); const el = draw(a); const charts = el.__w.__charts;
+  assert.ok(charts.length >= 8, "графиков: " + charts.length);
+  for (const c of charts) {
+    const cb = c.cfg.options?.plugins?.tooltip?.callbacks; assert.ok(cb?.footer, `${c.cfg.type}: нет подвала подсказки`);
+    const lines = cb.footer([]); assert.ok(Array.isArray(lines) && lines.join(" ").startsWith("Что это:"), `${c.cfg.type}: ${JSON.stringify(lines).slice(0, 80)}`);
+    assert.ok(lines.every((l) => l.length <= 70), "строки подвала переносятся");
+    assert.ok(cb.label, `${c.cfg.type}: нет подписи значения`);
+    if (c.cfg.type === "line" || c.cfg.type === "bar") assert.ok(c.cfg.options.interaction?.mode === "index" && c.cfg.options.interaction?.intersect === false, "подсказка по всей колонке, не только по фигуре");
+    assert.equal(c.cfg.desc, undefined, "desc не уходит в Chart.js");
+  }
+  const pie = charts.find((c) => c.cfg.type === "doughnut"); assert.match(pie.cfg.options.plugins.tooltip.callbacks.footer([]).join(" "), /доля выручки ниши по значениям поля/);
+  assert.match(pie.cfg.options.plugins.tooltip.callbacks.label({ label: "Steel", parsed: 61.5, dataIndex: 0 }), /Steel: 61,5 % выручки · \d+ лист\./);
+});
+
+test("вкладки «Этап 1 / Этап 2» внутри дашборда: есть в приложении, в снимке ссылки и без app.js; без Xray вкладок нет; переключение перерисовывает секции", () => {
+  const a = withConfig(entryFixture()); const el = draw(a, { stage: 1 });
+  const tabs = el.querySelectorAll("[data-stagetabs] [data-stage]"); assert.equal(tabs.length, 2); assert.equal(el.dataset.stage, "1"); assert.equal(tabs[0].classList.contains("active"), true);
+  assert.match(tabs[1].textContent, /ТЗ готово/); assert.equal(el.querySelectorAll("[data-stagetabs] button").length, 0, "вкладки — не кнопки: публичная страница остаётся без элементов управления");
+  let seen = null; el.__w.FBARender.setStage(el, a, 2); el.__w.FBARender.update(el, a, { onStage: (n) => { seen = n; } }, []);
+  assert.equal(el.dataset.stage, "2"); assert.equal(el.querySelector('[data-stagetabs] [data-stage="2"]').classList.contains("active"), true);
+  const before = el.__w.__charts.length; el.querySelector('[data-stagetabs] [data-stage="1"]').dispatchEvent(new el.__w.MouseEvent("click", { bubbles: true, cancelable: true }));
+  assert.equal(el.dataset.stage, "1"); assert.equal(seen, 1, "приложению сообщён выбор"); assert.ok(el.__w.__charts.length > before, "секции этапа 1 перерисованы (графики созданы заново)");
+  const snap = buildSnapshot(a, { mode: "full" }); const sh = draw(snap.analysis, { static: true, hidden: snap.hidden, stage: 2 });
+  assert.equal(sh.querySelectorAll("[data-stagetabs] [data-stage]").length, 2, "в публичной ссылке вкладки есть"); assert.equal(sh.dataset.stage, "2"); assert.match(sh.querySelector('[data-stagetabs] [data-stage="2"]').textContent, /извлечено/, "ТЗ в снимке нет — бейдж «извлечено»");
+  assert.equal(draw(entryFixture({ withXray: false })).querySelector("[data-stagetabs]"), null, "без Xray этапа 2 нет — вкладок нет");
+  assert.equal(draw(entryFixture({ withXray: false }), { stage: 2 }).dataset.stage, "1");
+});

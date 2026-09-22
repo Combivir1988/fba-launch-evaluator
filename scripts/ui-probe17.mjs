@@ -23,12 +23,12 @@ try {
   ok(await page.evaluate(() => document.querySelector('#sec-config [data-action="config-extract"]').disabled), "без схемы извлечение недоступно");
 
   // точка входа: раздел 9 панели и ссылка в шапке
-  ok(/не начат/.test(await txt(page, "#stage2-badge")), "бейдж вкладки «Этап 2»: не начат");
+  ok(/не начат/.test(await txt(page, '#dashboard [data-stagetabs] [data-stage="2"] .chip')), "бейдж вкладки «Этап 2»: не начат");
   ok(/Этап 2 · конфигурация продукта и ТЗ: не начат/.test(await txt(page, "#sec-hero [data-goto]")), "в шапке дашборда есть ссылка на этап 2");
   ok(await page.evaluate(() => document.querySelector("#dashboard").dataset.stage === "1" && getComputedStyle(document.querySelector("#sec-config")).display === "none" && getComputedStyle(document.querySelector("#sec-economics")).display !== "none"), "вкладка «Этап 1»: секции этапа 2 скрыты, экономика видна");
-  await click(page, '#stage-tabs [data-stage="2"]'); await page.waitForTimeout(300);
+  await click(page, '#dashboard [data-stagetabs] [data-stage="2"]'); await page.waitForTimeout(300);
   ok(await page.evaluate(() => document.querySelector("#dashboard").dataset.stage === "2" && getComputedStyle(document.querySelector("#sec-config")).display !== "none" && getComputedStyle(document.querySelector("#sec-economics")).display === "none" && getComputedStyle(document.querySelector("#sec-hero")).display !== "none"), "вкладка «Этап 2»: видны шапка и секции этапа 2, остальное скрыто");
-  await click(page, '#stage-tabs [data-stage="1"]'); await page.waitForTimeout(200);
+  await click(page, '#dashboard [data-stagetabs] [data-stage="1"]'); await page.waitForTimeout(200);
   await click(page, "#sec-hero [data-goto]");
   const scrolled = await page.waitForFunction(() => { const r = document.querySelector("#sec-config").getBoundingClientRect(); return r.top >= -5 && r.top < window.innerHeight - 100 && document.querySelector("#dashboard").dataset.stage === "2"; }, null, { timeout: 4000 }).then(() => true).catch(() => false);
   ok(scrolled, "ссылка в шапке открывает вкладку «Этап 2», секция в поле зрения");
@@ -75,7 +75,7 @@ try {
   await page.waitForFunction((c) => /✎/.test(document.querySelector(`#sec-config td[data-cell="${c}"]`)?.textContent || ""), cellSel, { timeout: 5000 });
   ok(true, "клетка исправлена вручную (пометка ✎)"); ok(await page.evaluate(() => document.querySelector("#sec-config details.cfgtable").open), "таблица осталась раскрытой после перерисовки");
 
-  ok(/извлечено/.test(await txt(page, "#stage2-badge")), "бейдж вкладки: «извлечено»");
+  ok(/извлечено/.test(await txt(page, '#dashboard [data-stagetabs] [data-stage="2"] .chip')), "бейдж вкладки: «извлечено»");
   // шаг 3 — ТЗ
   ok(/не составлено/.test(await txt(page, "#sec-tz h2")), "секция ТЗ видна после извлечения");
   await click(page, '#sec-tz [data-action="config-tz"]');
@@ -100,7 +100,10 @@ try {
   const guest = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const g = await guest.newPage(); g.on("pageerror", (e) => logs.push("guest pageerror: " + e.message));
   const token = sh.share.token || String(sh.share.url || "").split("/s/")[1]; await g.goto(`${base}/s/${token}`, { waitUntil: "networkidle" });
   await g.waitForFunction(() => document.querySelector("#sec-config .piegrid"), null, { timeout: 20000 });
-  ok(await g.evaluate(() => document.querySelector("#sec-tz").classList.contains("hidden") && document.querySelectorAll("#sec-config button, #sec-config td[data-cell]").length === 0), "в публичной ссылке: диаграммы и таблица есть, ТЗ и кнопок нет");
+  ok(await g.evaluate(() => (document.querySelector("#sec-tz").classList.contains("hidden") && document.querySelectorAll("#sec-config button, #sec-config td[data-cell]").length === 0)), "в публичной ссылке: диаграммы и таблица есть, ТЗ и кнопок нет");
+  ok(await g.evaluate(() => document.querySelectorAll("#dashboard [data-stagetabs] [data-stage]").length === 2 && document.querySelector("#dashboard").dataset.stage === "1" && getComputedStyle(document.querySelector("#sec-config")).display === "none"), "в публичной ссылке две вкладки, открыт этап 1, секции этапа 2 скрыты");
+  await g.evaluate(() => document.querySelector('#dashboard [data-stagetabs] [data-stage="2"]').click()); await g.waitForTimeout(400);
+  ok(await g.evaluate(() => document.querySelector("#dashboard").dataset.stage === "2" && getComputedStyle(document.querySelector("#sec-config")).display !== "none" && getComputedStyle(document.querySelector("#sec-economics")).display === "none" && document.querySelector("#sec-config canvas").width > 0), "гость переключился на этап 2: диаграммы видны и отрисованы, экономика скрыта");
   const body = await (await guest.request.get(`${base}/api/public/shares/${token}`)).text();
   ok(!/Правленое требование/.test(body) && !/"listings"/.test(body), "в данных ссылки нет ТЗ и кэша страниц");
   ok(logs.length === 0, "ошибок в консоли нет" + (logs.length ? ": " + logs.slice(0, 3).join(" | ") : ""));
