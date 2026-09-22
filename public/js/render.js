@@ -200,7 +200,24 @@
     mkChart(container, "ch-gate2", { type: "line", data: { labels: xs.map((c) => (Number.isInteger(+(c * 100).toFixed(6)) ? Math.round(c * 100) : (c * 100).toFixed(1).replace(".", ",")) + " %"), datasets: [
       { label: "Net after ads, $/юнит", data: ys, borderColor: s1, backgroundColor: s1, borderWidth: 2, pointRadius: 0, tension: .2 },
       { label: "Текущий CVR", data: xs.map((c) => (cur !== null && Math.abs(c - cur) < 1e-9 ? g2.atCvr.net : null)), borderColor: s2, backgroundColor: s2, pointRadius: 6, pointHoverRadius: 8, showLine: false },
-    ] }, options: { plugins: { legend: { display: true }, tooltip: { callbacks: { label: tooltipMoney(2) } } }, scales: { x: { grid, title: { display: true, text: "CVR" } }, y: { grid, ticks: { callback: (v) => fmtMoney(v) } } } } });
+    ] }, options: { plugins: { legend: { display: true }, tooltip: { callbacks: { label: tooltipMoney(2) } } }, scales: { x: { grid, title: { display: true, text: "CVR" } }, y: { grid, ticks: { callback: (v) => fmtMoney(v) } } } },
+      plugins: [breakEvenLine(xs, R.economics.breakEvenCvr)] });
+  }
+  /** Пунктир безубыточной конверсии (вертикаль между отметками оси) и нулевой линии прибыли. */
+  function breakEvenLine(xs, be) {
+    return { id: "breakEven", afterDatasetsDraw(chart) {
+      const { ctx, chartArea: a, scales: { x, y } } = chart; if (!a) return;
+      ctx.save(); ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+      const y0 = y.getPixelForValue(0); if (y0 >= a.top && y0 <= a.bottom) { ctx.strokeStyle = cssVar("--muted"); ctx.beginPath(); ctx.moveTo(a.left, y0); ctx.lineTo(a.right, y0); ctx.stroke(); }
+      if (isNum(be) && be >= xs[0] && be <= xs[xs.length - 1]) {
+        let i = xs.findIndex((c) => c >= be); if (i < 0) i = xs.length - 1;
+        const px = i === 0 || Math.abs(xs[i] - be) < 1e-9 ? x.getPixelForValue(i) : x.getPixelForValue(i - 1) + (x.getPixelForValue(i) - x.getPixelForValue(i - 1)) * ((be - xs[i - 1]) / (xs[i] - xs[i - 1]));
+        ctx.strokeStyle = cssVar("--fail"); ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle = cssVar("--fail"); ctx.font = "11px " + (cssVar("--font") || "sans-serif"); ctx.textBaseline = "top";
+        const label = "безубыточный CVR " + fmtPct(be, 1); const w = ctx.measureText(label).width; ctx.textAlign = px + 6 + w > a.right ? "right" : "left"; ctx.fillText(label, px + (ctx.textAlign === "right" ? -6 : 6), a.top + 4);
+      }
+      ctx.restore();
+    } };
   }
 
   function secBudget(A, R) {
@@ -571,7 +588,7 @@
     "ROI без рекламы": "Прибыль с единицы ДО рекламы, делённая на полную себестоимость (товар + доставка). Норма — от 150 %; выше 200 % — повод перепроверить данные. Не путать с 2j — ROI после рекламы за 90 дней, он всегда ниже.",
     "Gate 2 — стресс-тест рекламы": "Остаётся ли прибыль после рекламы. Реклама на одну продажу = CPC ÷ конверсия × доля продаж через рекламу. Тест пройден, если прибыль положительна при конверсии 12 % и ниже.",
     "Маржа без / с рекламой": "Две разные цифры: маржа из калькулятора Amazon и маржа после реальных расходов на рекламу. Решения принимают по второй.",
-    "Net after ads по CVR": "Прибыль с одной штуки после рекламы при разной конверсии. Точка — ваша текущая конверсия.",
+    "Net after ads по CVR": "Прибыль с одной штуки после рекламы при разной конверсии. Точка — ваша текущая конверсия; красный пунктир — безубыточная конверсия, левее неё реклама съедает всю прибыль; серый пунктир — ноль.",
     "Партия": "Сколько штук и денег нужно на одну партию: продажи в день × срок поставки (производство + доставка + приёмка Amazon).",
     "Нужно всего": "Две партии плюс резерв на рекламу — правило методики, чтобы не остаться без товара после запуска.",
     "Пик вложений": "Максимальная сумма, которая одновременно будет вложена в товар и рекламу до того, как продажи начнут её возвращать. С ней сравнивается ваш бюджет.",

@@ -113,3 +113,11 @@ test("таблица Gate 2: сетка 8/10/12/15 % плюс строка «в�
   const r10 = rows(0.10); assert.equal(r10.length, 4); assert.match(r10[1], /^10 % ваш/);
   const r135 = rows(0.135); assert.equal(r135.length, 5); assert.match(r135[3], /^13,5 % ваш/); assert.match(r135[4], /^15 %/);
 });
+
+test("график Gate 2: подключён плагин пунктира безубыточного CVR", () => {
+  const a = entryFixture(); const el = draw(a); const chart = el.__w.__charts.find((c) => c.data.datasets.some((d) => d.label === "Текущий CVR"));
+  assert.ok(chart.plugins && chart.plugins.some((p) => p.id === "breakEven")); assert.ok(a.results.economics.breakEvenCvr > 0);
+  const calls = []; const px = (i) => 100 + i * 10; const fake = { ctx: { save() {}, restore() {}, setLineDash() {}, beginPath() {}, moveTo() {}, lineTo(x) { calls.push(x); }, stroke() {}, fillText(t) { calls.push(t); }, measureText: () => ({ width: 50 }) }, chartArea: { left: 100, right: 400, top: 0, bottom: 200 }, scales: { x: { getPixelForValue: px }, y: { getPixelForValue: () => 120 } } };
+  chart.plugins.find((p) => p.id === "breakEven").afterDatasetsDraw(fake);
+  assert.ok(calls.some((c) => typeof c === "string" && /безубыточный CVR \d+,\d %/.test(c)), "подпись линии нарисована: " + calls.filter((c) => typeof c === "string"));
+});
