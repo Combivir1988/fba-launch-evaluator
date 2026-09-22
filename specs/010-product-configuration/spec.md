@@ -1,6 +1,6 @@
 # Feature Specification: Этап 2 — конфигурация продукта и ТЗ производителю
 
-**Feature Branch**: `010-product-configuration` · **Created**: 2026-09-22 · **Status**: Draft, старт разрешён владельцем 2026-09-22 («починай»); проба Scrapfly выполнена 2026-09-22, разработка — следующая сессия
+**Feature Branch**: `010-product-configuration` · **Created**: 2026-09-22 · **Status**: Implemented — на проде 2026-09-22 (см. [tasks.md](tasks.md) → «Выпуск»); проба Scrapfly выполнена 2026-09-22
 **Образец**: `C:\Users\User\Downloads\boxing machine.xlsx` — 61 ASIN × 23 характеристики, вручную извлечённые из листингов; 15 секторных диаграмм «характеристика → доля выручки»; листы анализа отзывов, патентов/FDA, проработки поставщиков.
 
 ## Проблема
