@@ -25,6 +25,7 @@ export function configFromEnv(env = process.env) {
   return {
     provider, openrouterKey, openrouterModel, openrouterModels,
     googleKey: env.GOOGLE_AI_STUDIO_KEY || "", // модели с префиксом aistudio/ идут напрямую в Google AI Studio
+    scrapflyKey: env.SCRAPFLY_API_KEY || "", // этап 2 (spec 010): загрузка страниц Amazon; только сервер
     openrouterReasoning: env.OPENROUTER_REASONING === "1",
     publicUrl: env.PUBLIC_URL || (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : ""),
     schema: VERDICT_SCHEMA,

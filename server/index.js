@@ -13,6 +13,8 @@ import { createAnalyses } from "./analyses.js";
 import { createShares } from "./shares.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
+import { schemaStream, extractStream, tzStream } from "./config-jobs.js";
+import { buildTzDocx, tzFileName } from "./tz-docx.js";
 import { startJob, getJob, subscribe, cancelJob, runningCount } from "./jobs.js";
 import { log } from "./log.js";
 
@@ -46,7 +48,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   });
 
   app.get("/api/health", (req, res) => res.json({ ok: true, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model,
-    models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()), running: runningCount(), storage: db.kind, googleLogin: google.enabled })); // БД не трогаем — Neon должен спать при простое
+    models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()), running: runningCount(), storage: db.kind, googleLogin: google.enabled, scrapfly: Boolean(cfg.mock || cfg.scrapflyKey) })); // БД не трогаем — Neon должен спать при простое
 
   // Лимиты тела — по роутам (contracts/api.md): 100 KB по умолчанию, 1 MB для AI-задач.
   const jsonSmall = express.json({ limit: "100kb" });
@@ -208,6 +210,23 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
     const job = startJob("patents", (signal) => patentScanStream(body, cfg, { signal }), { niche: String(body.niche || body.coreKeyword || "").slice(0, 60), userId: req.user.id, userName: req.user.name });
     log("info", "patent scan job start", { id: job.id, user: req.user.login, niche: job.meta.niche });
     res.status(202).json({ jobId: job.id });
+  });
+  // Этап 2 (spec 010): схема полей → извлечение характеристик → ТЗ. Страницы грузит сервер через Scrapfly (ключ только здесь).
+  const scrapflyReady = (req, res, next) => (cfg.mock || cfg.scrapflyKey ? next() : res.status(400).json({ error: "bad_request", message: "Scrapfly не настроен: задайте SCRAPFLY_API_KEY на сервере" }));
+  const configJob = (type, stream, check) => (req, res) => {
+    const body = req.body || {}; const bad = check(body); if (bad) return res.status(400).json({ error: "bad_request", message: bad });
+    const job = startJob(type, (signal) => stream(body, cfg, { signal }), { niche: String(body.niche || body.coreKeyword || "").slice(0, 60), userId: req.user.id, userName: req.user.name });
+    log("info", type + " job start", { id: job.id, user: req.user.login, niche: job.meta.niche, asins: Array.isArray(body.asins) ? body.asins.length : 0 });
+    res.status(202).json({ jobId: job.id });
+  };
+  app.post("/api/config/schema", authed, limiter, scrapflyReady, jsonBig, configJob("config_schema", schemaStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : null)));
+  app.post("/api/config/extract", authed, limiter, scrapflyReady, jsonBig, configJob("config_extract", extractStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : !b.schema?.fields?.length ? "schema обязательна" : null)));
+  app.post("/api/config/tz", authed, limiter, jsonMid, configJob("config_tz", tzStream, (b) => (!b.payload || typeof b.payload !== "object" ? "payload обязателен" : null)));
+  app.post("/api/tz/docx", authed, jsonMid, async (req, res) => {
+    const { tz, meta } = req.body || {};
+    if (!tz || !Array.isArray(tz.rows)) return res.status(400).json({ error: "bad_request", message: "tz.rows обязателен" });
+    const buf = await buildTzDocx(tz, { ...(meta || {}), preparedBy: meta?.preparedBy || req.user.name });
+    res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Content-Disposition": `attachment; filename="${tzFileName(meta || {})}"`, "Cache-Control": "no-store" }).send(buf);
   });
   // Состояние задачи (для восстановления после перезагрузки страницы)
   app.get("/api/jobs/:id", authed, (req, res) => {

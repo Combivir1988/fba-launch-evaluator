@@ -17,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
     "chart.js": "^4.5.1",
+    "docx": "^9.7.1",
     "express": "^5.2.1",
     "papaparse": "^5.7.0",
     "pg": "^8.23.0"
