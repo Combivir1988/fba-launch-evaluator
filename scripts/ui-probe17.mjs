@@ -22,8 +22,16 @@ try {
   const head0 = await txt(page, "#sec-config h2"); ok(/Конфигурация продукта — этап 2/.test(head0) && /\d+ ASIN/.test(head0), "секция этапа 2 видна после Xray: " + head0.trim());
   ok(await page.evaluate(() => document.querySelector('#sec-config [data-action="config-extract"]').disabled), "без схемы извлечение недоступно");
 
-  // шаг 1 — схема
-  await click(page, '#sec-config [data-action="config-schema"]');
+  // точка входа: раздел 9 панели и ссылка в шапке
+  ok(/не начат/.test(await txt(page, "#config-side-badge")) && /Начните с шага 1/.test(await txt(page, "#config-side-status")), "раздел 9 панели показывает состояние «не начат» и подсказку");
+  ok(/Этап 2 · конфигурация продукта и ТЗ: не начат/.test(await txt(page, "#sec-hero [data-goto]")), "в шапке дашборда есть ссылка на этап 2");
+  await click(page, "#side-config-go");
+  const scrolled = await page.waitForFunction(() => { const r = document.querySelector("#sec-config").getBoundingClientRect(); return r.top >= -5 && r.top < 200; }, null, { timeout: 4000 }).then(() => true).catch(() => false);
+  ok(scrolled, "«Показать секцию ↓» прокручивает к секции этапа 2" + (scrolled ? "" : " (top=" + (await page.evaluate(() => Math.round(document.querySelector("#sec-config").getBoundingClientRect().top))) + ")"));
+  ok(await page.evaluate(() => document.querySelector("#side-config-extract").disabled && !document.querySelector("#side-config-schema").disabled), "кнопки панели: шаг 1 доступен, шаг 2 — нет");
+
+  // шаг 1 — схема (кнопкой из панели)
+  await click(page, "#side-config-schema");
   await page.waitForFunction(() => /Схема полей \(\d+\)/.test(document.querySelector("#sec-config")?.textContent || ""), null, { timeout: 30000 });
   const nFields = await page.evaluate(() => document.querySelectorAll("#sec-config .chips .chip").length); ok(nFields >= 3, `схема предложена: ${nFields} полей`);
   await saved(page);
@@ -64,6 +72,7 @@ try {
   await page.waitForFunction((c) => /✎/.test(document.querySelector(`#sec-config td[data-cell="${c}"]`)?.textContent || ""), cellSel, { timeout: 5000 });
   ok(true, "клетка исправлена вручную (пометка ✎)"); ok(await page.evaluate(() => document.querySelector("#sec-config details.cfgtable").open), "таблица осталась раскрытой после перерисовки");
 
+  ok(/извлечено/.test(await txt(page, "#config-side-badge")) && !(await page.evaluate(() => document.querySelector("#side-config-tz").disabled)), "раздел 9: «извлечено», шаг 3 доступен");
   // шаг 3 — ТЗ
   ok(/не составлено/.test(await txt(page, "#sec-tz h2")), "секция ТЗ видна после извлечения");
   await click(page, '#sec-tz [data-action="config-tz"]');

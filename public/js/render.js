@@ -79,6 +79,12 @@
     const m = A.aggregates?.poe?.merged; if (!m) return "";
     return `<div class="notice info bandnote"><b>POE объединён из ${m.count} ниш:</b> ${m.niches.map((n) => `${esc(n.title)} — ${fmtPct(n.weight)}`).join(" · ")}. Товаров без дублей ${fmtN(m.asinsTotal)} (общих ${fmtN(m.overlapAsins)}), запросов ${fmtN(m.termsTotal)} (общих ${fmtN(m.overlapTerms)}). Доли кликов, конверсия клика и новички посчитаны по общему рынку; что сложено, а что взято приближённо — в секции «Вход в нишу» → «Особенности данных POE».</div>`;
   }
+  /** Ссылка на этап 2 в шапке: секция далеко внизу дашборда, без неё её не находят. */
+  function stage2Note(A, R, o) {
+    if (o.static || !A.aggregates?.xray?.asins?.length) return "";
+    const C = A.config || {}; const st = C.tz ? `ТЗ: ${C.tz.rows.length} требований` : C.table ? `извлечено ${Object.keys(C.table.rows).length} листингов, ТЗ не составлено` : C.schema ? `схема: ${C.schema.fields.length} полей, извлечение не запущено` : "не начат";
+    return `<div class="noprint" style="margin-top:.4rem"><a href="#sec-config" class="chip ${C.table ? "ok" : "na"}" data-goto="sec-config" title="Прокрутить к секции «Конфигурация продукта — этап 2»">Этап 2 · конфигурация продукта и ТЗ: ${esc(st)} ↓</a></div>`;
+  }
   function secHero(A, R, o) {
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;
     const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(k === "poe" && m.parts?.length > 1 ? m.parts.map((p) => p.nicheTitle || p.fileName).join(" + ") : m.fileName || "")}">${SRC_LABEL[k]}${k === "poe" && m.parts?.length > 1 ? ` · ${m.parts.length} ниш(и)` : ""} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
@@ -87,7 +93,7 @@
       <div><h1>${esc(A.niche || "Без названия")}</h1>
         <div class="meta">Ключ: <b>${esc(A.coreKeyword || "—")}</b> · ${esc(A.marketplace || "US")} · расчёт ${fmtDate(R.computedAt)} · методология ${esc(R.methodologyVersion || "")}</div>
         <div class="chips" style="margin-top:.4rem">${srcs || '<span class="chip na">файлы не загружены</span>'}</div>
-        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${mergedNote(A)}${bandNote(R, o)}</div>
+        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${mergedNote(A)}${bandNote(R, o)}${stage2Note(A, R, o)}</div>
       <div class="verdict ${esc(v)}"><div class="k muted">${ai ? "Вердикт AI" + (ai.adjustedByRules ? " (скорректирован правилами)" : "") : "Потолок по правилам"}</div>
         <div class="big">${esc(VLABEL[v])}</div>
         <div class="muted">Критерий 1: <b>${R.criterion1.okCount} из 8</b> · решающий: ${esc(ai?.decisiveGate || R.verdict.decisiveGate || "—")}</div>
@@ -905,6 +911,7 @@
     "#op-auto": "Считать операционный риск автоматически из галочек чеклиста.",
   };
   const SIDE_TIPS = {
+    "Этап 2 — конфигурация продукта и ТЗ": "Какой именно товар делать: Scrapfly читает листинги ниши, AI заполняет таблицу характеристик, доли считаются по выручке; итог — доминирующая конфигурация и ТЗ производителю. Кнопки шагов дублируют кнопки в секции внизу дашборда.",
     "Ниша": "Название анализа и главный поисковый запрос товара.",
     "Файлы": "Отчёты Helium 10 (Xray, Cerebro), JSON из POE и, если есть, SQP. Разбираются в браузере; на сервере хранится только результат разбора.",
     "Ключи кластера": "Какие запросы считать вашими. От выбора зависят Adj. SV и оценка трафика.",
