@@ -45,7 +45,9 @@ export const DEFAULT_THRESHOLDS = {
   entry: { minOverlap: 5, cohortMinAgeMonths: 2, cohortMaxAgeMonths: 24, minCohort: 3, inheritedReviewRate: 0.10, reachOkPct: 75, reachWarnPct: 90, reachOkProducts: 5, dateGapDays: 90, clickPriceGap: 0.15 },
   cashflow: { horizonMonths: 12, rampMonths: 6, reviewRate: 0.02, vineReviews: 30, newListingCvrFactor: 0.7 },
   borderline: { pct: 0.15 },
-  priceBand: { smallSample: 15, minSample: 5 }, // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
+  priceBand: { smallSample: 15, minSample: 5 },
+  // Этап 2 — конфигурация продукта (spec 010): область страниц, кэш, пачки AI, числовые поля как дискретные
+  config: { topForSchema: 15, maxAsins: 150, cacheDays: 30, batchSize: 6, numericDistinctMax: 12 }, // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
 };
 
 /** Глубокое слияние пользовательских порогов с дефолтами. */

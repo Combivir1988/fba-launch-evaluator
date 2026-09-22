@@ -29,7 +29,7 @@ export function newAnalysis(partial = {}) {
     id: newId(), schemaVersion: SCHEMA_VERSION, methodologyVersion: METHODOLOGY_VERSION,
     niche: "", coreKeyword: "", marketplace: "US", createdAt: now, updatedAt: now, status: "draft",
     sources: { xray: null, cerebro: null, poe: null, sqp: null },
-    inputs: defaultInputs(), thresholds: {}, aggregates: {}, results: null, ai: null, patents: null,
+    inputs: defaultInputs(), thresholds: {}, aggregates: {}, results: null, ai: null, patents: null, config: null,
     ...partial,
   };
 }
@@ -55,7 +55,7 @@ export function metaFromCore(core = {}) {
     verdict: core.ai?.verdict || core.results?.verdict?.ceiling || null,
     c1: num(core.results?.criterion1?.okCount), score: num(core.results?.scorecard?.total),
     sources: Object.entries(core.sources || {}).filter(([, v]) => v).map(([k]) => k),
-    aiDone: Boolean(core.ai), patentsDone: Boolean(core.patents),
+    aiDone: Boolean(core.ai), patentsDone: Boolean(core.patents), configDone: Boolean(core.config?.table),
   };
 }
 

@@ -15,6 +15,7 @@ import { entryFeasibility, clickWeightedPrice, poeDataNotes } from "./entry.js";
 import { cashflow } from "./cashflow.js";
 import { borderline } from "./borderline.js";
 import { regulatoryTriggers } from "./regulatory.js";
+import { configStats } from "./config-stats.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -73,6 +74,7 @@ export function compute(analysis) {
     regulatory: regulatoryTriggers({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, xray: whole.xray, poe: whole.poe, cerebro: whole.cerebro }),
     dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
   };
+  results.config = configStats(analysis.config, whole.xray, { band, th: th.config }); // этап 2 (spec 010): null, пока таблица характеристик не извлечена
   results.borderline = borderline(results, th);
   results.verdict = verdictCeiling(results);
   results.computedAt = new Date().toISOString();

@@ -791,7 +791,7 @@ async function openLastIfEmpty() {
 $("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
 
 // ---------- thresholds tab ----------
-const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет", traffic: "Трафик по ключам и Cerebro", poe: "POE / концентрация", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения" };
+const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет", traffic: "Трафик по ключам и Cerebro", poe: "POE / концентрация", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения", config: "Этап 2 — конфигурация продукта" };
 // Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
 const THR_LABELS = {
   "criterion1.passCount": ["Минимум зелёных подпунктов из 8", "шт (порог прохождения Критерия 1)"],
@@ -828,6 +828,8 @@ const THR_LABELS = {
   "cashflow.horizonMonths": ["Горизонт сценария по умолчанию", "месяцев продаж"], "cashflow.rampMonths": ["Разгон до цели по умолчанию", "мес"], "cashflow.reviewRate": ["Покупателей с отзывом по умолчанию", "доля (допущение)"],
   "cashflow.vineReviews": ["Отзывов по программе Vine по умолчанию", "шт"], "cashflow.newListingCvrFactor": ["Конверсия до планки отзывов — множитель", "доля от заданного CVR"],
   "borderline.pct": ["Пограничное значение — ближе к порогу чем", "доля"],
+  "config.topForSchema": ["Схема полей — листингов для AI", "шт (первые по выручке)"], "config.maxAsins": ["Извлечение — максимум страниц за запуск", "шт"], "config.cacheDays": ["Кэш страниц", "дней"],
+  "config.batchSize": ["Листингов на один вызов AI", "шт"], "config.numericDistinctMax": ["Числовое поле как дискретное — различных значений до", "шт (больше — интервалы)"],
   "checklist.designTestMin": ["Тест дизайна (PickFu) — минимум голосов", "%"], "checklist.lifecycleMonthsMin": ["Жизненный цикл, минимум", "мес"], "checklist.listingsHigh": ["Листингов в выдаче — высокая конкуренция от", "шт"],
 };
 function renderThresholds() {

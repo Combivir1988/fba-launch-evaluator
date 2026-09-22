@@ -111,6 +111,8 @@ export function buildSnapshot(analysis, { mode = "full", preparedBy = "", snapsh
   const a = clone(analysis);
   if (a.aggregates?.cerebro?.keywords) { a.aggregates.cerebro.keywordCount = a.aggregates.cerebro.keywords.length; delete a.aggregates.cerebro.keywords; } // до 4 MB, дашборду не нужны
   if (a.aggregates?.poeParts) delete a.aggregates.poeParts; // для просмотра хватает объединённого POE
+  if (a.aggregates?.listings) delete a.aggregates.listings; // кэш страниц этапа 2 диаграммам не нужен
+  if (a.config?.tz) { a.config = { ...a.config }; delete a.config.tz; } // ТЗ производителю в публичную ссылку не попадает (spec 010, FR-006)
   a.id = "share"; delete a.status;
   let redactions = 0; const hidden = [];
   if (mode === "no_economics") { redactions = redactEconomics(a, analysis); hidden.push("economics", "budget", "cashflow"); }
