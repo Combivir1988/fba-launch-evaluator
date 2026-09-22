@@ -96,3 +96,13 @@ test("Критерий 2 и «Деньги по месяцам» не споря
   const same = draw(entryFixture({ inputs: { startSalesMonthly: 300, rampMonths: 1 } })); assert.doesNotMatch(text(same, "economics"), /по сценарию разгона за первые/, "старт сразу с цели — расхождения нет, лишних пометок тоже");
   const p = buildAiPayload(a); assert.ok(p.cashflow.first90DaysByRampScenario.units > 0); assert.match(SYSTEM_PROMPT, /first90DaysByRampScenario/);
 });
+
+test("график Gate 2: ось доходит до текущего CVR, точка «Текущий CVR» стоит ровно на нём — и при 25 %, и при 13 %", () => {
+  for (const [cvr, label] of [[0.25, "25 %"], [0.13, "13 %"], [0.135, "13,5 %"]]) {
+    const a = entryFixture({ inputs: { cvr } }); const el = draw(a);
+    const chart = el.__w.__charts.find((c) => c.data.datasets.some((d) => d.label === "Текущий CVR"));
+    const labels = [...chart.data.labels], pts = [...chart.data.datasets[1].data]; const i = pts.findIndex((v) => v !== null);
+    assert.ok(i >= 0, `точка есть при ${label}`); assert.equal(labels[i], label); assert.ok(Math.abs(pts[i] - a.results.economics.gate2.atCvr.net) < 1e-9);
+    assert.ok(labels.includes("20 %") && labels[0] === "4 %", "базовый диапазон 4–20 % сохранён");
+  }
+});

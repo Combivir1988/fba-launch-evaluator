@@ -184,13 +184,16 @@
   }
   function drawEconomics(container, R) {
     const g2 = R.economics.gate2; if (!g2?.byCvr?.length) return;
-    const xs = []; for (let c = 0.04; c <= 0.2001; c += 0.01) xs.push(+c.toFixed(2));
+    // Ось CVR — от 4 % до 20 % или до текущего CVR, если он выше; точка текущего CVR стоит ровно на его значении (шаг оси — 1 %, при необходимости добавляется промежуточная отметка).
+    const cur = g2.atCvr ? Math.round(g2.atCvr.cvr * 1000) / 1000 : null; const hi = Math.max(0.20, cur ? Math.ceil(cur * 100 + 1) / 100 : 0);
+    const xs = []; for (let c = 0.04; c <= hi + 1e-9; c += 0.01) xs.push(+c.toFixed(2));
+    if (cur !== null && cur >= 0.04 && !xs.some((c) => Math.abs(c - cur) < 1e-9)) xs.push(cur); xs.sort((a, b) => a - b);
     const net0 = R.economics.gate1.net0;
     const ys = xs.map((c) => net0 - (g2.cpc / c) * g2.ppcShare);
     const [s1, s2] = series();
-    mkChart(container, "ch-gate2", { type: "line", data: { labels: xs.map((c) => Math.round(c * 100) + " %"), datasets: [
+    mkChart(container, "ch-gate2", { type: "line", data: { labels: xs.map((c) => (Number.isInteger(+(c * 100).toFixed(6)) ? Math.round(c * 100) : (c * 100).toFixed(1).replace(".", ",")) + " %"), datasets: [
       { label: "Net after ads, $/юнит", data: ys, borderColor: s1, backgroundColor: s1, borderWidth: 2, pointRadius: 0, tension: .2 },
-      { label: "Текущий CVR", data: xs.map((c) => (Math.abs(c - Math.round(g2.atCvr.cvr * 100) / 100) < 1e-9 ? g2.atCvr.net : null)), borderColor: s2, backgroundColor: s2, pointRadius: 6, pointHoverRadius: 8, showLine: false },
+      { label: "Текущий CVR", data: xs.map((c) => (cur !== null && Math.abs(c - cur) < 1e-9 ? g2.atCvr.net : null)), borderColor: s2, backgroundColor: s2, pointRadius: 6, pointHoverRadius: 8, showLine: false },
     ] }, options: { plugins: { legend: { display: true }, tooltip: { callbacks: { label: tooltipMoney(2) } } }, scales: { x: { grid, title: { display: true, text: "CVR" } }, y: { grid, ticks: { callback: (v) => fmtMoney(v) } } } } });
   }
 
