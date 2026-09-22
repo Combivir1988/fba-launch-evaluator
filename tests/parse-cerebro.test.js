@@ -63,3 +63,14 @@ test("порог «конкурентов в топе» по умолчанию:
   assert.equal(defaultMinCompetitors({ flags: { multiAsin: true, maxCompetitors: 1 } }, 3), 3, "один ASIN — правило не имеет смысла, остаётся порог настроек");
   assert.equal(defaultMinCompetitors({ flags: { multiAsin: false, maxCompetitors: null } }, 3), 3); assert.equal(defaultMinCompetitors(null, 3), 3);
 });
+
+test("брендовые запросы: бренды с апострофом и двумя словами, бренды из POE и исключённых, «голова» бренда отдельным словом; общие слова не считаются брендом", async () => {
+  const { brandMatcher, knownBrands } = await import("../shared/parse-cerebro.js");
+  const is = brandMatcher(["Ling's moment", "Mandy's", "Melorca&Guilla", "Floroom", "Generic", "(без бренда)", "NOW Foods", "Villa Como", "Real Touch"], "artificial flower");
+  for (const p of ["lings moment artificial wedding flowers", "ling's moment flowers", "mandy rose", "melorca guilla plants", "royal blue floroom artificial flowers", "now foods vitamins", "villa como decor", "real touch artificial flowers"]) assert.equal(is(p), true, p);
+  for (const p of ["artificial flower", "gan mao ling plum flower", "generic artificial flowers", "whole foods fresh flowers", "now flowers", "unbranded flowers"]) assert.equal(is(p), false, p);
+  const kb = knownBrands({ xray: { asins: [{ brand: "KILMAT" }, { brand: "(без бренда)" }, { brand: "KILMAT" }] }, poe: { asinMetrics: [{ brand: "Floroom" }, { brand: "" }] }, excludedBrands: ["Yatim"] });
+  assert.deepEqual(kb, ["KILMAT", "Floroom", "Yatim"]);
+  const c = parseCerebro([{ "Keyword Phrase": "floroom artificial flowers", "Search Volume": "591" }, { "Keyword Phrase": "artificial flowers", "Search Volume": "9000" }], { coreKeyword: "artificial flowers", brands: kb });
+  assert.deepEqual(Object.fromEntries(c.keywords.map((k) => [k.phrase, k.isBranded])), { "floroom artificial flowers": true, "artificial flowers": false });
+});

@@ -2,7 +2,7 @@
 import { newAnalysis, migrate, splitDoc, coreSignature } from "/shared/analysis.js";
 import { compute } from "/shared/compute.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION } from "/shared/thresholds.js";
-import { suggestCluster, annotateKeywords, defaultMinCompetitors } from "/shared/parse-cerebro.js";
+import { suggestCluster, annotateKeywords, defaultMinCompetitors, knownBrands } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
 import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
 import { detectAndParse } from "./files.js";
@@ -309,10 +309,9 @@ $("#file-input").addEventListener("change", (e) => { const files = [...e.target.
 async function handleFiles(list) {
   for (const f of list) {
     try {
-      const brands = S.a.aggregates.xray ? [...new Set(S.a.aggregates.xray.asins.map((a) => a.brand))] : [];
-      const r = await detectAndParse(f, { coreKeyword: S.a.coreKeyword, brands });
+      const r = await detectAndParse(f, { coreKeyword: S.a.coreKeyword, brands: allBrands() });
       if (r.kind === "import") { await importDoc(r.data); continue; }
-      if (r.kind === "poe") { toast(addPoePart(r.data, r.meta), 5000); if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; continue; } // POE не заменяется, а добавляется к объединению ниш
+      if (r.kind === "poe") { toast(addPoePart(r.data, r.meta), 5000); if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; reannotateCerebro(); continue; } // бренды POE тоже помечают брендовые запросы // POE не заменяется, а добавляется к объединению ниш
       S.a.aggregates[r.kind] = r.data; S.a.sources[r.kind] = r.meta; S.aggDirty = true;
       if (r.kind === "poe") { if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; }
       if (r.kind === "xray") reannotateCerebro();
@@ -322,10 +321,15 @@ async function handleFiles(list) {
   }
   markDirty(); renderAll();
 }
+/** Бренды для пометки брендовых запросов Cerebro: Xray + POE + исключённые бренды. */
+const allBrands = () => knownBrands({ xray: S.a.aggregates.xray, poe: S.a.aggregates.poe, excludedBrands: S.a.inputs.excludedBrands });
 function reannotateCerebro() {
   const c = S.a.aggregates.cerebro; if (!c) return;
-  const brands = S.a.aggregates.xray ? [...new Set(S.a.aggregates.xray.asins.map((a) => a.brand))] : [];
-  c.keywords = annotateKeywords(c.keywords, { coreKeyword: S.a.coreKeyword, brands });
+  c.keywords = annotateKeywords(c.keywords, { coreKeyword: S.a.coreKeyword, brands: allBrands() });
+  // чистка кластера: фраза с брендом целиком выпадает из кластера (и из Adj. SV, трафика, графика ключей), даже если попала туда раньше, когда бренды ещё не были известны
+  const branded = new Set(c.keywords.filter((k) => k.isBranded || k.isAsin).map((k) => k.phrase));
+  const before = S.a.inputs.clusterKeywords.length; S.a.inputs.clusterKeywords = S.a.inputs.clusterKeywords.filter((p) => !branded.has(p));
+  const dropped = before - S.a.inputs.clusterKeywords.length; if (dropped) toast(`Из кластера убрано брендовых запросов: ${dropped}`, 5000);
 }
 function autoCluster() { const c = S.a.aggregates.cerebro; if (!c) return; const th = mergeThresholds(S.a.thresholds).traffic; S.a.inputs.clusterKeywords = suggestCluster(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minCompetitors: S.a.inputs.clusterMinCompetitors ?? defaultMinCompetitors(c, th.minCompetitors), limit: th.clusterLimit }); }
 $("#kw-minsv").addEventListener("input", (e) => { $("#kw-minsv").parentElement.querySelector("output").textContent = e.target.value; });
@@ -353,8 +357,8 @@ function addPoePart(data, meta) {
   const title = data.meta.nicheTitle || meta.fileName;
   return action === "updated" ? `POE: ниша «${title}» обновлена (${data.asinMetrics.length} ASIN)` : parts.length > 1 ? `POE: добавлена ниша «${title}» — объединено ниш: ${parts.length}, товаров без дублей: ${S.a.aggregates.poe.asinMetrics.length}` : `POE: ${data.asinMetrics.length} ASIN из ${meta.fileName}`;
 }
-function removePoePart(key) { setPoeParts(poeParts().filter((p) => poePartKey(p) !== key), poeMetas().filter((m) => m.key !== key)); markDirty(); renderAll(); }
-function removeSource(kind) { if (kind === "poe") delete S.a.aggregates.poeParts; delete S.a.aggregates[kind]; S.a.sources[kind] = null; S.aggDirty = true; if (kind === "cerebro") S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); }
+function removePoePart(key) { setPoeParts(poeParts().filter((p) => poePartKey(p) !== key), poeMetas().filter((m) => m.key !== key)); reannotateCerebro(); markDirty(); renderAll(); }
+function removeSource(kind) { if (kind === "poe") delete S.a.aggregates.poeParts; delete S.a.aggregates[kind]; S.a.sources[kind] = null; S.aggDirty = true; if (kind === "cerebro") S.a.inputs.clusterKeywords = []; else reannotateCerebro(); markDirty(); renderAll(); }
 
 function renderFileList() {
   const el = $("#filelist"); const labels = { xray: "Xray", cerebro: "Cerebro", poe: "POE", sqp: "SQP" };

@@ -57,6 +57,34 @@ export function stem(w) {
 }
 export const tokens = (phrase) => String(phrase).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(stem);
 
+// ---------- брендовые запросы ----------
+const BRAND_STOP = new Set(["the", "and", "for", "pro", "max", "plus", "new", "generic", "unbranded", "brand", "inc", "llc", "ltd", "usa", "shop", "store", "official", "без бренда"]);
+const normBrand = (b) => String(b ?? "").toLowerCase().replace(/['’`]/g, "").replace(/[^a-z0-9а-яё]+/gi, " ").trim();
+/**
+ * Матчер брендовых запросов. Бренд считается найденным, если запрос содержит нормализованное имя бренда (без апострофов и знаков:
+ * «Ling's moment» → «lings moment», «Melorca&Guilla» → «melorca guilla») или — отдельным словом — его «голову»: первое слово
+ * двухсловного бренда либо основу притяжательного («Mandy's» → «mandy»), если голова не короче 5 букв, не общее слово и не слово core-ключа.
+ */
+export function brandMatcher(brands = [], coreKeyword = "") {
+  const core = new Set(normBrand(coreKeyword).split(" ").filter(Boolean));
+  const full = new Set(), heads = new Set();
+  for (const raw of brands || []) {
+    const n = normBrand(raw); if (!n || n.length < 3 || BRAND_STOP.has(n)) continue; full.add(n);
+    const first = String(raw).trim().split(/\s+/)[0] || ""; const head = normBrand(first);
+    const possessive = /['’]s$/i.test(first);
+    if ((n.includes(" ") || possessive) && head) { const h = possessive ? head.replace(/s$/, "") : head; if (h.length >= 5 && !BRAND_STOP.has(h) && !core.has(h)) heads.add(h); }
+  }
+  return (phrase) => { const p = normBrand(phrase); if (!p) return false; for (const f of full) if (p.includes(f)) return true; const padded = " " + p + " "; for (const h of heads) if (padded.includes(" " + h + " ")) return true; return false; };
+}
+/** Все известные бренды анализа: Xray, POE (в т. ч. объединённый) и список исключённых брендов. */
+export function knownBrands({ xray, poe, excludedBrands } = {}) {
+  const out = new Set();
+  for (const a of xray?.asins || []) if (a?.brand) out.add(String(a.brand).trim());
+  for (const a of poe?.asinMetrics || []) if (a?.brand) out.add(String(a.brand).trim());
+  for (const b of excludedBrands || []) if (b) out.add(String(b).trim());
+  return [...out].filter((b) => b && !/^\(без бренда\)$/i.test(b));
+}
+
 /**
  * @param {object[]} rows PapaParse rows
  * @param {{coreKeyword?: string, brands?: string[], minSv?: number}} opts
@@ -65,7 +93,7 @@ export function parseCerebro(rows, opts = {}) {
   if (!rows?.length) return { keywords: [], flags: { rowsTotal: 0 } };
   const c = mapCerebroColumns(Object.keys(rows[0]));
   const get = (r, f) => (c[f] ? r[c[f]] : undefined);
-  const brands = (opts.brands || []).map((b) => String(b).toLowerCase().trim()).filter((b) => b.length >= 3 && !/^(the|and|for|pro|max|plus|new)$/.test(b));
+  const isBrand = brandMatcher(opts.brands, opts.coreKeyword);
   const coreTokens = tokens(opts.coreKeyword || "");
   const seen = new Set();
   const keywords = [];
@@ -77,7 +105,7 @@ export function parseCerebro(rows, opts = {}) {
     seen.add(key);
     const competingRaw = get(r, "competing");
     const isAsin = ASIN_RE.test(phrase);
-    const isBranded = brands.some((b) => key.includes(b));
+    const isBranded = isBrand(phrase);
     const toks = tokens(phrase);
     const relevance = coreTokens.length ? coreTokens.filter((t) => toks.includes(t)).length / coreTokens.length : 0;
     keywords.push({
@@ -105,12 +133,12 @@ export function parseCerebro(rows, opts = {}) {
 
 /** Пересчёт флагов isCore/isBranded/relevance при смене core-ключа или списка брендов (без сырых строк). */
 export function annotateKeywords(keywords, opts = {}) {
-  const brands = (opts.brands || []).map((b) => String(b).toLowerCase().trim()).filter((b) => b.length >= 3 && !/^(the|and|for|pro|max|plus|new)$/.test(b));
+  const isBrand = brandMatcher(opts.brands, opts.coreKeyword);
   const coreTokens = tokens(opts.coreKeyword || "");
   const core = String(opts.coreKeyword || "").toLowerCase().trim();
   return keywords.map((k) => {
     const key = k.phrase.toLowerCase(); const toks = tokens(k.phrase);
-    return { ...k, isBranded: brands.some((b) => key.includes(b)), isCore: coreTokens.length > 0 && key === core,
+    return { ...k, isBranded: isBrand(k.phrase), isCore: coreTokens.length > 0 && key === core,
       relevance: coreTokens.length ? coreTokens.filter((t) => toks.includes(t)).length / coreTokens.length : 0 };
   });
 }
