@@ -468,27 +468,19 @@ async function startPatentScan(resumeJobId = null) {
 
 // ---------- этап 2: конфигурация продукта и ТЗ производителю (spec 010) ----------
 const cfgTh = () => mergeThresholds(S.a.thresholds);
-const cfgStatus = (id, t) => { for (const sel of [id, "#config-side-status"]) { const el = $(sel); if (el) el.textContent = t; } };
+const cfgStatus = (id, t) => { const el = $(id); if (el) el.textContent = t; };
 const JSON_H = { "content-type": "application/json", "x-requested-with": "fba" };
 function mergeListings(listings) { if (!listings || !Object.keys(listings).length) return; S.a.aggregates.listings = { ...(S.a.aggregates.listings || {}), ...listings }; S.aggDirty = true; }
 function ensureConfig() { if (!S.a.config) S.a.config = {}; return S.a.config; }
 function renderConfig(ids = ["config", "tz"]) { recompute(); R().update(dash, S.a, renderOpts(), ids); renderConfigSide(); autosave(); }
-/** Раздел 9 панели: состояние этапа 2 и доступность шагов (сами секции — далеко внизу дашборда). */
+/** Бейдж состояния этапа 2 на вкладке дашборда. */
 function renderConfigSide() {
-  const C = S.a.config || {}; const hasX = Boolean(S.a.aggregates?.xray?.asins?.length); const busy = Boolean(S.cfgBusy || S.tzBusy);
-  const badge = $("#config-side-badge"); const [cls, text] = !hasX ? ["na", "нужен Xray"] : C.tz ? ["ok", "ТЗ готово"] : C.table ? ["ok", "извлечено"] : C.schema ? ["warn", "схема есть"] : ["na", "не начат"];
-  for (const b of [badge, $("#stage2-badge")]) if (b) { b.className = "chip " + cls; b.textContent = text; }
+  const C = S.a.config || {}; const hasX = Boolean(S.a.aggregates?.xray?.asins?.length);
+  const [cls, text] = !hasX ? ["na", "нужен Xray"] : C.tz ? ["ok", "ТЗ готово"] : C.table ? ["ok", "извлечено"] : C.schema ? ["warn", "схема есть"] : ["na", "не начат"];
+  const b = $("#stage2-badge"); if (b) { b.className = "chip " + cls; b.textContent = text; }
   $("#stage2-empty").classList.toggle("hidden", !(stageOf() === 2 && !hasX));
-  const st = !hasX ? "Загрузите Xray — этап 2 работает по его ASIN." : C.tz ? `ТЗ: ${C.tz.rows.length} требований · извлечено ${Object.keys(C.table?.rows || {}).length} листингов` : C.table ? `Извлечено ${Object.keys(C.table.rows).length} листингов по ${C.schema.fields.length} полям — можно составить ТЗ (шаг 3).` : C.schema ? `Схема: ${C.schema.fields.length} полей — проверьте её в секции («Править схему») и запустите извлечение (шаг 2).` : `Область: ${S.a.results?.configScope?.count ?? "—"} ASIN. Начните с шага 1 — схема полей по 15 самым продаваемым листингам.`;
-  if (!busy) cfgStatus("#config-side-status", st);
-  const dis = (id, v) => { const b = $(id); if (b) b.disabled = v; };
-  dis("#side-config-schema", !hasX || busy); dis("#side-config-extract", !C.schema || busy); dis("#side-config-tz", !C.table || busy); dis("#side-config-go", !hasX);
 }
 function gotoConfig(id = "sec-config") { showTab("analysis"); setStage(2); const el = document.getElementById(id); if (!el || el.classList.contains("hidden")) return toast("Секция появится после загрузки Xray"); el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
-$("#side-config-schema").addEventListener("click", () => startConfigSchema());
-$("#side-config-extract").addEventListener("click", () => startConfigExtract());
-$("#side-config-tz").addEventListener("click", () => startConfigTz());
-$("#side-config-go").addEventListener("click", () => gotoConfig(S.a.config?.table && !S.cfgBusy ? "sec-config" : "sec-config"));
 dash.addEventListener("click", (e) => { const a = e.target.closest("[data-goto]"); if (a) { e.preventDefault(); gotoConfig(a.dataset.goto); } });
 function configAction(b) {
   const act = b.dataset.action;

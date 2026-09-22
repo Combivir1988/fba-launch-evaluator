@@ -23,19 +23,18 @@ try {
   ok(await page.evaluate(() => document.querySelector('#sec-config [data-action="config-extract"]').disabled), "без схемы извлечение недоступно");
 
   // точка входа: раздел 9 панели и ссылка в шапке
-  ok(/не начат/.test(await txt(page, "#config-side-badge")) && /Начните с шага 1/.test(await txt(page, "#config-side-status")), "раздел 9 панели показывает состояние «не начат» и подсказку");
+  ok(/не начат/.test(await txt(page, "#stage2-badge")), "бейдж вкладки «Этап 2»: не начат");
   ok(/Этап 2 · конфигурация продукта и ТЗ: не начат/.test(await txt(page, "#sec-hero [data-goto]")), "в шапке дашборда есть ссылка на этап 2");
   ok(await page.evaluate(() => document.querySelector("#dashboard").dataset.stage === "1" && getComputedStyle(document.querySelector("#sec-config")).display === "none" && getComputedStyle(document.querySelector("#sec-economics")).display !== "none"), "вкладка «Этап 1»: секции этапа 2 скрыты, экономика видна");
   await click(page, '#stage-tabs [data-stage="2"]'); await page.waitForTimeout(300);
   ok(await page.evaluate(() => document.querySelector("#dashboard").dataset.stage === "2" && getComputedStyle(document.querySelector("#sec-config")).display !== "none" && getComputedStyle(document.querySelector("#sec-economics")).display === "none" && getComputedStyle(document.querySelector("#sec-hero")).display !== "none"), "вкладка «Этап 2»: видны шапка и секции этапа 2, остальное скрыто");
   await click(page, '#stage-tabs [data-stage="1"]'); await page.waitForTimeout(200);
-  await click(page, "#side-config-go");
+  await click(page, "#sec-hero [data-goto]");
   const scrolled = await page.waitForFunction(() => { const r = document.querySelector("#sec-config").getBoundingClientRect(); return r.top >= -5 && r.top < window.innerHeight - 100 && document.querySelector("#dashboard").dataset.stage === "2"; }, null, { timeout: 4000 }).then(() => true).catch(() => false);
-  ok(scrolled, "«Показать секцию ↓» открывает вкладку «Этап 2», секция в поле зрения" + (scrolled ? "" : " (top=" + (await page.evaluate(() => Math.round(document.querySelector("#sec-config").getBoundingClientRect().top))) + ")"));
-  ok(await page.evaluate(() => document.querySelector("#side-config-extract").disabled && !document.querySelector("#side-config-schema").disabled), "кнопки панели: шаг 1 доступен, шаг 2 — нет");
+  ok(scrolled, "ссылка в шапке открывает вкладку «Этап 2», секция в поле зрения");
 
-  // шаг 1 — схема (кнопкой из панели)
-  await click(page, "#side-config-schema");
+  // шаг 1 — схема
+  await click(page, '#sec-config [data-action="config-schema"]');
   await page.waitForFunction(() => /Схема полей \(\d+\)/.test(document.querySelector("#sec-config")?.textContent || ""), null, { timeout: 30000 });
   const nFields = await page.evaluate(() => document.querySelectorAll("#sec-config .chips .chip").length); ok(nFields >= 3, `схема предложена: ${nFields} полей`);
   await saved(page);
@@ -76,7 +75,7 @@ try {
   await page.waitForFunction((c) => /✎/.test(document.querySelector(`#sec-config td[data-cell="${c}"]`)?.textContent || ""), cellSel, { timeout: 5000 });
   ok(true, "клетка исправлена вручную (пометка ✎)"); ok(await page.evaluate(() => document.querySelector("#sec-config details.cfgtable").open), "таблица осталась раскрытой после перерисовки");
 
-  ok(/извлечено/.test(await txt(page, "#config-side-badge")) && /извлечено/.test(await txt(page, "#stage2-badge")) && !(await page.evaluate(() => document.querySelector("#side-config-tz").disabled)), "раздел 9 и бейдж вкладки: «извлечено», шаг 3 доступен");
+  ok(/извлечено/.test(await txt(page, "#stage2-badge")), "бейдж вкладки: «извлечено»");
   // шаг 3 — ТЗ
   ok(/не составлено/.test(await txt(page, "#sec-tz h2")), "секция ТЗ видна после извлечения");
   await click(page, '#sec-tz [data-action="config-tz"]');

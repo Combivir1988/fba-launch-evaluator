@@ -290,7 +290,6 @@ td.editable select, td.editable input { font-size: .85rem; padding: .1rem .3rem;
 
 .section { scroll-margin-top: 66px; } /* якорь ниже закреплённой шапки */
 .section.flash { outline: 3px solid var(--accent); outline-offset: 2px; transition: outline-color 1.2s ease; }
-#det-config .row button { font-size: .82rem; }
 
 /* две вкладки над дашбордом: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) */
 .stagetabs { display: flex; gap: .2rem; border-bottom: 1px solid var(--border); margin-bottom: 12px; overflow-x: auto; }

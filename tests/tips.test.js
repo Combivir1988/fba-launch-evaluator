@@ -64,7 +64,7 @@ test("FR-002: у каждого поля, ползунка и галочки п�
   const missing = controls.filter((c) => { const label = (c.id && side.querySelector(`label[for="${c.id}"]`)) || c.closest("label"); return !label?.getAttribute("data-tip"); }).map((c) => c.dataset.input || c.dataset.check || c.dataset.field || c.dataset.axis);
   assert.deepEqual(missing, []);
   assert.match(side.querySelector('label[for="f-cogs"]').getAttribute("data-tip"), /Себестоимость одной штуки/); assert.equal(side.querySelectorAll("label[title]").length, 0);
-  assert.equal(side.querySelectorAll("details > summary [data-tip]").length, 9, "все девять разделов панели"); assert.equal(side.querySelector('label[for="f-cogs"]').hasAttribute("tabindex"), false);
+  assert.equal(side.querySelectorAll("details > summary [data-tip]").length, 8, "все восемь разделов панели"); assert.equal(side.querySelector('label[for="f-cogs"]').hasAttribute("tabindex"), false);
 });
 
 test("FR-004/FR-005: подсказка показывается по наведению, фокусу и касанию; скрывается по Esc, уходу и перерисовке секции", async () => {
