@@ -55,3 +55,11 @@ test("Cerebro multi-ASIN: Ranking Competitors → кластер по прави
   const cl2 = suggestCluster(c.keywords, { coreKeyword: "urinal screen deodorizer", minSv: 50, minCompetitors: 4 });
   assert.ok(cl2.includes("urinal mat"), "порог SV и минимум конкурентов настраиваются");
 });
+
+test("порог «конкурентов в топе» по умолчанию: число ASIN в multi-ASIN Cerebro минус один; single-ASIN — порог настроек", async () => {
+  const { defaultMinCompetitors } = await import("../shared/parse-cerebro.js");
+  assert.equal(defaultMinCompetitors({ flags: { multiAsin: true, maxCompetitors: 5 } }, 3), 4);
+  assert.equal(defaultMinCompetitors({ flags: { multiAsin: true, maxCompetitors: 2 } }, 3), 1);
+  assert.equal(defaultMinCompetitors({ flags: { multiAsin: true, maxCompetitors: 1 } }, 3), 3, "один ASIN — правило не имеет смысла, остаётся порог настроек");
+  assert.equal(defaultMinCompetitors({ flags: { multiAsin: false, maxCompetitors: null } }, 3), 3); assert.equal(defaultMinCompetitors(null, 3), 3);
+});

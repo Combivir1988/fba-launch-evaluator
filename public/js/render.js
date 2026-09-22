@@ -232,7 +232,7 @@
         ${pc ? `<div class="tile ${pc.flags.top20Heavy ? "warn" : ""}"><div class="k">Топ-20 продуктов (клики)</div><div class="v">${fmtPct(pc.top20Products)}</div><div class="s">топ-5 продуктов ${fmtPct(pc.top5Products)}</div></div>` : ""}
       </div>
       <div class="stack" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-kw"></canvas></div>
-      <div class="tablewrap"><table class="kwtable"><thead><tr><th>Запрос</th><th class="num">SV/мес</th>${hasSales ? '<th class="num" title="Keyword Sales — продаж/мес по ключу (продают ключи, не объём)">Продаж/мес</th>' : ""}${multi ? '<th class="num" title="Сколько из заданных в Cerebro конкурентов ранжируются по фразе">Конкур. в топе</th>' : ""}<th class="num">Тренд</th><th class="num">Bid</th><th class="num">Конкур. товаров</th><th class="num">${tr.source === "poe" ? "Click share" : "ABA click %"}</th></tr></thead><tbody>${rows}</tbody></table>${multi ? `<p class="muted" style="font-size:.8rem">Cerebro по нескольким ASIN: в кластер автоматически попадают фразы, по которым ранжируются ≥ ${esc(String(A.inputs.clusterMinCompetitors ?? 3))} конкурентов (правило отбора), SV ≥ ${fmtN(tr.minSv)}.</p>` : ""}</div></div>`;
+      <div class="tablewrap"><table class="kwtable"><thead><tr><th>Запрос</th><th class="num">SV/мес</th>${hasSales ? '<th class="num" title="Keyword Sales — продаж/мес по ключу (продают ключи, не объём)">Продаж/мес</th>' : ""}${multi ? '<th class="num" title="Сколько из заданных в Cerebro конкурентов ранжируются по фразе">Конкур. в топе</th>' : ""}<th class="num">Тренд</th><th class="num">Bid</th><th class="num">Конкур. товаров</th><th class="num">${tr.source === "poe" ? "Click share" : "ABA click %"}</th></tr></thead><tbody>${rows}</tbody></table>${multi ? `<p class="muted" style="font-size:.8rem">Cerebro по нескольким ASIN: в кластер автоматически попадают фразы, по которым ранжируются ≥ ${esc(String(A.inputs.clusterMinCompetitors ?? Math.max(1, (A.aggregates?.cerebro?.flags?.maxCompetitors ?? 4) - 1)))} конкурентов (правило отбора), SV ≥ ${fmtN(tr.minSv)}.</p>` : ""}</div></div>`;
   }
   function drawTraffic(container, R) {
     const tr = R.traffic; if (!tr.cluster?.length) return;
@@ -792,7 +792,7 @@
     brandFit: "Насколько товар подходит вашему бренду и опыту, от 0 до 10. Ось scorecard с весом 15 %.",
     opRisk: "Операционный риск от 0 до 10, где 10 — низкий. «Авто» считает его из галочек чеклиста.",
     "#kw-minsv": "Запросы с объёмом ниже порога не попадают в кластер автоматически.",
-    "#kw-mincomp": "Для Cerebro по нескольким ASIN: фраза релевантна, если по ней ранжируется не меньше стольких конкурентов.",
+    "#kw-mincomp": "Для Cerebro по нескольким ASIN: фраза релевантна, если по ней ранжируется не меньше стольких конкурентов. По умолчанию — число ASIN в отчёте минус один: все конкуренты, кроме одного.",
     "#op-auto": "Считать операционный риск автоматически из галочек чеклиста.",
   };
   const SIDE_TIPS = {

@@ -2,7 +2,7 @@
 import { newAnalysis, migrate, splitDoc, coreSignature } from "/shared/analysis.js";
 import { compute } from "/shared/compute.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION } from "/shared/thresholds.js";
-import { suggestCluster, annotateKeywords } from "/shared/parse-cerebro.js";
+import { suggestCluster, annotateKeywords, defaultMinCompetitors } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
 import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
 import { detectAndParse } from "./files.js";
@@ -321,7 +321,7 @@ function reannotateCerebro() {
   const brands = S.a.aggregates.xray ? [...new Set(S.a.aggregates.xray.asins.map((a) => a.brand))] : [];
   c.keywords = annotateKeywords(c.keywords, { coreKeyword: S.a.coreKeyword, brands });
 }
-function autoCluster() { const c = S.a.aggregates.cerebro; if (!c) return; const th = mergeThresholds(S.a.thresholds).traffic; S.a.inputs.clusterKeywords = suggestCluster(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minCompetitors: S.a.inputs.clusterMinCompetitors ?? th.minCompetitors, limit: th.clusterLimit }); }
+function autoCluster() { const c = S.a.aggregates.cerebro; if (!c) return; const th = mergeThresholds(S.a.thresholds).traffic; S.a.inputs.clusterKeywords = suggestCluster(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minCompetitors: S.a.inputs.clusterMinCompetitors ?? defaultMinCompetitors(c, th.minCompetitors), limit: th.clusterLimit }); }
 $("#kw-minsv").addEventListener("input", (e) => { $("#kw-minsv").parentElement.querySelector("output").textContent = e.target.value; });
 $("#kw-minsv").addEventListener("change", (e) => { S.a.inputs.clusterMinSv = Number(e.target.value); autoCluster(); markDirty(); renderAll(); });
 $("#kw-mincomp").addEventListener("change", (e) => { S.a.inputs.clusterMinCompetitors = Math.max(1, Number(e.target.value) || 3); autoCluster(); markDirty(); renderAll(); });
@@ -366,7 +366,7 @@ function renderCluster() {
   const th = mergeThresholds(S.a.thresholds).traffic; const minSv = S.a.inputs.clusterMinSv ?? th.minSv;
   const multi = Boolean(c.flags?.multiAsin);
   $("#kw-multi").classList.toggle("hidden", !multi);
-  if (multi) { $("#kw-mincomp").value = S.a.inputs.clusterMinCompetitors ?? th.minCompetitors; $("#kw-multi-note").textContent = `Cerebro по ${c.flags.maxCompetitors} ASIN: релевантны фразы, по которым ранжируются ≥ N конкурентов`; }
+  if (multi) { const def = defaultMinCompetitors(c, th.minCompetitors); $("#kw-mincomp").value = S.a.inputs.clusterMinCompetitors ?? def; $("#kw-multi-note").textContent = `Cerebro по ${c.flags.maxCompetitors} ASIN: релевантны фразы, по которым ранжируются ≥ N конкурентов (по умолчанию ${def} — все, кроме одного)`; }
   const ms = $("#kw-minsv"); ms.value = minSv; ms.parentElement.querySelector("output").textContent = String(minSv);
   const sort = $("#kw-sort").value; const by = { sv: (k) => k.sv, sales: (k) => k.keywordSales ?? -1, comp: (k) => (k.rankingCompetitors ?? -1) * 1e6 + k.sv, rel: (k) => k.relevance * 1e7 + k.sv }[sort] || ((k) => k.sv);
   const list = c.keywords.filter((k) => (S.kwShowAll || sel.has(k.phrase) || (!k.isAsin && !k.isBranded)) && (!q || k.phrase.toLowerCase().includes(q))).sort((a, b) => by(b) - by(a)).slice(0, 400);

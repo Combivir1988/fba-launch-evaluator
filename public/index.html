@@ -57,7 +57,7 @@
         <div class="row hidden" id="kw-multi"><div class="field" style="flex:1 1 160px"><label for="kw-mincomp">Мин. конкурентов в топе (multi-ASIN Cerebro)</label><input id="kw-mincomp" type="number" min="1" max="20" value="3"></div><span class="muted" id="kw-multi-note" style="flex:2 1 160px;font-size:.8rem"></span></div>
         <div class="row"><button type="button" id="kw-auto">Автовыбор</button><button type="button" id="kw-none">Снять все</button><span class="muted" id="kw-stats" style="font-size:.8rem"></span></div>
         <div class="kwlist" id="kwlist"></div>
-        <p class="muted" style="font-size:.8rem">Adj. SV = SV core + 0.4 × Σ остальных. Отбор — по смысловой близости, не топ-N слепо; ASIN-строки и брендовые запросы скрыты по умолчанию (<label style="display:inline"><input type="checkbox" id="kw-showall"> показать все</label>).</p>
+        <p class="muted" style="font-size:.8rem">Adj. SV = SV core + 0.4 × Σ остальных. Отбор — по смысловой близости, не топ-N слепо; для Cerebro по нескольким ASIN порог «конкурентов в топе» по умолчанию равен числу ASIN минус один; ASIN-строки и брендовые запросы скрыты по умолчанию (<label style="display:inline"><input type="checkbox" id="kw-showall"> показать все</label>).</p>
       </div>
     </details>
     <details id="det-brands" class="hidden">

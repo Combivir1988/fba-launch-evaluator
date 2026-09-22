@@ -118,6 +118,12 @@ export function annotateKeywords(keywords, opts = {}) {
 /** Экспорт Cerebro по нескольким ASIN? (есть колонка Ranking Competitors) */
 export const isMultiAsin = (keywords) => keywords.some((k) => typeof k.rankingCompetitors === "number");
 
+/** Порог «конкурентов в топе» по умолчанию для multi-ASIN Cerebro: число ASIN в отчёте минус один (не меньше 1); без multi-ASIN — порог из настроек. */
+export function defaultMinCompetitors(cerebro, fallback = 3) {
+  const n = cerebro?.flags?.multiAsin ? cerebro.flags.maxCompetitors : null;
+  return typeof n === "number" && n >= 2 ? n - 1 : fallback;
+}
+
 /**
  * Автопредложение кластера.
  * Multi-ASIN Cerebro (правило отбора): фраза релевантна, если по ней ранжируются ≥ minCompetitors из заданных
