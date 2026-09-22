@@ -76,19 +76,20 @@ test("снимок ссылки рендерится без ТЗ; секция �
   assert.equal(el.querySelector("#sec-config").classList.contains("hidden"), false); assert.equal(el.querySelector("#sec-tz").classList.contains("hidden"), true);
 });
 
-test("подсказки графиков: у каждого графика в подвале подсказки Chart.js есть описание «что это», значения подписаны", () => {
+test("подсказки графиков: только числа с единицей, без пояснений; пояснение «что это» — у значка «?» каждого графика", () => {
   const a = withConfig(entryFixture()); const el = draw(a); const charts = el.__w.__charts;
   assert.ok(charts.length >= 8, "графиков: " + charts.length);
   for (const c of charts) {
-    const cb = c.cfg.options?.plugins?.tooltip?.callbacks; assert.ok(cb?.footer, `${c.cfg.type}: нет подвала подсказки`);
-    const lines = cb.footer([]); assert.ok(Array.isArray(lines) && lines.join(" ").startsWith("Что это:"), `${c.cfg.type}: ${JSON.stringify(lines).slice(0, 80)}`);
-    assert.ok(lines.every((l) => l.length <= 70), "строки подвала переносятся");
-    assert.ok(cb.label, `${c.cfg.type}: нет подписи значения`);
+    const cb = c.cfg.options?.plugins?.tooltip?.callbacks; assert.ok(cb?.label, `${c.cfg.type}: нет подписи значения`); assert.equal(cb.footer, undefined, `${c.cfg.type}: в подсказке не должно быть пояснений`);
     if (c.cfg.type === "line" || c.cfg.type === "bar") assert.ok(c.cfg.options.interaction?.mode === "index" && c.cfg.options.interaction?.intersect === false, "подсказка по всей колонке, не только по фигуре");
     assert.equal(c.cfg.desc, undefined, "desc не уходит в Chart.js");
   }
-  const pie = charts.find((c) => c.cfg.type === "doughnut"); assert.match(pie.cfg.options.plugins.tooltip.callbacks.footer([]).join(" "), /доля выручки ниши по значениям поля/);
-  assert.match(pie.cfg.options.plugins.tooltip.callbacks.label({ label: "Steel", parsed: 61.5, dataIndex: 0 }), /Steel: 61,5 % выручки · \d+ лист\./);
+  const marks = [...el.querySelectorAll(".chartbox .chart-what[data-tip]")]; assert.equal(marks.length, el.querySelectorAll(".chartbox").length, "значок «?» у каждого графика");
+  assert.ok(marks.every((m) => /^Что это:/.test(m.getAttribute("data-tip")) && m.getAttribute("data-tip").length >= 40));
+  const pie = charts.find((c) => c.cfg.type === "doughnut"); const cbp = pie.cfg.options.plugins.tooltip.callbacks; assert.equal(cbp.title(), "", "заголовок кольца не дублирует строку");
+  const first = a.results.config.whole.fields[0].values[0]; const line = cbp.label({ label: first.label, parsed: Math.round(first.share * 1000) / 10, dataIndex: 0 });
+  assert.match(line, /^(★ )?.+ · [\d,]+ % · \$\S+ · \d+ лист\.( · \$\S+)?$/, line); assert.ok(line.includes(first.label), "подпись содержит значение");
+  assert.equal(pie.cfg.options.plugins.tooltip.displayColors, false);
 });
 
 test("вкладки «Этап 1 / Этап 2» внутри дашборда: есть в приложении, в снимке ссылки и без app.js; без Xray вкладок нет; переключение перерисовывает секции", () => {

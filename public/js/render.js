@@ -38,14 +38,12 @@
     const box = canvas.closest(".chartbox") || canvas.parentElement;
     if (box) box.innerHTML = `<div class="notice fail" style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center">${esc(msg)}</div>`;
   }
-  /** Подсказка при наведении на график: строка значения (как настроено графиком) + подвал «что это и как читать» (cfg.desc).
+  /** Подсказка при наведении на график — только числа (значение с единицей), без пояснений: пояснение «что это» живёт за значком «?» в углу графика (cfg.desc).
    *  Для линий и столбцов подсказка появляется при наведении на любую точку колонки, не только на саму фигуру. */
   function withChartTips(cfg) {
     const desc = cfg.desc; delete cfg.desc; if (!desc) return cfg;
-    const o = (cfg.options = cfg.options || {}); const p = (o.plugins = o.plugins || {}); const t = (p.tooltip = p.tooltip || {}); const cb = (t.callbacks = t.callbacks || {});
-    const lines = []; let cur = ""; for (const w of String(desc).split(" ")) { if ((cur + " " + w).trim().length > 64) { lines.push(cur.trim()); cur = w; } else cur += " " + w; } if (cur.trim()) lines.push(cur.trim());
-    const prevFooter = cb.footer; cb.footer = (items) => { const own = typeof prevFooter === "function" ? prevFooter(items) : []; return [...(Array.isArray(own) ? own : own ? [own] : []), ...lines]; };
-    t.footerFont = t.footerFont || { weight: "normal", size: 11 }; t.footerColor = t.footerColor || cssVar("--text-2") || undefined; t.footerMarginTop = t.footerMarginTop ?? 6;
+    const o = (cfg.options = cfg.options || {}); const p = (o.plugins = o.plugins || {}); const t = (p.tooltip = p.tooltip || {}); t.callbacks = t.callbacks || {};
+    t.displayColors = t.displayColors ?? (cfg.type !== "doughnut");
     if (!o.interaction && (cfg.type === "line" || cfg.type === "bar")) o.interaction = { mode: "index", intersect: false };
     if (!o.interaction) o.interaction = { mode: "nearest", intersect: false }; // кольцо, радар: подсказка ближайшего сектора при наведении в любую точку графика
     cfg.__desc = desc; return cfg;
@@ -631,7 +629,7 @@
     for (const f of st[view].fields) {
       const rows = pieRows(f); if (!rows.length) continue;
       mkChart(container, "ch-cfg-" + f.id, { type: "doughnut", desc: `Что это: доля выручки ниши по значениям поля «${f.name}» — вес каждого листинга равен его выручке по Xray. Сектор «нет данных» — листинги, где значение в тексте не найдено; сумма секторов 100 %.`, data: { labels: rows.map((v) => v.label), datasets: [{ data: rows.map((v) => Math.round(v.share * 1000) / 10), backgroundColor: rows.map((v, i) => (v.noData ? cssVar("--na-bg") : v.other ? cssVar("--muted") : pal[i % pal.length])), borderWidth: 2, borderColor: cssVar("--surface") || "#fff" }] },
-        options: { cutout: "55%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtN(c.parsed, 1)} % выручки · ${fmtN(rows[c.dataIndex].count)} лист.` } } } } });
+        options: { cutout: "55%", plugins: { legend: { display: false }, tooltip: { callbacks: { title: () => "", label: (c) => { const v = rows[c.dataIndex]; return `${v.premium ? "★ " : ""}${c.label} · ${fmtN(c.parsed, 1)} %${st[view].weightLabel === "revenue" && !v.noData && !v.other ? " · " + fmtK(v.revenue) : ""} · ${fmtN(v.count)} лист.${isNum(v.avgPrice) ? " · " + fmtMoney(v.avgPrice) : ""}`; } } } } } });
     }
     // переключатель «вся ниша / диапазон» и раскрытие таблицы работают и в автономном HTML: состояние живёт на контейнере, секция перерисовывается
     container.querySelectorAll("[data-config-view]").forEach((r) => r.addEventListener("change", () => { container.__opts = { ...o, configView: r.value }; fill(container, "config", A, R, container.__opts); }));

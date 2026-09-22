@@ -25,7 +25,7 @@ try {
   for (const [id, want] of [["ch-brands", /%/], ["ch-price", /%/], ["ch-kw", /запросов/], ["ch-sv", /\d/], ["ch-radar", /из 10/], ["ch-rev", /%/]]) {
     await page.evaluate((id) => document.getElementById(id)?.scrollIntoView({ block: "center" }), id); await page.waitForTimeout(250);
     const t = await hover(id);
-    ok(t && t.active && t.opacity === 1 && want.test(t.body) && /^Что это:/.test(t.footer), `${id}: подсказка нарисована (opacity ${t?.opacity}) — ${t ? `${t.title ? t.title + " · " : ""}${t.body} · ${t.footer.slice(0, 50)}…` : "графика нет"}`);
+    ok(t && t.active && t.opacity === 1 && want.test(t.body) && !t.footer, `${id}: подсказка нарисована, только числа — ${t ? `${t.title ? t.title + " · " : ""}${t.body}` : "графика нет"}`);
   }
   // кольцевая диаграмма этапа 2: подсказка при наведении в центр (не на дугу)
   await page.evaluate(() => document.querySelector('#sec-hero [data-goto]').click()); await page.waitForTimeout(400);
@@ -37,7 +37,7 @@ try {
   const pie = await page.evaluate(() => { const c = document.querySelector("#sec-config .piegrid canvas"); c.scrollIntoView({ block: "center" }); const r = c.getBoundingClientRect(); return { id: c.id, x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
   await page.mouse.move(pie.x, pie.y); await page.waitForTimeout(150); await page.mouse.move(pie.x + 1, pie.y + 1); await page.waitForTimeout(400);
   const pt = await page.evaluate((id) => { const t = Chart.getChart(document.getElementById(id)).tooltip; return { body: (t.body || []).flatMap((b) => b.lines).join(" | "), footer: (t.footer || []).join(" ") }; }, pie.id);
-  ok(/% выручки/.test(pt.body) && /^Что это: доля выручки ниши по значениям поля/.test(pt.footer), `кольцо этапа 2: подсказка при наведении в центр — ${pt.body} · ${pt.footer.slice(0, 40)}…`);
+  ok(/^(★ )?.+ · [\d,]+ % · \$\S+ · \d+ лист\./.test(pt.body) && !pt.footer, `кольцо этапа 2: подсказка при наведении в центр — ${pt.body}`);
   // значок «?» у каждого графика — подсказка «что это» без наведения на фигуру
   const marks = await page.evaluate(() => [...document.querySelectorAll(".chartbox .chart-what[data-tip]")].map((m) => m.getAttribute("data-tip").slice(0, 40)));
   const boxes = await page.evaluate(() => document.querySelectorAll(".chartbox").length);
