@@ -299,3 +299,8 @@ td.editable select, td.editable input { font-size: .85rem; padding: .1rem .3rem;
 .dash[data-stage="1"] > #sec-config, .dash[data-stage="1"] > #sec-tz { display: none; }
 .dash[data-stage="2"] > .section:not(#sec-hero):not(#sec-config):not(#sec-tz) { display: none; }
 @media print { .dash > .section { display: block !important; } }
+
+/* значок «?» у графика: пояснение «что это» подсказкой */
+.chartbox .chart-what { position: absolute; top: 4px; right: 4px; z-index: 2; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 11px; font-weight: 600; line-height: 16px; text-align: center; cursor: help; text-decoration: none; }
+.chartbox .chart-what:hover, .chartbox .chart-what:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+@media print { .chartbox .chart-what { display: none; } }

@@ -28,7 +28,10 @@
     C.defaults.font.size = 12;
     C.defaults.plugins.legend.labels.boxWidth = 10;
     C.defaults.plugins.legend.labels.boxHeight = 10;
-    C.defaults.animation = matchMedia("(prefers-reduced-motion: reduce)").matches ? false : { duration: 250 };
+    // НЕ подменять объект defaults.animation целиком: Chart.js берёт список полей анимации (type, fn, easing…) из его ключей,
+    // и с {duration} без type терялся интерполятор цвета — каждое наведение бросало «this._fn is not a function», подсказки не рисовались.
+    if (!chartDefaults.anim && C.defaults.animation && typeof C.defaults.animation === "object") chartDefaults.anim = { ...C.defaults.animation };
+    C.defaults.animation = matchMedia("(prefers-reduced-motion: reduce)").matches ? false : { ...(chartDefaults.anim || {}), duration: 250 };
     C.defaults.maintainAspectRatio = false;
   }
   function chartFail(canvas, msg) {
@@ -44,8 +47,14 @@
     const prevFooter = cb.footer; cb.footer = (items) => { const own = typeof prevFooter === "function" ? prevFooter(items) : []; return [...(Array.isArray(own) ? own : own ? [own] : []), ...lines]; };
     t.footerFont = t.footerFont || { weight: "normal", size: 11 }; t.footerColor = t.footerColor || cssVar("--text-2") || undefined; t.footerMarginTop = t.footerMarginTop ?? 6;
     if (!o.interaction && (cfg.type === "line" || cfg.type === "bar")) o.interaction = { mode: "index", intersect: false };
-    if (!o.interaction && cfg.type === "radar") o.interaction = { mode: "nearest", intersect: false };
-    return cfg;
+    if (!o.interaction) o.interaction = { mode: "nearest", intersect: false }; // кольцо, радар: подсказка ближайшего сектора при наведении в любую точку графика
+    cfg.__desc = desc; return cfg;
+  }
+  /** Значок «?» в углу графика: пояснение «что это» через общую систему подсказок — видно, куда навести, и работает без попадания в столбец. */
+  function chartWhat(canvas, desc) {
+    const box = canvas.closest(".chartbox"); if (!box || !desc) return;
+    let m = box.querySelector(".chart-what"); if (!m) { m = document.createElement("span"); m.className = "chart-what"; m.textContent = "?"; m.setAttribute("aria-label", "Что показывает график"); box.appendChild(m); }
+    setTip(m, desc, true);
   }
   function mkChart(container, id, cfg) {
     const canvas = container.querySelector(`#${id}`);
@@ -57,7 +66,7 @@
       const ctx = canvas.getContext("2d");
       if (!ctx) { chartFail(canvas, "Браузер не даёт 2D-контекст canvas (расширение приватности / аппаратное ускорение)"); return null; }
       const ch = new window.Chart(ctx, cfg);
-      container.__charts[id] = ch;
+      container.__charts[id] = ch; chartWhat(canvas, cfg.__desc);
       // страховка: если контейнер ещё не имел размера на момент создания — перерисовать
       requestAnimationFrame(() => { try { if (!ch.width || !ch.height) ch.resize(); } catch {} });
       return ch;
