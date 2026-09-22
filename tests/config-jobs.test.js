@@ -72,7 +72,7 @@ test("AI перегружен после загрузки страниц: опл
   let n = 0; const flaky = async () => { if (++n < 3) throw Object.assign(new Error("busy"), { code: "upstream", retryable: true }); return { fields: [{ id: "a", name: "A", type: "text", unit: "", options: [], hint: "" }, { id: "b", name: "B", type: "text", unit: "", options: [], hint: "" }, { id: "c", name: "C", type: "text", unit: "", options: [], hint: "" }] }; };
   const ev2 = await collect(schemaStream({ niche: "x", asins, listings: {} }, live, { fetchImpl, aiJson: flaky, aiPauseMs: 0 })); assert.equal(ev2.at(-1).event, "done"); assert.equal(n, 3, "две неудачи, третья попытка удалась");
   n = 0; const parseErr = async () => { n++; throw Object.assign(new Error("не по схеме"), { code: "parse" }); };
-  const ev3 = await collect(schemaStream({ niche: "x", asins, listings: {} }, live, { fetchImpl, aiJson: parseErr, aiPauseMs: 0 })); assert.equal(ev3.at(-1).data.code, "parse"); assert.equal(n, 1, "ошибку разбора не повторяем");
+  const ev3 = await collect(schemaStream({ niche: "x", asins, listings: {} }, live, { fetchImpl, aiJson: parseErr, aiPauseMs: 0 })); assert.equal(ev3.at(-1).data.code, "parse"); assert.equal(n, 2, "ошибка разбора — один повтор, не три");
   const ev4 = await collect(extractStream({ niche: "x", schema, asins, listings: {} }, live, { fetchImpl, aiJson: overloaded, aiPauseMs: 0, aiParallel: 1 }));
   assert.equal(ev4.at(-1).event, "done", "извлечение: ошибка пачки не валит задачу"); assert.equal(ev4.at(-1).data.table.aiErrors.length, 1); assert.equal(Object.keys(ev4.at(-1).data.listings).length, 3);
 });
@@ -85,6 +85,17 @@ test("extractStream / schemaStream / tzStream в MOCK: без сети и клю
   const payload = { niche: "mock", listingsAnalyzed: 4, configuration: [{ field: "Материал", unit: "", dominant: { value: "Steel", revenueSharePct: 61.5, listings: 3 } }], reviews: { negative: [{ topic: "ржавеет", mentionsPct: 12.5 }] }, regulatory: [] };
   const z = await collect(tzStream({ niche: "mock", payload }, cfg, {})); assert.equal(z.at(-1).event, "done"); const tz = z.at(-1).data.tz;
   assert.ok(tz.rows.length >= 5); assert.equal(tz.rows[0].unverified, false, "61,5 % и 3 листинга — из фактов"); assert.equal(tz.model, "mock"); assert.ok(tz.generatedAt);
+});
+
+test("ТЗ: ответ не по схеме повторяется один раз; вольные раздел и приоритет нормализуются", async () => {
+  const { normalizeSection, normalizePriority } = await import("../server/config-prompts.js");
+  assert.equal(normalizeSection("Материалы и конструкция"), "материалы"); assert.equal(normalizeSection("Упаковка/маркировка"), "сертификация и маркировка"); assert.equal(normalizeSection("Packaging"), "упаковка"); assert.equal(normalizeSection("что-то"), "конструкция"); assert.equal(normalizeSection("функции"), "функции");
+  assert.equal(normalizePriority("Must"), "must"); assert.equal(normalizePriority("обязательно"), "must"); assert.equal(normalizePriority("high"), "must"); assert.equal(normalizePriority("should"), "should"); assert.equal(normalizePriority(""), "should");
+  let n = 0; const aiJson = async () => { if (++n === 1) throw Object.assign(new Error("Ответ не по схеме: rows[0].section"), { code: "parse" }); return { title: "ТЗ", summary: "s", rows: [{ section: "Материалы", param: "p", requirement: "r", rationale: "x", priority: "Высокий", source: "s" }, { section: "", param: "", requirement: "", rationale: "", priority: "", source: "" }], openQuestions: [] }; };
+  const ev = await collect(tzStream({ niche: "x", payload: { niche: "x", configuration: [] } }, live, { aiJson })); assert.equal(ev.at(-1).event, "done"); assert.equal(n, 2, "один повтор после ошибки разбора");
+  const tz = ev.at(-1).data.tz; assert.equal(tz.rows.length, 1, "пустые строки отброшены"); assert.equal(tz.rows[0].section, "материалы"); assert.equal(tz.rows[0].priority, "must");
+  n = 0; const always = async () => { n++; throw Object.assign(new Error("не по схеме"), { code: "parse" }); };
+  const ev2 = await collect(tzStream({ niche: "x", payload: { niche: "x" } }, live, { aiJson: always })); assert.equal(ev2.at(-1).event, "error"); assert.equal(ev2.at(-1).data.code, "parse"); assert.equal(n, 2, "не больше двух попыток при ошибке разбора");
 });
 
 test("tzStream (live, подмена AI): постпроверка чисел помечает выдуманные значения", async () => {

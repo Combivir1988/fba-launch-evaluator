@@ -5,7 +5,7 @@ export const FIELDS_SCHEMA = { type: "object", additionalProperties: false, requ
   fields: { type: "array", minItems: 3, maxItems: 25, items: { type: "object", additionalProperties: false, required: ["id", "name", "type", "unit", "options", "hint"], properties: {
     id: { type: "string", description: "латиница, snake_case, уникально: connection_type, target_zones" },
     name: { type: "string", description: "название поля по-русски, коротко: «Тип подключения»" },
-    type: { type: "string", enum: ["choice", "number", "text"] },
+    type: { type: "string", description: "choice | number | text" },
     unit: { type: "string", description: "единица для числа (шт, см, кг, Вт) или пустая строка" },
     options: { type: "array", items: { type: "string" }, description: "для choice — 2–10 допустимых значений по-русски (или общепринятые термины: Bluetooth, USB-C); для остальных — пустой список" },
     hint: { type: "string", description: "как искать это в листинге, 1 фраза" } } } } } };
@@ -16,15 +16,15 @@ export const EXTRACT_SCHEMA = { type: "object", additionalProperties: false, req
     values: { type: "array", items: { type: "object", additionalProperties: false, required: ["field", "value", "source"], properties: {
       field: { type: "string", description: "id поля из схемы" },
       value: { type: "string", description: "для choice — точно одно из значений списка; для number — число (можно с единицей); для text — коротко; если в тексте листинга этого нет — строго «нет данных»" },
-      source: { type: "string", enum: ["title", "bullets", "specs", "aplus", "none"], description: "где найдено: тайтл / буллеты / таблица характеристик / текст A+; none — если «нет данных»" } } } } } } } } };
+      source: { type: "string", description: "где найдено: title | bullets | specs | aplus; none — если «нет данных»" } } } } } } } } };
 
 export const TZ_SECTIONS = ["конструкция", "материалы", "комплектация", "размеры и вес", "функции", "упаковка", "качество и контроль", "сертификация и маркировка", "отличия от конкурентов"];
 export const TZ_SCHEMA = { type: "object", additionalProperties: false, required: ["title", "summary", "rows", "openQuestions"], properties: {
   title: { type: "string" }, summary: { type: "string", description: "2–4 предложения: что за товар, на кого ориентирован, главная идея конфигурации" },
   rows: { type: "array", minItems: 5, maxItems: 60, items: { type: "object", additionalProperties: false, required: ["section", "param", "requirement", "rationale", "priority", "source"], properties: {
-    section: { type: "string", enum: TZ_SECTIONS }, param: { type: "string", description: "параметр: «Ударные зоны»" },
+    section: { type: "string", description: "один из разделов: " + TZ_SECTIONS.join(" | ") }, param: { type: "string", description: "параметр: «Ударные зоны»" },
     requirement: { type: "string", description: "измеримое требование производителю" }, rationale: { type: "string", description: "обоснование с числом из фактов: «9 зон — 58 % выручки ниши»" },
-    priority: { type: "string", enum: ["must", "should"] }, source: { type: "string", description: "откуда факт: поле «…» / отзывы POE / регуляторный триггер / патентный скан / цены" } } } },
+    priority: { type: "string", description: "must — обязательно, should — желательно" }, source: { type: "string", description: "откуда факт: поле «…» / отзывы POE / регуляторный триггер / патентный скан / цены" } } } },
   openQuestions: { type: "array", items: { type: "string" }, description: "что уточнить у производителя или проверить до заказа" } } };
 
 const RULES = "Отвечай по-русски, кратко, без markdown. Только JSON по схеме.";
@@ -60,3 +60,13 @@ export function extractUser({ niche, schema, listings }) {
 export function tzUser({ niche, coreKeyword, payload }) {
   return `Ниша: ${niche || coreKeyword}\nГлавный ключ: ${coreKeyword || "—"}\n\nФАКТЫ (JSON):\n${JSON.stringify(payload)}`;
 }
+
+/** Раздел ТЗ из свободного текста модели → один из TZ_SECTIONS (модели любят «Материалы и конструкция», «Упаковка/маркировка» и т. п.). */
+const SECTION_HINTS = [[/сертиф|маркиров|compliance|fda|ce\b|ul\b|safety|безопас/i, "сертификация и маркировка"], [/упаков|коробк|packag/i, "упаковка"], [/качеств|контрол|aql|тест|провер/i, "качество и контроль"], [/материал|ткан|металл|пластик|latex|silicone|material/i, "материалы"],
+  [/комплект|в комплекте|аксессуар|включ|accessor|includ/i, "комплектация"], [/размер|вес|габарит|dimension|weight|size/i, "размеры и вес"], [/функци|режим|feature|function|mode|подключ|bluetooth|app/i, "функции"], [/отлич|конкурент|дифференц|уник|usp|differ/i, "отличия от конкурентов"]];
+export function normalizeSection(raw) {
+  const t = String(raw || "").trim().toLowerCase(); if (TZ_SECTIONS.includes(t)) return t;
+  for (const [re, sec] of SECTION_HINTS) if (re.test(t)) return sec;
+  return "конструкция";
+}
+export const normalizePriority = (raw) => (/^(must|обяз|высок|high|critical|критич|1)/i.test(String(raw || "").trim()) ? "must" : "should");
