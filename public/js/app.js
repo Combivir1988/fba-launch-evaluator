@@ -7,10 +7,13 @@ import { toNum } from "/shared/num.js";
 import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
 import { detectAndParse } from "./files.js";
 import { history, localHistory } from "./history.js";
-import { runAi, runPatentScan, pendingJob } from "./ai.js";
+import { runAi, runPatentScan, runConfigJob, pendingJob } from "./ai.js";
+import { configScope, topForSchema, freshListings } from "/shared/config-scope.js";
+import { sanitizeSchema, setCell, renameOption } from "/shared/config-extract.js";
+import { buildTzPayload } from "/shared/tz-payload.js";
 import { api, goLogin } from "/js/api.js";
 import { startIdleWatch } from "./idle.js";
-import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml } from "./export.js";
+import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml, download } from "./export.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -18,7 +21,7 @@ const R = () => window.FBARender;
 const S = { a: newAnalysis(), user: null, baseVersion: null, meta: null, sig: "", aggDirty: false, conflict: null, dirty: false, aiBusy: false, kwShowAll: false, models: [], model: "", modelPatents: "" };
 const modelAi = () => (S.models.includes(S.model) ? S.model : S.models[0] || "");
 const modelPatents = () => (S.models.includes(S.modelPatents) ? S.modelPatents : modelAi());
-const renderOpts = () => ({ static: false, models: S.models, selectedModel: modelAi(), selectedPatentModel: modelPatents(), aiRunning: S.aiBusy, patentsRunning: S.patBusy });
+const renderOpts = () => ({ static: false, models: S.models, selectedModel: modelAi(), selectedPatentModel: modelPatents(), aiRunning: S.aiBusy, patentsRunning: S.patBusy, configRunning: S.cfgBusy || null, tzRunning: S.tzBusy || null, scrapfly: S.scrapfly });
 const dash = $("#dashboard");
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const toast = (msg, ms = 3200) => { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), ms); };
@@ -399,7 +402,7 @@ function renderChallengerUser() {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // ---------- AI ----------
-dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); const sb = e.target.closest('[data-action="settings"]'); if (sb) { e.preventDefault(); showTab("settings"); } });
+dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const cb = e.target.closest("[data-action^=\"config-\"], [data-action^=\"tz-\"]"); if (cb) return configAction(cb); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); const sb = e.target.closest('[data-action="settings"]'); if (sb) { e.preventDefault(); showTab("settings"); } });
 $("#btn-patents").addEventListener("click", () => startPatentScan());
 $("#btn-ai").addEventListener("click", () => startAi());
 async function startAi(resumeJobId = null) {
@@ -450,11 +453,138 @@ async function startPatentScan(resumeJobId = null) {
   finally { S.patBusy = false; $("#btn-patents").disabled = false; R().update(dash, S.a, renderOpts(), ["patents"]); }
 }
 
+
+// ---------- этап 2: конфигурация продукта и ТЗ производителю (spec 010) ----------
+const cfgTh = () => mergeThresholds(S.a.thresholds);
+const cfgStatus = (id, t) => { const el = $(id); if (el) el.textContent = t; };
+const JSON_H = { "content-type": "application/json", "x-requested-with": "fba" };
+function mergeListings(listings) { if (!listings || !Object.keys(listings).length) return; S.a.aggregates.listings = { ...(S.a.aggregates.listings || {}), ...listings }; S.aggDirty = true; }
+function ensureConfig() { if (!S.a.config) S.a.config = {}; return S.a.config; }
+function renderConfig(ids = ["config", "tz"]) { recompute(); R().update(dash, S.a, renderOpts(), ids); autosave(); }
+function configAction(b) {
+  const act = b.dataset.action;
+  if (act === "config-schema") return startConfigSchema(); if (act === "config-edit") return openSchemaDialog(); if (act === "config-extract") return startConfigExtract();
+  if (act === "config-tz") return startConfigTz(); if (act === "tz-docx") return downloadTzDocx();
+  const T = S.a.config?.tz; if (!T) return;
+  if (act === "tz-add") T.rows.push({ section: "конструкция", param: "", requirement: "", rationale: "", priority: "should", source: "вручную", unverified: false });
+  if (act === "tz-del") T.rows.splice(Number(b.dataset.i), 1);
+  if (act === "tz-addq") (T.openQuestions ||= []).push("");
+  T.editedAt = new Date().toISOString(); markDirty(); renderConfig(["tz"]);
+}
+async function startConfigSchema(resumeJobId = null) {
+  if (S.cfgBusy) return; if (!S.a.aggregates?.xray?.asins?.length) return toast("Загрузите Xray — этап 2 работает по его ASIN");
+  if (!S.a.results) renderAll();
+  const th = cfgTh(); const top = topForSchema(configScope(S.a, th), th);
+  if (top.length < 3) return toast("В области меньше трёх ASIN — проверьте Xray и исключённые бренды");
+  S.cfgBusy = { type: "schema", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; R().update(dash, S.a, renderOpts(), ["config", "tz"]);
+  const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
+  try {
+    const chosen = modelAi();
+    const done = await runConfigJob(S.a, "config_schema", "/api/config/schema", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, asins: top, listings: freshListings(S.a.aggregates.listings, top.map((i) => i.asin), th), options: chosen ? { model: chosen } : {} },
+      { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
+    mergeListings(done.listings); ensureConfig().schema = done.schema; markDirty(); renderAll(); await persistJobResult("Схема полей");
+    toast(`Схема полей: ${done.schema.fields.length} полей по ${done.schema.basedOn} листингам${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""} — проверьте и поправьте перед извлечением`, 7000);
+    document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Схема полей: " + e.message, 8000); }
+  finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
+}
+async function startConfigExtract(resumeJobId = null) {
+  if (S.cfgBusy) return; const C = S.a.config; if (!C?.schema?.fields?.length) return toast("Сначала предложите и утвердите схему полей (шаг 1)");
+  if (!S.a.results) renderAll();
+  const th = cfgTh(); const scope = configScope(S.a, th); if (!scope.asins.length) return toast("Нет ASIN для извлечения");
+  const cached = freshListings(S.a.aggregates.listings, scope.asins, th); const missing = scope.asins.length - Object.keys(cached).length;
+  if (!resumeJobId && missing > 0 && !confirm(`Будет загружено ${missing} страниц листингов через Scrapfly (≈ ${missing * 30} кредитов; ${Object.keys(cached).length} уже в кэше) и выполнено извлечение по ${scope.asins.length} листингам${scope.capped ? ` (предел ${scope.asins.length} из ${scope.total} — см. «Пороги»)` : ""}. Продолжить?`)) return;
+  S.cfgBusy = { type: "extract", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; R().update(dash, S.a, renderOpts(), ["config", "tz"]);
+  const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
+  try {
+    const chosen = modelAi();
+    const done = await runConfigJob(S.a, "config_extract", "/api/config/extract", { niche: S.a.niche, schema: C.schema, asins: scope.items, listings: cached, prevTable: C.table || null, batchSize: th.config.batchSize, options: chosen ? { model: chosen } : {} },
+      { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
+    mergeListings(done.listings); C.table = done.table; markDirty(); renderAll(); await persistJobResult("Извлечение характеристик");
+    const cov = Object.values(done.table.coverage || {}); const avg = cov.length ? cov.reduce((x, v) => x + v, 0) / cov.length : 0;
+    toast(`Извлечено: ${Object.keys(done.table.rows).length} листингов, среднее покрытие ${Math.round(avg * 100)} %${done.table.failed?.length ? `, не загружено ${done.table.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
+    document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Извлечение: " + e.message, 8000); }
+  finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
+}
+async function startConfigTz(resumeJobId = null) {
+  if (S.tzBusy) return; const C = S.a.config; if (!C?.table) return toast("Сначала извлеките характеристики (шаг 2)");
+  if (!S.a.results) renderAll();
+  S.tzBusy = { text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; R().update(dash, S.a, renderOpts(), ["tz"]);
+  try {
+    const chosen = modelAi();
+    const done = await runConfigJob(S.a, "config_tz", "/api/config/tz", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, payload: buildTzPayload(S.a), options: chosen ? { model: chosen } : {} },
+      { resumeJobId, onStage: (d) => cfgStatus("#tz-status", d.text || d.stage), onReconnect: (n) => cfgStatus("#tz-status", `связь прервалась — переподключаюсь (${n})…`) });
+    C.tz = done.tz; markDirty(); R().update(dash, S.a, renderOpts(), ["tz"]); await persistJobResult("ТЗ");
+    const unv = done.tz.rows.filter((r) => r.unverified).length;
+    toast(`ТЗ: ${done.tz.rows.length} требований${unv ? `, проверьте числа в ${unv} строках` : ""}`, 7000);
+    document.getElementById("sec-tz")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); toast("ТЗ: " + e.message, 8000); }
+  finally { S.tzBusy = null; R().update(dash, S.a, renderOpts(), ["tz"]); }
+}
+async function downloadTzDocx() {
+  const T = S.a.config?.tz; if (!T) return toast("Сначала составьте ТЗ");
+  try {
+    const r = await fetch("/api/tz/docx", { method: "POST", headers: JSON_H, body: JSON.stringify({ tz: T, meta: { niche: S.a.niche, coreKeyword: S.a.coreKeyword, listingsAnalyzed: S.a.results?.config?.whole?.asins ?? null } }) });
+    if (r.status === 401) return goLogin(); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "HTTP " + r.status);
+    const name = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") || "")?.[1] || "TZ.docx"; download(name, await r.blob()); toast("DOCX скачан: " + name);
+  } catch (e) { toast("DOCX: " + e.message, 7000); }
+}
+// правка клеток таблицы характеристик: клик → select/input → setCell (source: manual)
+dash.addEventListener("click", (e) => {
+  const td = e.target.closest("td[data-cell]"); if (!td || td.querySelector("select, input")) return;
+  const [asin, fid] = td.dataset.cell.split("|"); const C = S.a.config; const f = C?.schema?.fields.find((x) => x.id === fid); if (!f || !C.table) return;
+  const cur = C.table.rows[asin]?.values?.[fid]?.value ?? null;
+  td.innerHTML = f.type === "choice" ? `<select>${["", ...f.options].map((o) => `<option value="${esc(o)}" ${(o || null) === cur ? "selected" : ""}>${o ? esc(o) : "нет данных"}</option>`).join("")}</select>` : `<input type="${f.type === "number" ? "number" : "text"}" step="any" value="${cur === null ? "" : esc(String(cur))}" placeholder="нет данных" style="width:${f.type === "number" ? "6rem" : "10rem"}">`;
+  const el = td.firstElementChild; el.focus(); let done = false;
+  const commit = () => { if (done) return; done = true; C.table = setCell(C.table, C.schema, asin, fid, el.value === "" ? null : el.value); markDirty(); renderConfig(); };
+  el.addEventListener("change", commit); el.addEventListener("keydown", (ev) => { if (ev.key === "Enter") commit(); if (ev.key === "Escape") { done = true; renderConfig(["config"]); } }); el.addEventListener("blur", () => setTimeout(() => { if (el.isConnected) commit(); }, 150));
+});
+// правка ТЗ прямо в таблице
+const tzText = (el) => { const c = el.cloneNode(true); c.querySelectorAll(".chip, button").forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, " ").trim(); };
+function tzEdit(el) {
+  const T = S.a.config?.tz; if (!T) return; T.editedAt = new Date().toISOString();
+  if (el.hasAttribute("data-tz-summary")) T.summary = tzText(el);
+  else if (el.hasAttribute("data-tz-q")) T.openQuestions[Number(el.dataset.tzQ)] = tzText(el);
+  else { const [i, k] = el.dataset.tz.split("|"); const r = T.rows[Number(i)]; if (!r) return; r[k] = el.tagName === "SELECT" ? el.value : tzText(el); if (k === "rationale" || k === "requirement") r.unverified = false; }
+  markDirty(); autosave();
+}
+dash.addEventListener("input", (e) => { const el = e.target.closest("[data-tz], [data-tz-summary], [data-tz-q]"); if (el && el.tagName !== "SELECT") tzEdit(el); });
+dash.addEventListener("change", (e) => { const el = e.target.closest("select[data-tz]"); if (el) { tzEdit(el); R().update(dash, S.a, renderOpts(), ["tz"]); } });
+dash.addEventListener("focusout", (e) => { const el = e.target.closest("[data-tz], [data-tz-summary], [data-tz-q]"); if (el && el.tagName !== "SELECT" && S.a.config?.tz) R().update(dash, S.a, renderOpts(), ["tz"]); });
+// диалог схемы полей
+const slugId = (name) => String(name).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "f" + Date.now().toString(36);
+const schemaRow = (f, i) => `<tr data-fi="${i}"><td><input data-sf="name" value="${esc(f?.name || "")}" placeholder="Название поля"></td><td><select data-sf="type">${["choice", "number", "text"].map((t) => `<option value="${t}" ${(f?.type || "text") === t ? "selected" : ""}>${{ choice: "выбор", number: "число", text: "текст" }[t]}</option>`).join("")}</select></td><td><input data-sf="unit" value="${esc(f?.unit || "")}" style="width:5rem" placeholder="шт, см"></td><td><textarea data-sf="options" rows="2" placeholder="значения через запятую (для типа «выбор»)">${esc((f?.options || []).join(", "))}</textarea></td><td><button type="button" data-sf-del title="Удалить поле">×</button></td></tr>`;
+function openSchemaDialog() {
+  const C = S.a.config; if (!C?.schema) return;
+  $("#schema-rows").innerHTML = C.schema.fields.map(schemaRow).join("");
+  $("#schema-note").textContent = C.table ? "Таблица уже извлечена: переименованное значение перенесётся в клетки, удалённое станет «нет данных», новое поле заполнится при повторном извлечении." : "После правки запустите извлечение (шаг 2). Значения поля «выбор» — только из этого списка; синонимы объединяйте здесь.";
+  $("#schema-dlg").showModal();
+}
+$("#schema-add").addEventListener("click", () => $("#schema-rows").insertAdjacentHTML("beforeend", schemaRow(null, "new")));
+$("#schema-rows").addEventListener("click", (e) => { const b = e.target.closest("[data-sf-del]"); if (b) b.closest("tr").remove(); });
+$("#schema-close").addEventListener("click", () => $("#schema-dlg").close());
+$("#schema-save").addEventListener("click", () => {
+  const C = S.a.config; if (!C?.schema) return; const oldFields = C.schema.fields; let table = C.table;
+  const fields = $$("#schema-rows tr").map((tr) => { const g = (k) => tr.querySelector(`[data-sf="${k}"]`).value; const old = tr.dataset.fi === "new" ? null : oldFields[Number(tr.dataset.fi)];
+    return { id: old?.id || slugId(g("name")), name: g("name").trim(), type: g("type"), unit: g("unit").trim() || null, options: g("options").split(/[,;\n]/).map((x) => x.trim()).filter(Boolean), hint: old?.hint || "", _old: old }; }).filter((f) => f.name);
+  if (!fields.length) return toast("Нужно хотя бы одно поле");
+  if (table) for (const f of fields) { // переименование / удаление значений — согласованно с таблицей
+    const old = f._old; if (!old || old.type !== "choice" || f.type !== "choice") continue;
+    const removed = old.options.filter((o) => !f.options.includes(o)), added = f.options.filter((o) => !old.options.includes(o));
+    removed.forEach((from, k) => { table = renameOption({ fields: [old] }, table, f.id, from, added.length === removed.length ? added[k] : "").table; });
+  }
+  for (const f of fields) delete f._old;
+  C.schema = sanitizeSchema({ ...C.schema, fields, editedAt: new Date().toISOString() }); if (table) C.table = table;
+  $("#schema-dlg").close(); markDirty(); renderAll(); toast(`Схема сохранена: ${C.schema.fields.length} полей`);
+});
+
 /** После загрузки анализа — продолжить незавершённые задачи (страница перезагружалась во время AI). */
 function resumePendingJobs() {
   const hourAgo = Date.now() - 60 * 60 * 1000;
   const a = pendingJob.get(S.a.id, "analyze"); if (a?.jobId && a.startedAt > hourAgo) startAi(a.jobId); else if (a) pendingJob.clear(S.a.id, "analyze");
   const p = pendingJob.get(S.a.id, "patents"); if (p?.jobId && p.startedAt > hourAgo) startPatentScan(p.jobId); else if (p) pendingJob.clear(S.a.id, "patents");
+  for (const [type, fn] of [["config_schema", startConfigSchema], ["config_extract", startConfigExtract], ["config_tz", startConfigTz]]) { const j = pendingJob.get(S.a.id, type); if (j?.jobId && j.startedAt > hourAgo) fn(j.jobId); else if (j) pendingJob.clear(S.a.id, type); }
 }
 
 // ---------- save / export / new ----------
@@ -858,7 +988,7 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
   const startTab = wantedTab(); // до загрузки анализа: она сама переключает на «Анализ»
   try { R().initTips(); R().annotateInputs($(".side")); } catch (e) { console.warn("tips", e); } // подсказки у полей панели (spec 006)
   $("#help-ver").textContent = METHODOLOGY_VERSION;
-  try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; } catch {}
+  try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; S.scrapfly = h.scrapfly !== false; } catch {}
   if (!window.Chart) toast("Chart.js не загрузился — графики не будут отрисованы. Проверьте блокировщик скриптов.", 10000);
 
   try { await initUser(); } catch { return; } // без сеанса api() уже увёл на страницу входа

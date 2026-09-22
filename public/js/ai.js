@@ -81,3 +81,11 @@ export async function runPatentScan(analysis, body, { onStage, onReconnect, resu
   try { const done = await waitJob(jobId, { onStage, onReconnect }); return done.scan; }
   finally { pendingJob.clear(analysis.id, "patents"); }
 }
+
+/** Задачи этапа 2 (spec 010): схема полей / извлечение характеристик / ТЗ. type: config_schema | config_extract | config_tz. Возвращает данные события done. */
+export async function runConfigJob(analysis, type, url, body, { onStage, onReconnect, resumeJobId } = {}) {
+  let jobId = resumeJobId;
+  if (!jobId) { jobId = await startJob(url, body); pendingJob.set(analysis.id, type, { jobId, startedAt: Date.now() }); }
+  try { return await waitJob(jobId, { onStage, onReconnect }); }
+  finally { pendingJob.clear(analysis.id, type); }
+}

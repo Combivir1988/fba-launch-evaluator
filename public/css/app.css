@@ -272,3 +272,18 @@ label.row { flex-wrap: nowrap; align-items: flex-start; } label.row > input[type
 /* Шапка дашборда: левая колонка и блок вердикта — одной высоты (верх и низ совпадают при любой ширине); текст вердикта по центру блока. */
 .hero { align-items: stretch; }
 .hero > .verdict { display: flex; flex-direction: column; justify-content: center; }
+
+/* этап 2 — конфигурация продукта (spec 010) */
+.piegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .8rem; margin-top: .8rem; }
+.pie { border: 1px solid var(--border); border-radius: var(--radius); padding: .6rem .7rem; background: var(--surface); min-width: 0; }
+.pie h4 { margin: 0 0 .4rem; font-size: .92rem; display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.pie .chartbox.short { height: 170px; }
+.pietab { width: 100%; font-size: .78rem; margin-top: .4rem; } .pietab td { padding: .15rem .3rem; }
+.chip.prem { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+td.editable { cursor: pointer; } td.editable:hover { outline: 1px dashed var(--accent); outline-offset: -1px; }
+td.editable select, td.editable input { font-size: .85rem; padding: .1rem .3rem; }
+.tztable td[contenteditable], [data-tz-summary][contenteditable], li[data-tz-q][contenteditable] { cursor: text; }
+.tztable td[contenteditable]:focus, [data-tz-summary][contenteditable]:focus, li[data-tz-q][contenteditable]:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--surface-2); }
+.tztable select { font-size: .82rem; padding: .1rem .2rem; max-width: 11rem; }
+.schematable input, .schematable textarea, .schematable select { width: 100%; box-sizing: border-box; font-size: .85rem; }
+.schematable td { vertical-align: top; }

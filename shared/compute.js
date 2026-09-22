@@ -16,6 +16,7 @@ import { cashflow } from "./cashflow.js";
 import { borderline } from "./borderline.js";
 import { regulatoryTriggers } from "./regulatory.js";
 import { configStats } from "./config-stats.js";
+import { configScope } from "./config-scope.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -75,6 +76,7 @@ export function compute(analysis) {
     dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
   };
   results.config = configStats(analysis.config, whole.xray, { band, th: th.config }); // этап 2 (spec 010): null, пока таблица характеристик не извлечена
+  if (whole.xray?.asins?.length) { const sc = configScope(analysis, th); results.configScope = { count: sc.asins.length, total: sc.total, excluded: sc.excluded, capped: sc.capped }; } else results.configScope = null;
   results.borderline = borderline(results, th);
   results.verdict = verdictCeiling(results);
   results.computedAt = new Date().toISOString();

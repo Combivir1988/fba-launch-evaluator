@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { entryFixture } from "./helpers/entry-fixture.js";
 import { fixtureAnalysis } from "./helpers/fixture-analysis.js";
+import { withConfig } from "./helpers/config-fixture.js";
 import { buildSnapshot, findEconomicsLeaks } from "../shared/share-snapshot.js";
 import { compute } from "../shared/compute.js";
 
@@ -48,6 +49,7 @@ test("FR-008: осиротевших пояснений нет — каждое 
   const withAi = entryFixture(); withAi.ai = AI; withAi.patents = PATENTS; withAi.niche = "antibacterial baby teether"; withAi.results = compute(withAi); variants.push(withAi);
   const cer = fixtureAnalysis(); cer.coreKeyword = "bike tube"; delete cer.aggregates.poe; cer.inputs.clusterKeywords = cer.aggregates.cerebro.keywords.slice(0, 12).map((k) => k.phrase); cer.results = compute(cer); variants.push(cer); // трафик по Cerebro, без POE
   const sqp = fixtureAnalysis(); sqp.sources.sqp = { fileName: "sqp.csv", rows: 3 }; variants.push(sqp);
+  variants.push(withConfig(entryFixture())); const band = withConfig(entryFixture()); band.inputs.priceMin = 10; band.inputs.priceMax = 40; band.results = compute(band); variants.push(band); // этап 2: конфигурация, диапазон и ТЗ
   for (const a of variants) { const el = draw(a); tips = el.__w.FBARender.tips; for (const k of tips.used) used.add(k); }
   const RARE = new Set(["Конкуренты", "Цена ниши", "SQP", "ПРОКСИ POE", "Срок"]); // показываются только в редких состояниях (нет ни одного отчёта и т. п.)
   const orphans = [...Object.keys(tips.TIPS), ...Object.keys(tips.KEY_TIPS)].filter((k) => !used.has(k) && !RARE.has(k));

@@ -552,7 +552,99 @@
   // ---------- подсказки при наведении (spec 006) ----------
   // Пояснения — общие определения без цифр анализа: безопасны для публичной ссылки и автономного HTML.
   // Ключ — текст названия в интерфейсе (без чипов и без хвоста в скобках); "секция|название" — уточнение для одной секции.
+  // ---------- этап 2: конфигурация продукта и ТЗ производителю (spec 010) ----------
+  const CFG_TYPE = { choice: "выбор", number: "число", text: "текст" };
+  const CFG_SRC = { title: "тайтл", bullets: "буллеты", specs: "характеристики", aplus: "A+", manual: "вручную" };
+  const TZ_SECTIONS = ["конструкция", "материалы", "комплектация", "размеры и вес", "функции", "упаковка", "качество и контроль", "сертификация и маркировка", "отличия от конкурентов"];
+  const PRIO_LABEL = { must: "обязательно", should: "желательно" };
+  const PIE_MAX = 8;
+  const revenueOf = (a) => (isNum(a?.asinRevenue) ? a.asinRevenue : isNum(a?.price) && isNum(a?.asinSales) ? a.price * a.asinSales : 0);
+  /** Секторы диаграммы: до 8 значений + «прочее» + «нет данных» — сумма всегда 100 %. */
+  function pieRows(f) {
+    const vals = f.values.slice(0, PIE_MAX); const rest = f.values.slice(PIE_MAX);
+    if (rest.length) vals.push({ label: `прочее (${rest.length})`, share: rest.reduce((s, v) => s + v.share, 0), revenue: rest.reduce((s, v) => s + v.revenue, 0), count: rest.reduce((s, v) => s + v.count, 0), avgPrice: null, other: true });
+    if (f.noData.count) vals.push({ label: "нет данных", share: f.noData.share, revenue: f.noData.revenue, count: f.noData.count, avgPrice: null, noData: true });
+    return vals;
+  }
+  function secConfig(A, R, o) {
+    if (!A.aggregates?.xray?.asins?.length) return "";
+    const C = A.config || {}; const sc = R.configScope || { count: 0, total: 0, excluded: 0, capped: false }; const st = R.config;
+    const loaded = Object.values(A.aggregates.listings || {}).filter((l) => l && !l.error).length; const running = o.configRunning;
+    const btns = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0;flex-wrap:wrap">
+      <button data-action="config-schema" ${running ? "disabled" : ""}>${C.schema ? "🔄 Предложить схему заново" : "1 · Предложить схему полей"}</button>
+      <button data-action="config-edit" ${!C.schema || running ? "disabled" : ""}>✎ Править схему${C.schema ? ` (${C.schema.fields.length})` : ""}</button>
+      <button data-action="config-extract" ${!C.schema || running ? "disabled" : ""}>${C.table ? "🔄 Извлечь заново" : "2 · Извлечь характеристики"} · ${fmtN(sc.count)} ASIN</button>
+      ${o.selectedModel ? `<span class="chip" title="Модель AI для схемы полей и извлечения — та же, что для AI-вердикта">${esc(o.selectedModel)}</span>` : ""}<span class="muted" id="config-status">${running ? esc(running.text || "выполняется…") : ""}</span></div>
+      ${o.scrapfly === false ? '<div class="notice" style="margin:.4rem 0">На сервере не задан ключ Scrapfly — загрузка страниц листингов недоступна. Ключ задаёт администратор в переменных окружения сервера (SCRAPFLY_API_KEY).</div>' : ""}`;
+    const head = `<h2>Конфигурация продукта — этап 2 <span class="chip" title="Уникальные ASIN из Xray без исключённых брендов, по убыванию выручки">${fmtN(sc.count)} ASIN${sc.excluded ? ` · без ${fmtN(sc.excluded)} искл.` : ""}${sc.capped ? ` · предел ${fmtN(sc.count)} из ${fmtN(sc.total)}` : ""}</span><span class="chip ${loaded ? "ok" : "na"}" title="Страниц листингов в кэше анализа — повторно не загружаются 30 дней">страниц: ${fmtN(loaded)}</span>${C.table ? `<span class="chip ok" title="Листингов в таблице характеристик">извлечено: ${fmtN(Object.keys(C.table.rows).length)}</span>` : ""}${C.table?.cost ? `<span class="chip" title="Кредиты Scrapfly, потраченные на страницы этого анализа">кредитов: ${fmtN(C.table.cost)}</span>` : ""}${running ? '<span class="chip pending">выполняется…</span>' : ""}</h2>`;
+    if (!C.schema) return head + btns + `<p class="muted">Шаг 1: приложение загрузит страницы ${fmtN(Math.min(sc.count, 15))} самых продаваемых листингов и предложит схему характеристик ниши (тип подключения, материал, комплектация…). Шаг 2: по утверждённой схеме AI заполнит таблицу по всем ${fmtN(sc.count)} листингам — значения только из списка схемы, чего нет в тексте — «нет данных». Дальше — диаграммы «характеристика → доля выручки», доминирующая конфигурация и ТЗ производителю.</p>`;
+    const fieldsHtml = `<details ${C.table ? "" : "open"}><summary>Схема полей (${C.schema.fields.length})${C.schema.editedAt ? " · правилась вручную" : ""}</summary><div class="chips" style="margin:.4rem 0">${C.schema.fields.map((f) => `<span class="chip" title="${esc(f.hint || "где искать в листинге")}">${esc(f.name)} <small class="muted">${CFG_TYPE[f.type] || f.type}${f.unit ? ", " + esc(f.unit) : ""}${f.type === "choice" ? ": " + esc(f.options.join(" | ")) : ""}</small></span>`).join("")}</div></details>`;
+    if (!C.table || !st) return head + btns + fieldsHtml + `<p class="muted">Схема готова — проверьте поля («Править схему»: переименовать, объединить значения, добавить или убрать поле) и запустите извлечение.</p>`;
+    const view = o.configView === "band" && st.band ? "band" : "whole"; const SS = st[view];
+    const toggle = st.band ? `<div class="row" style="gap:1rem;margin:.4rem 0;flex-wrap:wrap"><label class="row" style="gap:.3rem"><input type="radio" name="cfg-view" value="whole" data-config-view ${view === "whole" ? "checked" : ""}> вся ниша (${fmtN(st.whole.asins)} листингов)</label><label class="row" style="gap:.3rem"><input type="radio" name="cfg-view" value="band" data-config-view ${view === "band" ? "checked" : ""}> мой ценовой диапазон ${esc(R.priceBand?.label || "")} (${fmtN(st.band.asins)})</label></div>` : "";
+    const dom = `<div class="tablewrap" style="margin-top:.6rem"><h3>Доминирующая конфигурация${view === "band" ? ` <span class="chip warn">диапазон ${esc(R.priceBand?.label || "")}</span>` : ""}</h3><table><thead><tr><th>Поле</th><th>Значение</th><th class="num">Доля выручки</th><th class="num">Доля листингов</th><th class="num">Средняя цена</th><th>Премия</th><th class="num">Покрытие</th></tr></thead><tbody>${SS.fields.map((f) => (f.dominant ? `<tr><td>${esc(f.name)}</td><td><b>${esc(f.dominant.label)}</b>${f.values.length > 1 ? `<br><small class="muted">затем: ${f.values.slice(1, 3).map((v) => esc(v.label) + " " + fmtPct(v.share)).join(", ")}</small>` : ""}</td><td class="num">${fmtPct(f.dominant.share, 1)}</td><td class="num">${fmtPct(f.dominant.listingShare, 1)}</td><td class="num">${fmtMoney(f.dominant.avgPrice, 2)}</td><td>${f.values.filter((v) => v.premium).map((v) => `<span class="chip prem" title="Доля выручки выше доли листингов при средней цене выше медианы поля — за это значение покупатель платит больше">★ ${esc(v.label)}</span>`).join(" ") || "—"}</td><td class="num">${fmtPct(f.coverage)}</td></tr>` : `<tr><td>${esc(f.name)}</td><td colspan="6" class="muted">нет данных ни по одному листингу</td></tr>`)).join("")}</tbody></table>
+      <p class="muted" style="font-size:.8rem">Вес — ${SS.weightLabel === "revenue" ? "выручка ASIN по Xray" : "число листингов (выручки в Xray нет)"} · листингов ${fmtN(SS.asins)}${SS.weightLabel === "revenue" ? `, с выручкой ${fmtN(SS.withRevenue)}, всего ${fmtK(SS.totalRevenue)}/мес` : ""}. «Нет данных» — отдельный сектор, сумма долей по полю всегда 100 %.</p></div>`;
+    const pies = `<div class="piegrid">${SS.fields.map((f) => `<div class="pie"><h4>${esc(f.name)}${f.unit ? ` <small class="muted">${esc(f.unit)}</small>` : ""} <span class="chip ${f.coverage >= 0.7 ? "ok" : f.coverage >= 0.4 ? "warn" : "na"}" title="Покрытие: доля листингов, где значение найдено">${fmtPct(f.coverage)}</span>${f.bucketed ? '<span class="chip na" title="Значений слишком много — показаны интервалы">интервалы</span>' : ""}</h4><div class="chartbox short"><canvas id="ch-cfg-${esc(f.id)}"></canvas></div><table class="pietab"><tbody>${pieRows(f).map((v) => `<tr class="${v.noData ? "muted" : ""}"><td>${v.premium ? "★ " : ""}${esc(v.label)}</td><td class="num">${fmtPct(v.share, 1)}</td><td class="num">${SS.weightLabel === "revenue" ? fmtK(v.revenue) : "—"}</td><td class="num">${fmtN(v.count)} лист.</td><td class="num">${fmtMoney(v.avgPrice)}</td></tr>`).join("")}</tbody></table></div>`).join("")}</div>`;
+    return head + btns + toggle + fieldsHtml + dom + pies + cfgTable(A, C, o);
+  }
+  function cfgTable(A, C, o) {
+    const byAsin = new Map((A.aggregates.xray?.asins || []).map((a) => [a.asin, a])); const fields = C.schema.fields;
+    const rows = Object.entries(C.table.rows).sort((x, y) => revenueOf(byAsin.get(y[0])) - revenueOf(byAsin.get(x[0])));
+    const cell = (asin, f, c) => { const v = c?.value; const none = v === null || v === undefined; const txt = none ? "нет данных" : f.type === "number" ? fmtN(v, 2) + (f.unit ? " " + f.unit : "") : String(v);
+      const title = [c?.source ? "источник: " + (CFG_SRC[c.source] || c.source) : "", c?.raw ? "в листинге: " + c.raw : ""].filter(Boolean).join(" · ");
+      return `<td class="${none ? "muted" : ""}${o.static ? "" : " editable"}"${o.static ? "" : ` data-cell="${esc(asin)}|${esc(f.id)}"`}${title ? ` title="${esc(title)}"` : ""}>${esc(txt)}${c?.source === "manual" ? " ✎" : ""}</td>`; };
+    const failed = C.table.failed || [];
+    return `<details class="cfgtable" ${o.configTableOpen ? "open" : ""}><summary>Таблица характеристик: ${fmtN(rows.length)} листингов × ${fields.length} полей${failed.length ? ` · не загружено ${failed.length}` : ""}${o.static ? "" : " — клетку можно править"}</summary>
+      <div class="tablewrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th>ASIN</th><th>Бренд</th><th class="num">Цена</th><th class="num">Выручка</th>${fields.map((f) => `<th title="${esc(f.hint || CFG_TYPE[f.type] || "")}">${esc(f.name)}</th>`).join("")}</tr></thead><tbody>${rows.map(([asin, r]) => { const a = byAsin.get(asin) || {}; return `<tr class="${r.status === "failed" ? "muted" : ""}"><td><a href="https://www.amazon.com/dp/${esc(asin)}" target="_blank" rel="noopener">${esc(asin)}</a>${r.status === "failed" ? '<br><small class="muted">страница не загрузилась</small>' : ""}</td><td>${esc(a.brand || "")}</td><td class="num">${fmtMoney(a.price, 2)}</td><td class="num">${fmtK(revenueOf(a))}</td>${fields.map((f) => cell(asin, f, r.values?.[f.id])).join("")}</tr>`; }).join("")}</tbody></table></div>
+      ${C.table.aiErrors?.length ? `<p class="muted" style="font-size:.8rem">AI не ответил по ${C.table.aiErrors.length} пачкам (${C.table.aiErrors.map((e) => esc((e.asins || []).join(", "))).join("; ")}) — повторите извлечение.</p>` : ""}
+      <p class="muted" style="font-size:.8rem">Извлечено ${fmtDate(C.table.extractedAt)} · модель ${esc(C.table.model || "—")}${o.static ? "" : " · клик по клетке — исправить значение вручную (пометка ✎; повторное извлечение ручные значения не трогает)"}.</p></details>`;
+  }
+  function drawConfig(container, R, A) {
+    const st = R.config; if (!st) return; const o = container.__opts || {}; const view = o.configView === "band" && st.band ? "band" : "whole"; const pal = series();
+    for (const f of st[view].fields) {
+      const rows = pieRows(f); if (!rows.length) continue;
+      mkChart(container, "ch-cfg-" + f.id, { type: "doughnut", data: { labels: rows.map((v) => v.label), datasets: [{ data: rows.map((v) => Math.round(v.share * 1000) / 10), backgroundColor: rows.map((v, i) => (v.noData ? cssVar("--na-bg") : v.other ? cssVar("--muted") : pal[i % pal.length])), borderWidth: 2, borderColor: cssVar("--surface") || "#fff" }] },
+        options: { cutout: "55%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtN(c.parsed, 1)} % выручки · ${fmtN(rows[c.dataIndex].count)} лист.` } } } } });
+    }
+    // переключатель «вся ниша / диапазон» и раскрытие таблицы работают и в автономном HTML: состояние живёт на контейнере, секция перерисовывается
+    container.querySelectorAll("[data-config-view]").forEach((r) => r.addEventListener("change", () => { container.__opts = { ...o, configView: r.value }; fill(container, "config", A, R, container.__opts); }));
+    const det = container.querySelector("#sec-config details.cfgtable"); if (det) det.addEventListener("toggle", () => { container.__opts = { ...(container.__opts || {}), configTableOpen: det.open }; });
+  }
+  function secTz(A, R, o) {
+    const C = A.config; if (!C?.table) return "";
+    const T = C.tz; const running = o.tzRunning; if (!T && o.static) return ""; // в публичной ссылке и HTML без ТЗ секции нет
+    const btns = o.static ? "" : `<div class="row noprint" style="margin:.5rem 0;flex-wrap:wrap"><button data-action="config-tz" ${running || o.configRunning ? "disabled" : ""}>${T ? "🔄 Составить ТЗ заново" : "3 · Составить ТЗ производителю"}</button><button data-action="tz-docx" ${!T ? "disabled" : ""}>⬇ Скачать DOCX</button>${T ? '<button data-action="tz-add">＋ Строка</button>' : ""}${o.selectedModel ? `<span class="chip" title="Модель AI для текста ТЗ">${esc(o.selectedModel)}</span>` : ""}<span class="muted" id="tz-status">${running ? esc(running.text || "") : ""}</span></div>`;
+    const unv = T ? T.rows.filter((r) => r.unverified).length : 0;
+    const head = `<h2>ТЗ производителю <span class="chip ${T ? "ok" : "na"}">${T ? `${fmtN(T.rows.length)} требований` : "не составлено"}</span>${unv ? `<span class="chip warn" title="Число в строке не найдено среди фактов расчёта — проверьте вручную">проверьте числа: ${unv}</span>` : ""}${running ? '<span class="chip pending">составляется…</span>' : ""}</h2>`;
+    if (!T) return head + btns + `<p class="muted">AI соберёт таблицу «параметр / требование / обоснование / приоритет»: база — доминирующая конфигурация ниши; где отличаться — негативные темы отзывов и гипотезы дифференциации; что проверить — регуляторные триггеры и патентный скан; ориентир партии и цен. Все числа — из расчётов; строки с числами не из расчётов получают пометку. Текст можно править прямо в таблице, затем «Скачать DOCX». В публичную ссылку ТЗ не попадает.</p>`;
+    const ed = o.static ? "" : ' contenteditable="true"';
+    const rows = T.rows.map((r, i) => `<tr><td>${o.static ? esc(r.section) : `<select data-tz="${i}|section">${TZ_SECTIONS.map((s) => `<option ${s === r.section ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>`}</td><td${ed} data-tz="${i}|param">${esc(r.param)}</td><td${ed} data-tz="${i}|requirement">${esc(r.requirement)}</td><td${ed} data-tz="${i}|rationale">${esc(r.rationale)}${r.unverified ? ' <span class="chip warn" contenteditable="false" title="Число не найдено среди фактов расчёта — проверьте вручную; правка строки снимает пометку">проверьте число</span>' : ""}</td><td>${o.static ? esc(PRIO_LABEL[r.priority] || r.priority) : `<select data-tz="${i}|priority"><option value="must" ${r.priority === "must" ? "selected" : ""}>обязательно</option><option value="should" ${r.priority !== "must" ? "selected" : ""}>желательно</option></select>`}</td><td${ed} data-tz="${i}|source"><small class="muted">${esc(r.source)}</small></td>${o.static ? "" : `<td><button data-action="tz-del" data-i="${i}" title="Удалить строку">×</button></td>`}</tr>`).join("");
+    return head + btns + `<p${ed} data-tz-summary>${esc(T.summary)}</p>
+      <div class="tablewrap"><table class="tztable"><thead><tr><th>Раздел</th><th>Параметр</th><th>Требование</th><th>Обоснование</th><th>Приоритет</th><th>Источник</th>${o.static ? "" : "<th></th>"}</tr></thead><tbody>${rows}</tbody></table></div>
+      ${T.openQuestions?.length || !o.static ? `<h4>Открытые вопросы к производителю</h4><ul>${(T.openQuestions || []).map((q, i) => `<li${ed} data-tz-q="${i}">${esc(q)}</li>`).join("")}</ul>${o.static ? "" : '<button data-action="tz-addq" class="noprint" style="font-size:.8rem">＋ Вопрос</button>'}` : ""}
+      <p class="muted" style="font-size:.8rem">Составлено ${fmtDate(T.generatedAt)} · модель ${esc(T.model || "—")}${T.editedAt ? ` · правки ${fmtDate(T.editedAt)}` : ""}. Числа — из расчётов приложения; регуляторные и патентные пункты — подсказки, не юридическое заключение.</p>`;
+  }
+
   const TIPS = {
+    // этап 2 — конфигурация продукта (spec 010)
+    "Конфигурация продукта — этап 2": "Какие характеристики товара собирают выручку ниши: страницы листингов читает Scrapfly, AI заполняет таблицу по схеме полей, доли считаются по выручке ASIN из Xray.",
+    "Доминирующая конфигурация": "По каждому полю — значение с наибольшей выручкой ниши. Это «база» товара: так выглядит то, что покупают чаще всего.",
+    "config|Поле": "Характеристика из схемы полей ниши (тип подключения, материал, комплектация…). Схему предлагает AI, правит менеджер.",
+    "config|Значение": "Значение поля с наибольшей выручкой; ниже — следующие по выручке. «Нет данных» в доминанту не входит.",
+    "config|Доля выручки": "Часть выручки ниши (ASIN Revenue из Xray), которая приходится на листинги с этим значением.",
+    "config|Доля листингов": "Часть листингов ниши с этим значением. Если доля выручки заметно выше доли листингов — значение продаётся лучше среднего.",
+    "config|Средняя цена": "Средняя цена листингов с этим значением. Сравнивайте с медианой поля: дороже при большей доле выручки — премия.",
+    "config|Премия": "★ — значение, у которого доля выручки выше доли листингов, а средняя цена выше медианы поля: за него покупатель готов платить больше.",
+    "config|Покрытие": "Доля листингов, где значение поля найдено в тексте (тайтл, буллеты, характеристики). Ниже 70 % — смотрите таблицу и правьте вручную.",
+    "config|ASIN": "Листинг из Xray. Ссылка открывает страницу Amazon. Строки отсортированы по выручке.",
+    "ТЗ производителю": "Техническое задание, собранное AI из фактов этапов 1–2: доминирующая конфигурация, отзывы, регуляторика, патенты, цены. Числа — только из расчётов; текст можно править и скачать DOCX.",
+    "tz|Раздел": "Группа требований: конструкция, материалы, комплектация, размеры и вес, функции, упаковка, качество, сертификация, отличия от конкурентов.",
+    "tz|Параметр": "Что задаём производителю: узел, материал, функция, элемент комплектации.",
+    "tz|Требование": "Измеримая формулировка для производителя. Правится прямо в таблице.",
+    "tz|Обоснование": "Почему требование именно такое, с числом из расчётов. Пометка «проверьте число» — число не найдено среди фактов приложения.",
+    "tz|Приоритет": "Обязательно — без этого товар не соответствует доминирующей конфигурации или требованиям рынка; желательно — отличие или улучшение.",
+    "tz|Источник": "Откуда факт: поле схемы, отзывы POE, регуляторный триггер, патентный скан, цены.",
+    "Открытые вопросы к производителю": "Что уточнить до заказа партии: то, для чего в данных не хватило фактов.",
     // секции
     "Обзор": "Главные цифры ниши одним взглядом. Цвет плитки — статус показателя по порогам методики.",
     "Критерий 1 — Рыночный контекст": "Восемь рыночных показателей ниши (1a–1h). Нужно минимум 6 чётких «OK»; пограничные значения в счёт не идут.",
@@ -886,13 +978,13 @@
   const SECTIONS = [
     ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget], ["cashflow", secCashflow, drawCashflow],
     ["traffic", secTraffic, drawTraffic], ["entry", secEntry], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
-    ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)],
-    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["conclusion", secConclusion], ["ai", secAi],
+    ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)], ["config", secConfig, drawConfig],
+    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["tz", secTz], ["conclusion", secConclusion], ["ai", secAi],
   ];
   const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "cashflow", "entry", "pricing", "borderline", "challenger", "scorecard", "conclusion", "ai"];
 
   function render(container, A, opts = {}) {
-    chartDefaults(); initTips();
+    chartDefaults(); initTips(); container.__opts = { ...(container.__opts || {}), ...opts };
     const R = A.results; if (!R) { container.innerHTML = '<div class="panel section empty">Нет результатов — загрузите файлы или введите данные.</div>'; return; }
     container.classList.add("dash");
     container.innerHTML = SECTIONS.map(([id]) => `<section class="panel section" data-section="${id}" id="sec-${id}"></section>`).join("");
@@ -910,7 +1002,7 @@
   }
   function update(container, A, opts = {}, ids = ECON_DEPENDENT) {
     if (!container.querySelector("[data-section]")) return render(container, A, opts);
-    const R = A.results; if (!R) return;
+    const R = A.results; if (!R) return; container.__opts = { ...(container.__opts || {}), ...opts }; opts = container.__opts;
     for (const id of ids) fill(container, id, A, R, opts);
   }
   function destroy(container) { for (const c of Object.values(container.__charts || {})) { try { c.destroy(); } catch {} } container.__charts = {}; }
