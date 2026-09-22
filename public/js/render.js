@@ -83,7 +83,7 @@
   function stage2Note(A, R, o) {
     if (o.static || !A.aggregates?.xray?.asins?.length) return "";
     const C = A.config || {}; const st = C.tz ? `ТЗ: ${C.tz.rows.length} требований` : C.table ? `извлечено ${Object.keys(C.table.rows).length} листингов, ТЗ не составлено` : C.schema ? `схема: ${C.schema.fields.length} полей, извлечение не запущено` : "не начат";
-    return `<div class="noprint" style="margin-top:.4rem"><a href="#sec-config" class="chip ${C.table ? "ok" : "na"}" data-goto="sec-config" title="Прокрутить к секции «Конфигурация продукта — этап 2»">Этап 2 · конфигурация продукта и ТЗ: ${esc(st)} ↓</a></div>`;
+    return `<div class="noprint" style="margin-top:.4rem"><a href="#sec-config" class="chip ${C.table ? "ok" : "na"}" data-goto="sec-config" title="Открыть вкладку «Этап 2 · конфигурация продукта и ТЗ»">Этап 2 · конфигурация продукта и ТЗ: ${esc(st)} →</a></div>`;
   }
   function secHero(A, R, o) {
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;

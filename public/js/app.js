@@ -181,6 +181,18 @@ function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.
 // ---------- compute / render ----------
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
 function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); renderCvrHint(); renderConfigSide(); autosave(); }
+// ---------- две вкладки дашборда: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) ----------
+const stageOf = () => (dash.dataset.stage === "2" ? 2 : 1);
+function setStage(n, { scroll = false } = {}) {
+  n = n === 2 ? 2 : 1; const changed = stageOf() !== n; dash.dataset.stage = String(n); try { localStorage.setItem("fba_stage", String(n)); } catch {}
+  $$("#stage-tabs [data-stage]").forEach((b) => b.classList.toggle("active", Number(b.dataset.stage) === n));
+  $("#stage2-empty").classList.toggle("hidden", !(n === 2 && !S.a.aggregates?.xray?.asins?.length));
+  if (changed && S.a.results) R().update(dash, S.a, renderOpts(), n === 2 ? ["hero", "config", "tz"] : SECTION_IDS()); // графики, нарисованные в скрытой вкладке, имеют нулевой размер — перерисовываем
+  if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+const SECTION_IDS = () => [...dash.querySelectorAll("[data-section]")].map((s) => s.dataset.section).filter((id) => id !== "config" && id !== "tz");
+$("#stage-tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-stage]"); if (b) setStage(Number(b.dataset.stage), { scroll: true }); });
+try { if (localStorage.getItem("fba_stage") === "2") setStage(2); } catch {}
 function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
 const scheduleFull = debounce(renderAll, 250);
 let rafId = 0; function scheduleEcon() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(renderEcon); }
@@ -465,13 +477,14 @@ function renderConfig(ids = ["config", "tz"]) { recompute(); R().update(dash, S.
 function renderConfigSide() {
   const C = S.a.config || {}; const hasX = Boolean(S.a.aggregates?.xray?.asins?.length); const busy = Boolean(S.cfgBusy || S.tzBusy);
   const badge = $("#config-side-badge"); const [cls, text] = !hasX ? ["na", "нужен Xray"] : C.tz ? ["ok", "ТЗ готово"] : C.table ? ["ok", "извлечено"] : C.schema ? ["warn", "схема есть"] : ["na", "не начат"];
-  if (badge) { badge.className = "chip " + cls; badge.textContent = text; }
+  for (const b of [badge, $("#stage2-badge")]) if (b) { b.className = "chip " + cls; b.textContent = text; }
+  $("#stage2-empty").classList.toggle("hidden", !(stageOf() === 2 && !hasX));
   const st = !hasX ? "Загрузите Xray — этап 2 работает по его ASIN." : C.tz ? `ТЗ: ${C.tz.rows.length} требований · извлечено ${Object.keys(C.table?.rows || {}).length} листингов` : C.table ? `Извлечено ${Object.keys(C.table.rows).length} листингов по ${C.schema.fields.length} полям — можно составить ТЗ (шаг 3).` : C.schema ? `Схема: ${C.schema.fields.length} полей — проверьте её в секции («Править схему») и запустите извлечение (шаг 2).` : `Область: ${S.a.results?.configScope?.count ?? "—"} ASIN. Начните с шага 1 — схема полей по 15 самым продаваемым листингам.`;
   if (!busy) cfgStatus("#config-side-status", st);
   const dis = (id, v) => { const b = $(id); if (b) b.disabled = v; };
   dis("#side-config-schema", !hasX || busy); dis("#side-config-extract", !C.schema || busy); dis("#side-config-tz", !C.table || busy); dis("#side-config-go", !hasX);
 }
-function gotoConfig(id = "sec-config") { showTab("analysis"); const el = document.getElementById(id); if (!el) return toast("Секция появится после загрузки Xray"); el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
+function gotoConfig(id = "sec-config") { showTab("analysis"); setStage(2); const el = document.getElementById(id); if (!el || el.classList.contains("hidden")) return toast("Секция появится после загрузки Xray"); el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
 $("#side-config-schema").addEventListener("click", () => startConfigSchema());
 $("#side-config-extract").addEventListener("click", () => startConfigExtract());
 $("#side-config-tz").addEventListener("click", () => startConfigTz());
@@ -492,7 +505,7 @@ async function startConfigSchema(resumeJobId = null) {
   if (!S.a.results) renderAll();
   const th = cfgTh(); const top = topForSchema(configScope(S.a, th), th);
   if (top.length < 3) return toast("В области меньше трёх ASIN — проверьте Xray и исключённые бренды");
-  S.cfgBusy = { type: "schema", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); cfgStatus("#config-status", S.cfgBusy.text);
+  S.cfgBusy = { type: "schema", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); cfgStatus("#config-status", S.cfgBusy.text);
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
     const chosen = modelAi();
@@ -510,7 +523,7 @@ async function startConfigExtract(resumeJobId = null) {
   const th = cfgTh(); const scope = configScope(S.a, th); if (!scope.asins.length) return toast("Нет ASIN для извлечения");
   const cached = freshListings(S.a.aggregates.listings, scope.asins, th); const missing = scope.asins.length - Object.keys(cached).length;
   if (!resumeJobId && missing > 0 && !confirm(`Будет загружено ${missing} страниц листингов через Scrapfly (≈ ${missing * 30} кредитов; ${Object.keys(cached).length} уже в кэше) и выполнено извлечение по ${scope.asins.length} листингам${scope.capped ? ` (предел ${scope.asins.length} из ${scope.total} — см. «Пороги»)` : ""}. Продолжить?`)) return;
-  S.cfgBusy = { type: "extract", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); cfgStatus("#config-status", S.cfgBusy.text);
+  S.cfgBusy = { type: "extract", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); renderConfigSide(); cfgStatus("#config-status", S.cfgBusy.text);
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
     const chosen = modelAi();
@@ -526,7 +539,7 @@ async function startConfigExtract(resumeJobId = null) {
 async function startConfigTz(resumeJobId = null) {
   if (S.tzBusy) return; const C = S.a.config; if (!C?.table) return toast("Сначала извлеките характеристики (шаг 2)");
   if (!S.a.results) renderAll();
-  S.tzBusy = { text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; R().update(dash, S.a, renderOpts(), ["tz"]); renderConfigSide(); cfgStatus("#tz-status", S.tzBusy.text);
+  S.tzBusy = { text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["tz"]); renderConfigSide(); cfgStatus("#tz-status", S.tzBusy.text);
   try {
     const chosen = modelAi();
     const done = await runConfigJob(S.a, "config_tz", "/api/config/tz", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, payload: buildTzPayload(S.a), options: chosen ? { model: chosen } : {} },

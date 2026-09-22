@@ -291,3 +291,12 @@ td.editable select, td.editable input { font-size: .85rem; padding: .1rem .3rem;
 .section { scroll-margin-top: 66px; } /* якорь ниже закреплённой шапки */
 .section.flash { outline: 3px solid var(--accent); outline-offset: 2px; transition: outline-color 1.2s ease; }
 #det-config .row button { font-size: .82rem; }
+
+/* две вкладки над дашбордом: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) */
+.stagetabs { display: flex; gap: .2rem; border-bottom: 1px solid var(--border); margin-bottom: 12px; overflow-x: auto; }
+.stagetabs button { border: none; border-radius: 0; background: transparent; padding: .55rem .9rem; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: inline-flex; gap: .4rem; align-items: center; }
+.stagetabs button:hover { background: var(--surface-2); color: var(--text); }
+.stagetabs button.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+#dashboard[data-stage="1"] > #sec-config, #dashboard[data-stage="1"] > #sec-tz { display: none; }
+#dashboard[data-stage="2"] > .section:not(#sec-hero):not(#sec-config):not(#sec-tz) { display: none; }
+#stage2-empty { margin-bottom: 12px; }

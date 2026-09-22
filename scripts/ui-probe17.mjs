@@ -25,9 +25,13 @@ try {
   // точка входа: раздел 9 панели и ссылка в шапке
   ok(/не начат/.test(await txt(page, "#config-side-badge")) && /Начните с шага 1/.test(await txt(page, "#config-side-status")), "раздел 9 панели показывает состояние «не начат» и подсказку");
   ok(/Этап 2 · конфигурация продукта и ТЗ: не начат/.test(await txt(page, "#sec-hero [data-goto]")), "в шапке дашборда есть ссылка на этап 2");
+  ok(await page.evaluate(() => document.querySelector("#dashboard").dataset.stage === "1" && getComputedStyle(document.querySelector("#sec-config")).display === "none" && getComputedStyle(document.querySelector("#sec-economics")).display !== "none"), "вкладка «Этап 1»: секции этапа 2 скрыты, экономика видна");
+  await click(page, '#stage-tabs [data-stage="2"]'); await page.waitForTimeout(300);
+  ok(await page.evaluate(() => document.querySelector("#dashboard").dataset.stage === "2" && getComputedStyle(document.querySelector("#sec-config")).display !== "none" && getComputedStyle(document.querySelector("#sec-economics")).display === "none" && getComputedStyle(document.querySelector("#sec-hero")).display !== "none"), "вкладка «Этап 2»: видны шапка и секции этапа 2, остальное скрыто");
+  await click(page, '#stage-tabs [data-stage="1"]'); await page.waitForTimeout(200);
   await click(page, "#side-config-go");
-  const scrolled = await page.waitForFunction(() => { const r = document.querySelector("#sec-config").getBoundingClientRect(); return r.top >= -5 && r.top < 200; }, null, { timeout: 4000 }).then(() => true).catch(() => false);
-  ok(scrolled, "«Показать секцию ↓» прокручивает к секции этапа 2" + (scrolled ? "" : " (top=" + (await page.evaluate(() => Math.round(document.querySelector("#sec-config").getBoundingClientRect().top))) + ")"));
+  const scrolled = await page.waitForFunction(() => { const r = document.querySelector("#sec-config").getBoundingClientRect(); return r.top >= -5 && r.top < window.innerHeight - 100 && document.querySelector("#dashboard").dataset.stage === "2"; }, null, { timeout: 4000 }).then(() => true).catch(() => false);
+  ok(scrolled, "«Показать секцию ↓» открывает вкладку «Этап 2», секция в поле зрения" + (scrolled ? "" : " (top=" + (await page.evaluate(() => Math.round(document.querySelector("#sec-config").getBoundingClientRect().top))) + ")"));
   ok(await page.evaluate(() => document.querySelector("#side-config-extract").disabled && !document.querySelector("#side-config-schema").disabled), "кнопки панели: шаг 1 доступен, шаг 2 — нет");
 
   // шаг 1 — схема (кнопкой из панели)
@@ -72,7 +76,7 @@ try {
   await page.waitForFunction((c) => /✎/.test(document.querySelector(`#sec-config td[data-cell="${c}"]`)?.textContent || ""), cellSel, { timeout: 5000 });
   ok(true, "клетка исправлена вручную (пометка ✎)"); ok(await page.evaluate(() => document.querySelector("#sec-config details.cfgtable").open), "таблица осталась раскрытой после перерисовки");
 
-  ok(/извлечено/.test(await txt(page, "#config-side-badge")) && !(await page.evaluate(() => document.querySelector("#side-config-tz").disabled)), "раздел 9: «извлечено», шаг 3 доступен");
+  ok(/извлечено/.test(await txt(page, "#config-side-badge")) && /извлечено/.test(await txt(page, "#stage2-badge")) && !(await page.evaluate(() => document.querySelector("#side-config-tz").disabled)), "раздел 9 и бейдж вкладки: «извлечено», шаг 3 доступен");
   // шаг 3 — ТЗ
   ok(/не составлено/.test(await txt(page, "#sec-tz h2")), "секция ТЗ видна после извлечения");
   await click(page, '#sec-tz [data-action="config-tz"]');
@@ -87,6 +91,7 @@ try {
 
   // F5: схема, таблица, ручная клетка и ТЗ — из общей истории
   await page.reload({ waitUntil: "networkidle" }); await page.waitForFunction(() => document.querySelector("#sec-config .piegrid"), null, { timeout: 20000 });
+  ok(await page.evaluate(() => document.querySelector("#dashboard").dataset.stage === "2" && document.querySelector("#sec-config canvas").width > 0), "после F5 открыта вкладка «Этап 2» (запомнена), диаграммы отрисованы");
   ok(/Материал корпуса/.test(await txt(page, "#sec-config .chips")) && /Правленое требование/.test(await txt(page, "#sec-tz")), "после F5 схема, таблица и правленое ТЗ на месте");
   ok(await page.evaluate((c) => /✎/.test(document.querySelector(`#sec-config td[data-cell="${c}"]`)?.textContent || ""), cellSel), "ручная клетка пережила F5");
 
