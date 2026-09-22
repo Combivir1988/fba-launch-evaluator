@@ -14,6 +14,16 @@ export const MAX_ASINS_HARD = 200; // жёсткий предел сервера
 const pickModel = (options, cfg) => (options?.model && cfg.openrouterModels?.includes(options.model) ? options.model : cfg.openrouterModel);
 const cleanAsins = (list) => [...new Set((Array.isArray(list) ? list : []).map((a) => String(a?.asin ?? a).toUpperCase().trim()).filter((a) => ASIN_RE.test(a)))].slice(0, MAX_ASINS_HARD);
 const toErr = (e) => ({ code: e?.code || "upstream", message: e?.message || String(e), retryable: e?.retryable ?? (e?.code !== "auth" && e?.code !== "credits") });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Вызов AI с повторами: перегрузка бесплатной модели (429/503) — обычное дело, а страницы уже оплачены. Ошибки ключа и разбора не повторяем. */
+async function retryAi(fn, { tries = 3, pauseMs = 15000, signal } = {}) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) { last = e; if (e?.code === "auth" || e?.code === "parse" || e?.retryable === false || signal?.aborted || i === tries - 1) throw e; await sleep(pauseMs * (i + 1)); }
+  }
+  throw last;
+}
 
 /** Загрузить недостающие страницы: cached — свежий кэш клиента; отдаёт события fetch и возвращает { listings (все), fresh (новые), cost }. */
 async function* fetchMissing(asins, cached, cfg, deps, label = "Загружаю страницы") {
@@ -42,17 +52,18 @@ export async function* schemaStream(body, cfg, deps = {}) {
   const aiJson = deps.aiJson || openrouterJson; const t0 = Date.now();
   const asins = cleanAsins(body.asins).slice(0, 25); const model = pickModel(body.options, cfg);
   if (!asins.length) { yield { event: "error", data: { code: "bad_request", message: "Нет ASIN для схемы — загрузите Xray", retryable: false } }; return; }
+  let fresh = null;
   try {
-    const got = yield* fetchMissing(asins, body.listings, cfg, deps);
+    const got = yield* fetchMissing(asins, body.listings, cfg, deps); fresh = got.fresh;
     const listings = asins.map((a) => got.listings[a]).filter((l) => l && !l.error);
     if (listings.length < 3) { yield { event: "stage", data: { stage: "partial", listings: got.fresh } }; yield { event: "error", data: { code: "asp", message: `Загрузилось только ${listings.length} страниц — схему не построить`, retryable: true } }; return; }
     yield { event: "stage", data: { stage: "ai", text: `AI предлагает схему полей по ${listings.length} листингам…`, cost: got.cost } };
-    const raw = cfg.mock ? mockFields({ listings }) : await aiJson({ cfg, model, system: SYS_FIELDS, user: fieldsUser({ niche: body.niche, coreKeyword: body.coreKeyword, listings }), schema: FIELDS_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 6000 });
+    const raw = cfg.mock ? mockFields({ listings }) : await retryAi(() => aiJson({ cfg, model, system: SYS_FIELDS, user: fieldsUser({ niche: body.niche, coreKeyword: body.coreKeyword, listings }), schema: FIELDS_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 6000 }), { pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
     const schema = sanitizeSchema({ fields: raw.fields, proposedAt: new Date().toISOString(), model: cfg.mock ? "mock" : model, editedAt: null, basedOn: listings.length });
-    if (schema.fields.length < 3) { yield { event: "error", data: { code: "parse", message: "AI вернул меньше трёх полей — повторите", retryable: true } }; return; }
+    if (schema.fields.length < 3) { yield { event: "stage", data: { stage: "partial", listings: got.fresh } }; yield { event: "error", data: { code: "parse", message: "AI вернул меньше трёх полей — повторите (страницы сохранены в кэше)", retryable: true } }; return; }
     log("info", "config schema done", { fields: schema.fields.length, listings: listings.length, cost: got.cost, ms: Date.now() - t0 });
     yield { event: "done", data: { schema, listings: got.fresh, cost: got.cost, model: schema.model, durationMs: Date.now() - t0 } };
-  } catch (e) { if (e?.partial) yield { event: "stage", data: { stage: "partial", listings: e.partial } }; yield { event: "error", data: toErr(e) }; }
+  } catch (e) { const partial = e?.partial || fresh; if (partial && Object.keys(partial).length) yield { event: "stage", data: { stage: "partial", listings: partial } }; yield { event: "error", data: toErr(e) }; } // оплаченные страницы не теряются
 }
 
 /** Извлечение: недостающие страницы → AI пачками. body: { niche, schema, asins, listings, prevTable, options } */
@@ -62,8 +73,9 @@ export async function* extractStream(body, cfg, deps = {}) {
   const batchSize = Math.max(1, Math.min(12, Number(body.batchSize) || 6)); const parallel = deps.aiParallel ?? 2;
   if (!schema.fields.length) { yield { event: "error", data: { code: "bad_request", message: "Схема полей пуста", retryable: false } }; return; }
   if (!asins.length) { yield { event: "error", data: { code: "bad_request", message: "Нет ASIN для извлечения", retryable: false } }; return; }
+  let fresh = null;
   try {
-    const got = yield* fetchMissing(asins, body.listings, cfg, deps);
+    const got = yield* fetchMissing(asins, body.listings, cfg, deps); fresh = got.fresh;
     const ok = asins.filter((a) => got.listings[a] && !got.listings[a].error);
     const batches = []; for (let i = 0; i < ok.length; i += batchSize) batches.push(ok.slice(i, i + batchSize));
     const items = []; let doneB = 0; const errors = [];
@@ -72,11 +84,8 @@ export async function* extractStream(body, cfg, deps = {}) {
     const runBatch = async (batch) => {
       const listings = batch.map((a) => got.listings[a]);
       if (cfg.mock) return mockExtract({ schema, listings }).items;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try { const r = await aiJson({ cfg, model, system: SYS_EXTRACT, user: extractUser({ niche: body.niche, schema, listings }), schema: EXTRACT_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 8000 }); return r.items || []; }
-        catch (e) { if (attempt === 1 || e?.code === "auth" || deps.signal?.aborted) throw e; }
-      }
-      return [];
+      const r = await retryAi(() => aiJson({ cfg, model, system: SYS_EXTRACT, user: extractUser({ niche: body.niche, schema, listings }), schema: EXTRACT_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 8000 }), { tries: 3, pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
+      return r.items || [];
     };
     const worker = async (out) => { while (bi < batches.length && !deps.signal?.aborted) { const b = batches[bi++]; try { out.push(...(await runBatch(b))); } catch (e) { errors.push({ asins: b, message: e?.message }); if (e?.code === "auth") throw e; } doneB++; } };
     // события между пачками: воркеры пишут в items, генератор опрашивает прогресс
@@ -88,7 +97,7 @@ export async function* extractStream(body, cfg, deps = {}) {
     if (errors.length) table.aiErrors = errors.map((e) => ({ asins: e.asins, message: String(e.message || "").slice(0, 200) }));
     log("info", "config extract done", { asins: asins.length, loaded: ok.length, batches: batches.length, errors: errors.length, cost: got.cost, ms: Date.now() - t0 });
     yield { event: "done", data: { table, schema, listings: got.fresh, cost: got.cost, model: table.model, durationMs: Date.now() - t0 } };
-  } catch (e) { if (e?.partial) yield { event: "stage", data: { stage: "partial", listings: e.partial } }; yield { event: "error", data: toErr(e) }; }
+  } catch (e) { const partial = e?.partial || fresh; if (partial && Object.keys(partial).length) yield { event: "stage", data: { stage: "partial", listings: partial } }; yield { event: "error", data: toErr(e) }; }
 }
 
 /** ТЗ производителю: факты → AI → проверка чисел. body: { niche, coreKeyword, payload, options } */
@@ -97,7 +106,7 @@ export async function* tzStream(body, cfg, deps = {}) {
   const payload = body.payload; if (!payload || typeof payload !== "object") { yield { event: "error", data: { code: "bad_request", message: "Нет фактов для ТЗ", retryable: false } }; return; }
   try {
     yield { event: "stage", data: { stage: "ai", text: "AI составляет ТЗ по фактам этапов 1–2…" } };
-    const raw = cfg.mock ? mockTz({ payload }) : await aiJson({ cfg, model, system: SYS_TZ, user: tzUser({ niche: body.niche, coreKeyword: body.coreKeyword, payload }), schema: TZ_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 10000 });
+    const raw = cfg.mock ? mockTz({ payload }) : await retryAi(() => aiJson({ cfg, model, system: SYS_TZ, user: tzUser({ niche: body.niche, coreKeyword: body.coreKeyword, payload }), schema: TZ_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 10000 }), { pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
     const tz = markUnverified({ title: String(raw.title || "").slice(0, 200), summary: String(raw.summary || "").slice(0, 2000), rows: (raw.rows || []).slice(0, 60).map((r) => ({ section: r.section, param: String(r.param || "").slice(0, 120), requirement: String(r.requirement || "").slice(0, 600), rationale: String(r.rationale || "").slice(0, 600), priority: r.priority === "must" ? "must" : "should", source: String(r.source || "").slice(0, 200) })),
       openQuestions: (raw.openQuestions || []).slice(0, 20).map((q) => String(q).slice(0, 300)), generatedAt: new Date().toISOString(), model: cfg.mock ? "mock" : model, editedAt: null }, collectTzNumbers(payload));
     log("info", "config tz done", { rows: tz.rows.length, unverified: tz.rows.filter((r) => r.unverified).length, ms: Date.now() - t0 });

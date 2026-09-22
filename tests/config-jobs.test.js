@@ -59,9 +59,22 @@ test("extractStream: кредиты закончились посреди заг
   assert.equal(ev.at(-1).event, "error"); assert.equal(ev.at(-1).data.code, "credits"); assert.equal(ev.at(-1).data.retryable, false);
   const partial = last(ev, "stage"); assert.equal(partial.stage, "partial"); assert.equal(Object.keys(partial.listings).length, 2, "загруженное до ошибки не пропало");
   let calls = 0; const aiJson = async ({ user }) => { calls++; if (calls === 1) throw Object.assign(new Error("boom"), { code: "upstream" }); const ids = [...user.matchAll(/ASIN (B0\d{8})/g)].map((m) => m[1]); return { items: ids.map((a) => ({ asin: a, values: [{ field: "material", value: "шёлк", source: "title" }] })) }; };
-  const ev2 = await collect(extractStream({ niche: "x", schema, asins: [asin(1), asin(2)], listings: {}, batchSize: 1 }, live, { fetchImpl: async () => res(200, j), aiJson, aiParallel: 1 }));
+  const ev2 = await collect(extractStream({ niche: "x", schema, asins: [asin(1), asin(2)], listings: {}, batchSize: 1 }, live, { fetchImpl: async () => res(200, j), aiJson, aiParallel: 1, aiPauseMs: 0 }));
   assert.equal(ev2.at(-1).event, "done"); const t = ev2.at(-1).data.table; assert.equal(calls, 3, "первая пачка: ошибка + повтор; вторая: одна попытка");
   assert.equal(t.rows[asin(1)].values.material.value, "шёлк"); assert.equal(t.aiErrors, undefined);
+});
+
+test("AI перегружен после загрузки страниц: оплаченные страницы уходят в partial перед ошибкой; повтор AI спасает задачу", async () => {
+  const j = fixture("B0BZHGDPMK"); const fetchImpl = async () => res(200, j); const asins = [asin(1), asin(2), asin(3)];
+  const overloaded = async () => { throw Object.assign(new Error("модель перегружена"), { code: "upstream", retryable: true }); };
+  const ev = await collect(schemaStream({ niche: "x", asins, listings: {} }, live, { fetchImpl, aiJson: overloaded, aiPauseMs: 0 }));
+  assert.equal(ev.at(-1).event, "error"); const partial = last(ev, "stage"); assert.equal(partial.stage, "partial"); assert.equal(Object.keys(partial.listings).length, 3, "три загруженные страницы отданы клиенту");
+  let n = 0; const flaky = async () => { if (++n < 3) throw Object.assign(new Error("busy"), { code: "upstream", retryable: true }); return { fields: [{ id: "a", name: "A", type: "text", unit: "", options: [], hint: "" }, { id: "b", name: "B", type: "text", unit: "", options: [], hint: "" }, { id: "c", name: "C", type: "text", unit: "", options: [], hint: "" }] }; };
+  const ev2 = await collect(schemaStream({ niche: "x", asins, listings: {} }, live, { fetchImpl, aiJson: flaky, aiPauseMs: 0 })); assert.equal(ev2.at(-1).event, "done"); assert.equal(n, 3, "две неудачи, третья попытка удалась");
+  n = 0; const parseErr = async () => { n++; throw Object.assign(new Error("не по схеме"), { code: "parse" }); };
+  const ev3 = await collect(schemaStream({ niche: "x", asins, listings: {} }, live, { fetchImpl, aiJson: parseErr, aiPauseMs: 0 })); assert.equal(ev3.at(-1).data.code, "parse"); assert.equal(n, 1, "ошибку разбора не повторяем");
+  const ev4 = await collect(extractStream({ niche: "x", schema, asins, listings: {} }, live, { fetchImpl, aiJson: overloaded, aiPauseMs: 0, aiParallel: 1 }));
+  assert.equal(ev4.at(-1).event, "done", "извлечение: ошибка пачки не валит задачу"); assert.equal(ev4.at(-1).data.table.aiErrors.length, 1); assert.equal(Object.keys(ev4.at(-1).data.listings).length, 3);
 });
 
 test("extractStream / schemaStream / tzStream в MOCK: без сети и ключей, детерминированно", async () => {
