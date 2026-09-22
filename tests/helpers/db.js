@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { connect } from "../../server/db/index.js";
 import { migrate } from "../../server/db/migrate.js";
 
-const TABLES = ["app_settings", "job_log", "shares", "analyses", "sessions", "users"];
+const TABLES = ["analysis_versions", "app_settings", "job_log", "shares", "analyses", "sessions", "users"];
 
 export async function testDb() {
   const db = await connect({ dbMemory: true });

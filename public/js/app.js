@@ -192,10 +192,19 @@ function setSaveState(state, extra = "") {
   el.className = state === "saved" ? "ok" : state === "conflict" || state === "error" ? "bad" : "muted";
   if (state === "conflict") { el.style.cursor = "pointer"; el.title = "Показать варианты"; } else { el.style.cursor = ""; el.title = ""; }
 }
+// Последний открытый анализ хранится в учётной записи (spec 009): на общем компьютере другой человек не увидит чужую работу.
+let lastSent = null;
+function rememberLast(id) {
+  if (!S.user || id === lastSent) return; lastSent = id; S.user.settings = { ...(S.user.settings || {}), lastAnalysisId: id };
+  api("PATCH", "/api/auth/settings", { lastAnalysisId: id }, { noRedirect: true }).catch(() => { lastSent = null; });
+}
 function renderDocMeta() {
   const m = S.meta; const el = $("#doc-meta"); if (!el) return;
   const t = (d) => new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
   el.textContent = m ? `автор: ${m.createdBy?.name || "—"} · изменил: ${m.updatedBy?.name || "—"}, ${t(m.updatedAt)}` : "";
+  // чужой анализ: предупредить до первой правки и предложить копию
+  const foreign = Boolean(m && S.user && m.createdBy?.id && m.createdBy.id !== S.user.id); const box = $("#foreign-note");
+  if (box) { box.classList.toggle("hidden", !foreign); if (foreign) box.querySelector("[data-foreign-name]").textContent = m.createdBy?.name || "другой пользователь"; }
 }
 let saveChain = Promise.resolve(true);
 /** Поставить сохранение в очередь (запросы к одному анализу идут строго по одному). → true, если на сервере актуальная версия. */
@@ -215,7 +224,7 @@ async function doSave({ force = false } = {}) {
     if (sendAgg) { last = await history.saveAggregates(doc, S.baseVersion, { force }); if (S.a.id !== id) return true; S.baseVersion = last.version; }
     S.conflict = null; S.dirty = coreSignature(splitDoc(S.a).core) !== S.sig || S.aggDirty;
     if (last) S.meta = { ...(S.meta || { createdBy: { id: S.user.id, name: S.user.name }, createdAt: last.updatedAt }), version: last.version, updatedAt: last.updatedAt, updatedBy: { id: S.user.id, name: S.user.name } };
-    localStorage.setItem("fba_last", id); setSaveState(S.dirty ? "dirty" : "saved"); renderDocMeta(); updateHistCount();
+    rememberLast(id); setSaveState(S.dirty ? "dirty" : "saved"); renderDocMeta(); updateHistCount();
     if (S.dirty) autosave();
     return true;
   } catch (e) {
@@ -242,6 +251,29 @@ function showConflict(e) {
 }
 $("#save-state").addEventListener("click", () => { if (S.conflict) showConflict(S.conflict); });
 $("#conflict-later").addEventListener("click", () => $("#conflict-dlg").close());
+// ---------- история версий (spec 009) ----------
+const VLABEL_SHORT = { go: "Go", go_conditional: "Go, условно", rework: "Доработка", no_go: "No-Go" };
+async function openVersions() {
+  if (!S.meta?.version) return toast("Анализ ещё не сохранён — истории версий пока нет");
+  const dlg = $("#versions-dlg"), list = $("#versions-list"); dlg.showModal(); list.innerHTML = '<p class="muted">Загрузка…</p>';
+  try {
+    const { items } = await history.versions(S.a.id);
+    const t = (d) => new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
+    list.innerHTML = items.length ? `<table><thead><tr><th>Состояние на</th><th>Кто записал</th><th>Ниша</th><th>Вердикт</th><th>Отчёты</th><th></th></tr></thead><tbody>${items.map((v) => `<tr><td>${esc(t(v.stateAt))}<br><small class="muted">${v.reason === "restore" ? "до восстановления" : "до правок"} ${esc(v.archivedBy || "")}, ${esc(t(v.archivedAt))}</small></td><td>${esc(v.stateBy?.name || "—")}</td><td>${esc(v.niche || "—")}</td><td>${esc(VLABEL_SHORT[v.verdict] || "—")}${v.c1 != null ? ` · К1 ${v.c1}/8` : ""}</td><td>${v.hasAggregates ? '<span class="chip ok" title="Версия хранит и отчёты того момента">с отчётами</span>' : `<span class="chip na" title="Отчёты останутся текущие">${esc((v.sources || []).join(", ") || "—")}</span>`}</td><td><button data-restore="${esc(v.id)}">Восстановить</button></td></tr>`).join("")}</tbody></table>`
+      : '<p class="muted">Прежних версий нет: анализ ещё не перезаписывали.</p>';
+  } catch (e) { list.innerHTML = `<p class="muted">Не удалось загрузить версии: ${esc(e.message)}</p>`; }
+}
+$("#btn-versions").addEventListener("click", openVersions);
+$("#versions-close").addEventListener("click", () => $("#versions-dlg").close());
+$("#versions-list").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-restore]"); if (!b) return; b.disabled = true;
+  try { if (S.dirty && !S.conflict) await saveNow(); const r = await history.restore(S.a.id, b.dataset.restore); $("#versions-dlg").close(); loadAnalysis(r.doc, r.meta);
+    toast(r.aggregatesRestored ? "Версия восстановлена вместе с отчётами; прежнее состояние тоже сохранено в версиях" : "Версия восстановлена (отчёты остались текущие); прежнее состояние сохранено в версиях", 7000); }
+  catch (err) { toast("Не удалось восстановить: " + err.message, 7000); b.disabled = false; }
+});
+$("#foreign-copy").addEventListener("click", async () => {
+  try { recompute(); const r = await history.copy(S.a); const g = await history.get(r.id); loadAnalysis(g.doc, g.meta); toast("Создана ваша копия — правки теперь идут в неё"); } catch (e) { toast("Не удалось создать копию: " + e.message, 6000); }
+});
 $("#conflict-copy").addEventListener("click", async () => {
   try { recompute(); const r = await history.copy(S.a); const g = await history.get(r.id); $("#conflict-dlg").close(); S.conflict = null; loadAnalysis(g.doc, g.meta); toast("Ваши правки сохранены как копия — вы её автор"); }
   catch (err) { toast("Не удалось сохранить копию: " + err.message, 7000); }
@@ -448,7 +480,7 @@ function loadAnalysis(doc, meta = null) {
   renderAll(); showTab("analysis");
   // Подпись — после пересчёта: открытие анализа само по себе ничего не сохраняет и не меняет «кто изменил».
   S.sig = meta ? coreSignature(splitDoc(S.a).core) : ""; S.dirty = false;
-  if (meta) localStorage.setItem("fba_last", S.a.id);
+  if (meta) rememberLast(S.a.id);
   setSaveState(meta ? "saved" : ""); renderDocMeta();
   resumePendingJobs();
 }
@@ -494,7 +526,7 @@ $("#histlist").addEventListener("click", async (e) => {
     else if (b.dataset.del) {
       if (!confirm("Удалить анализ из общей истории? Он пропадёт у всей команды, публичные ссылки на него перестанут работать.")) return;
       await history.delete(b.dataset.del);
-      if (S.a.id === b.dataset.del) { localStorage.removeItem("fba_last"); loadAnalysis(newAnalysis(), null); showTab("history"); }
+      if (S.a.id === b.dataset.del) { rememberLast(null); loadAnalysis(newAnalysis(), null); showTab("history"); }
       renderHistory(); updateHistCount();
     }
   } catch (err) { toast(err.message, 7000); }
@@ -751,7 +783,7 @@ async function offerLocalMigration() {
   });
 }
 async function openLastIfEmpty() {
-  if (hasContent()) return; const last = localStorage.getItem("fba_last"); if (!last) return;
+  if (hasContent()) return; const last = S.user?.settings?.lastAnalysisId; if (!last) return;
   try { const g = await history.get(last); loadAnalysis(g.doc, g.meta); showTab("history"); } catch {}
 }
 $("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
@@ -827,9 +859,10 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
 
   try { await initUser(); } catch { return; } // без сеанса api() уже увёл на страницу входа
   updateHistCount();
-  const last = localStorage.getItem("fba_last");
+  localStorage.removeItem("fba_last"); // прежняя привязка к браузеру — больше не используется
+  const last = S.user?.settings?.lastAnalysisId; lastSent = last || null;
   let opened = false;
-  if (last) { try { const g = await history.get(last); loadAnalysis(g.doc, g.meta); opened = true; } catch (e) { if (e.status === 404 && localStorage.getItem("fba_migrated")) localStorage.removeItem("fba_last"); } } // до переноса локальной истории анализ может быть ещё только в браузере
+  if (last) { try { const g = await history.get(last); loadAnalysis(g.doc, g.meta); opened = true; } catch (e) { if (e.status === 404) rememberLast(null); } } // до переноса локальной истории анализ может быть ещё только в браузере
   if (!opened) { renderAll(); resumePendingJobs(); }
   showTab(startTab);
   offerLocalMigration().catch((e) => console.warn("migration offer", e));

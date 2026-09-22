@@ -28,7 +28,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const appSettings = deps.appSettings || createAppSettings(db, deps.appSettingsOpts || {});
   const sessions = deps.sessions || createSessions(db, { ...cfg, getPolicy: appSettings.getSessionPolicy });
   const users = deps.users || createUsers(db, sessions, deps.usersOpts || {});
-  const analyses = deps.analyses || createAnalyses(db);
+  const analyses = deps.analyses || createAnalyses(db, deps.analysesOpts || {});
   const google = deps.google || createGoogleAuth(cfg, deps.googleOpts || {});
   const shares = deps.shares || createShares(db, analyses, { publicUrl: cfg.publicUrl, ...(deps.sharesOpts || {}) });
   const app = express();
@@ -155,6 +155,9 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
     const b = req.body || {};
     res.json(await analyses.saveAggregates({ id: req.params.id, baseVersion: b.baseVersion, aggregates: b.aggregates, force: b.force === true }, req.user));
   });
+  // История версий (spec 009)
+  app.get("/api/analyses/:id/versions", authed, async (req, res) => res.json({ items: await analyses.listVersions(req.params.id) }));
+  app.post("/api/analyses/:id/versions/:vid/restore", authed, async (req, res) => { const r = await analyses.restoreVersion(req.params.id, req.params.vid, req.user); log("info", "version restored", { by: req.user.login, analysis: req.params.id, version: req.params.vid }); res.json(r); });
   app.post("/api/analyses/:id/copy", authed, jsonBig, async (req, res) => res.status(201).json(await analyses.copy({ core: req.body?.core, aggregates: req.body?.aggregates }, req.user)));
   app.delete("/api/analyses/:id", authed, async (req, res) => {
     await analyses.remove(req.params.id, req.user);

@@ -18,6 +18,8 @@ export const history = {
   saveCore(doc, baseVersion, { force = false } = {}) { return api("PUT", `/api/analyses/${enc(doc.id)}`, { baseVersion, core: splitDoc(doc).core, force }); },
   saveAggregates(doc, baseVersion, { force = false } = {}) { return api("PUT", `/api/analyses/${enc(doc.id)}/aggregates`, { baseVersion, aggregates: doc.aggregates || {}, force }); },
   /** «Сохранить как копию» → { id, version } */
+  versions(id) { return api("GET", `/api/analyses/${enc(id)}/versions`); },
+  restore(id, vid) { return api("POST", `/api/analyses/${enc(id)}/versions/${enc(vid)}/restore`).then((r) => ({ doc: joinDoc(r.core, r.aggregates), meta: r.meta, aggregatesRestored: r.aggregatesRestored })); },
   copy(doc) { const { core, aggregates } = splitDoc(doc); return api("POST", `/api/analyses/${enc(doc.id)}/copy`, { core, aggregates }); },
   delete(id) { return api("DELETE", `/api/analyses/${enc(id)}`); },
   /** Идемпотентный импорт целого документа → { id, imported } */

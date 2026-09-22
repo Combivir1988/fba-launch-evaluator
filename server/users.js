@@ -140,6 +140,7 @@ export function createUsers(db, sessions, opts = {}) {
 
   async function updateSettings(userId, patch = {}) {
     const clean = {};
+    if (patch.lastAnalysisId !== undefined) { const v = patch.lastAnalysisId; if (v !== null && !(typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v))) throw new UserError("bad_settings", "Недопустимое значение lastAnalysisId"); clean.lastAnalysisId = v; } // последний открытый анализ — у учётной записи, а не у браузера (spec 009)
     for (const k of ["modelAi", "modelPatents"]) if (patch[k] !== undefined) { if (typeof patch[k] !== "string" || patch[k].length > 120) throw new UserError("bad_settings", `Недопустимое значение ${k}`); clean[k] = patch[k]; }
     const r = (await db.query("UPDATE users SET settings = settings || $2::jsonb WHERE id = $1 RETURNING settings", [userId, JSON.stringify(clean)])).rows[0];
     if (!r) throw new UserError("not_found", "Пользователь не найден", 404);
