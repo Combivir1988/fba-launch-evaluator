@@ -94,6 +94,11 @@ test("updateSettings: только известные ключи, слияние
   assert.deepEqual(await U.updateSettings(u.id, { modelAi: "a/b", evil: "x" }), { modelAi: "a/b" });
   assert.deepEqual(await U.updateSettings(u.id, { modelPatents: "c/d" }), { modelAi: "a/b", modelPatents: "c/d" });
   await assert.rejects(U.updateSettings(u.id, { modelAi: 5 }), code("bad_settings"));
+  // личные наборы порогов (spec 011): форма проверяется, хранятся только отличия от умолчаний
+  const st = await U.updateSettings(u.id, { thresholdPresets: [{ id: "p1", name: "Дешёвые", thresholds: { criterion1: { priceOk: 20, priceWarn: 25 }, junk: { a: 1 } } }] });
+  assert.deepEqual(st.thresholdPresets[0].thresholds, { criterion1: { priceOk: 20 } }); assert.equal(st.modelAi, "a/b", "остальные настройки не тронуты");
+  await assert.rejects(U.updateSettings(u.id, { thresholdPresets: [{ id: "p1", name: "" }] }), code("bad_settings")); await assert.rejects(U.updateSettings(u.id, { thresholdPresets: "x" }), code("bad_settings"));
+  assert.deepEqual((await U.updateSettings(u.id, { thresholdPresets: [] })).thresholdPresets, []);
 });
 
 test("bootstrapAdmin: создаёт один раз, не трогает существующего, восстанавливает доступ", async () => {

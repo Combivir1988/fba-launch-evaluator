@@ -60,3 +60,38 @@ export function mergeThresholds(custom) {
   }
   return out;
 }
+
+// ---------- личные наборы порогов (spec 011) ----------
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+/** Только известные пороги правильного типа и только те, что отличаются от умолчаний (набор хранит diff, чтобы новые умолчания не «замораживались»). */
+export function thresholdOverrides(custom) {
+  const out = {};
+  for (const [g, obj] of Object.entries(custom || {})) {
+    const d = DEFAULT_THRESHOLDS[g]; if (!d || typeof d !== "object" || !obj || typeof obj !== "object" || Array.isArray(obj)) continue;
+    for (const [k, v] of Object.entries(obj)) {
+      const dv = d[k]; if (dv === undefined) continue;
+      const okNum = isNum(dv) && isNum(v);
+      const okArr = Array.isArray(dv) && Array.isArray(v) && v.length > 0 && v.every(isNum);
+      const okObj = dv && typeof dv === "object" && !Array.isArray(dv) && v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length > 0 && Object.entries(v).every(([kk, vv]) => isNum(dv[kk]) && isNum(vv));
+      if (!okNum && !okArr && !okObj) continue;
+      if (JSON.stringify(v) === JSON.stringify(dv)) continue;
+      (out[g] ||= {})[k] = v;
+    }
+  }
+  return out;
+}
+export const PRESET_LIMITS = { max: 20, nameMax: 60, idMax: 40 };
+/** Наборы порогов из настроек учётной записи: форма проверяется, лишнее отбрасывается; при грубом нарушении — ошибка. */
+export function sanitizePresets(list) {
+  if (!Array.isArray(list)) throw new Error("наборы — не список");
+  if (list.length > PRESET_LIMITS.max) throw new Error(`не больше ${PRESET_LIMITS.max} наборов`);
+  const ids = new Set();
+  return list.map((p, i) => {
+    if (!p || typeof p !== "object") throw new Error(`набор ${i + 1}: не объект`);
+    const id = String(p.id ?? "").trim().slice(0, PRESET_LIMITS.idMax) || "p" + (i + 1); if (ids.has(id)) throw new Error("повторяющийся id"); ids.add(id);
+    const name = String(p.name ?? "").trim().slice(0, PRESET_LIMITS.nameMax); if (!name) throw new Error(`набор ${i + 1}: пустое имя`);
+    const thresholds = thresholdOverrides(p.thresholds);
+    const updatedAt = typeof p.updatedAt === "string" && !Number.isNaN(Date.parse(p.updatedAt)) ? p.updatedAt : new Date().toISOString();
+    return { id, name, thresholds, updatedAt };
+  });
+}

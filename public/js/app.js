@@ -1,7 +1,7 @@
 // FBA Launch Evaluator — состояние приложения, привязка формы, пересчёт, история, AI, экспорт.
 import { newAnalysis, migrate, splitDoc, coreSignature } from "/shared/analysis.js";
 import { compute } from "/shared/compute.js";
-import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION } from "/shared/thresholds.js";
+import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION, thresholdOverrides, PRESET_LIMITS } from "/shared/thresholds.js";
 import { suggestCluster, annotateKeywords, defaultMinCompetitors, knownBrands } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
 import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
@@ -982,13 +982,38 @@ function renderThresholds() {
     if (Array.isArray(v)) return `<div class="field"><label title="${esc(g + "." + k)}">${esc(label)}${changed ? ' <span class="chip warn">изменено</span>' : ""}</label><input data-thr="${g}.${k}" data-arr="1" value="${v.join(", ")}">${hint}</div>`;
     return "";
   }).join("")}</div>`).join("");
-  $("#help-ver").textContent = METHODOLOGY_VERSION;
+  $("#help-ver").textContent = METHODOLOGY_VERSION; renderPresetBar();
 }
+// ---------- личные наборы порогов (spec 011): хранятся в настройках учётной записи, применяются к анализу только кнопкой ----------
+const presets = () => (Array.isArray(S.user?.settings?.thresholdPresets) ? S.user.settings.thresholdPresets : []);
+const countOverrides = (t) => Object.values(t || {}).reduce((n, g) => n + Object.keys(g || {}).length, 0);
+const selectedPreset = () => presets().find((p) => p.id === $("#thr-preset").value) || null;
+function renderPresetBar() {
+  const sel = $("#thr-preset"); if (!sel) return; const cur = sel.value; const list = presets();
+  sel.innerHTML = '<option value="">— выберите набор —</option>' + list.map((p) => `<option value="${esc(p.id)}">${esc(p.name)} · ${countOverrides(p.thresholds)}</option>`).join("");
+  if (list.some((p) => p.id === cur)) sel.value = cur; syncPresetButtons();
+  const ov = countOverrides(thresholdOverrides(S.a.thresholds)); $("#thr-preset-note").textContent = ov ? `В этом анализе изменено порогов: ${ov}` : "В этом анализе пороги по умолчанию";
+}
+function syncPresetButtons() { const has = Boolean(selectedPreset()); for (const id of ["#thr-load", "#thr-update", "#thr-delete"]) $(id).disabled = !has; }
+async function savePresets(list, okText) {
+  try { const r = await api("PATCH", "/api/auth/settings", { thresholdPresets: list }); S.user.settings = r.settings; renderPresetBar(); if (okText) toast(okText); return true; }
+  catch (e) { if (e.status === 401) goLogin(); toast("Наборы порогов: " + e.message, 7000); return false; }
+}
+$("#thr-preset").addEventListener("change", syncPresetButtons);
+$("#thr-save-as").addEventListener("click", async () => {
+  const ov = thresholdOverrides(S.a.thresholds); const n = countOverrides(ov); if (!n) return toast("Пороги сейчас по умолчанию — сохранять нечего: сначала измените нужные значения");
+  if (presets().length >= PRESET_LIMITS.max) return toast(`Не больше ${PRESET_LIMITS.max} наборов — удалите ненужный`);
+  const name = prompt("Название набора порогов:", ""); if (!name || !name.trim()) return;
+  const id = "p" + Date.now().toString(36); if (await savePresets([...presets(), { id, name: name.trim().slice(0, PRESET_LIMITS.nameMax), thresholds: ov, updatedAt: new Date().toISOString() }], `Набор «${name.trim()}» сохранён: ${n} порогов`)) { $("#thr-preset").value = id; syncPresetButtons(); }
+});
+$("#thr-load").addEventListener("click", () => { const p = selectedPreset(); if (!p) return; S.a.thresholds = structuredClone(p.thresholds); renderThresholds(); markDirty(); renderAll(); toast(`Пороги из набора «${p.name}» применены к этому анализу (${countOverrides(p.thresholds)})`); });
+$("#thr-update").addEventListener("click", async () => { const p = selectedPreset(); if (!p) return; const ov = thresholdOverrides(S.a.thresholds); if (!countOverrides(ov)) return toast("Пороги сейчас по умолчанию — набор не перезаписан"); await savePresets(presets().map((x) => (x.id === p.id ? { ...x, thresholds: ov, updatedAt: new Date().toISOString() } : x)), `Набор «${p.name}» обновлён: ${countOverrides(ov)} порогов`); });
+$("#thr-delete").addEventListener("click", async () => { const p = selectedPreset(); if (!p || !confirm(`Удалить набор «${p.name}»?`)) return; $("#thr-preset").value = ""; await savePresets(presets().filter((x) => x.id !== p.id), `Набор «${p.name}» удалён`); });
 $("#thr").addEventListener("change", (e) => {
-  const el = e.target; if (!el.dataset.thr) return;
+  const el = e.target; if (!el.dataset.thr || !el.isConnected) return; // change от поля, удалённого при перерисовке (Chrome шлёт его при потере фокуса), не должен попасть в уже другой анализ
   const [g, k] = el.dataset.thr.split("."); S.a.thresholds[g] ||= {};
   S.a.thresholds[g][k] = el.dataset.arr ? el.value.split(/[,\s]+/).filter(Boolean).map(Number) : Number(el.value);
-  markDirty(); scheduleFull(); toast("Порог изменён — пересчёт");
+  markDirty(); scheduleFull(); renderPresetBar(); toast("Порог изменён — пересчёт");
 });
 $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThresholds(); markDirty(); renderAll(); toast("Пороги сброшены к умолчаниям"); });
 
