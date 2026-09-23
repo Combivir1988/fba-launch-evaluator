@@ -121,3 +121,9 @@ test("деньги по месяцам: причина стартового ур
   const b = entryFixture({ inputs: { cogs: 4.37, startSalesMonthly: 120 } }); assert.match(text(draw(b), "#sec-cashflow .notice.info"), /заданы вручную: 120 шт\/мес/);
   const z = entryFixture({ withXray: false, inputs: { cogs: 4.37 } }); const n = text(draw(z), "#sec-cashflow .notice.info"); assert.match(n, /стартуют с нуля/); assert.match(n, /по \d+ шт\/мес до цели \d+ шт\/мес за \d+ мес/);
 });
+
+test("схема изменилась после извлечения: секция предупреждает и зовёт «Извлечь заново»", () => {
+  const a = withConfig(entryFixture(), { tz: false }); a.config.schema = { ...a.config.schema, fields: [...a.config.schema.fields, { id: "new_field", name: "Новое поле", type: "text", unit: null, options: [], hint: "" }] }; a.results = compute(a);
+  const el = draw(a); assert.match(text(el, "#sec-config .notice"), /Схема изменилась после извлечения.*«Новое поле».*Извлечь заново.*кредиты Scrapfly не тратятся/);
+  const ok = withConfig(entryFixture(), { tz: false }); assert.doesNotMatch(text(draw(ok), "#sec-config"), /Схема изменилась/);
+});

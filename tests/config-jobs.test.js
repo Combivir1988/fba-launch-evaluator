@@ -28,6 +28,16 @@ test("schemaStream (live, подмены): грузит только недос�
   assert.equal(d.schema.model, live.openrouterModel); assert.equal(d.schema.basedOn, 4);
 });
 
+test("повторная схема: текущая схема передаётся модели с просьбой сохранить id полей", async () => {
+  const { fieldsUser } = await import("../server/config-prompts.js");
+  const u = fieldsUser({ niche: "x", coreKeyword: "x", listings: [], prevSchema: { fields: [{ id: "merv_rating", name: "Рейтинг MERV", type: "choice", options: ["MERV 8", "MERV 11"], hint: "" }] } });
+  assert.match(u, /ТЕКУЩАЯ СХЕМА \(сохрани id, названия и типы/); assert.match(u, /merv_rating — «Рейтинг MERV» \(choice\): MERV 8 \| MERV 11/);
+  assert.doesNotMatch(fieldsUser({ niche: "x", coreKeyword: "x", listings: [] }), /ТЕКУЩАЯ СХЕМА/);
+  let seen = ""; const aiJson = async ({ user }) => { seen = user; return { fields: [{ id: "merv_rating", name: "Рейтинг MERV", type: "choice", unit: "", options: ["MERV 8", "MERV 11", "MERV 13"], hint: "" }, { id: "a", name: "A", type: "text", unit: "", options: [], hint: "" }, { id: "b", name: "B", type: "text", unit: "", options: [], hint: "" }] }; };
+  const ev = await collect(schemaStream({ niche: "x", asins: [asin(1), asin(2), asin(3)], listings: {}, prevSchema: { fields: [{ id: "merv_rating", name: "Рейтинг MERV", type: "choice", options: ["MERV 8"], hint: "" }] } }, live, { fetchImpl: async () => res(200, fixture("B0BZHGDPMK")), aiJson }));
+  assert.equal(ev.at(-1).event, "done"); assert.match(seen, /ТЕКУЩАЯ СХЕМА/); assert.equal(ev.at(-1).data.schema.fields[0].id, "merv_rating");
+});
+
 test("schemaStream: без ASIN — error; мало загрузилось — error с partial", async () => {
   const e1 = await collect(schemaStream({ asins: [] }, live, {})); assert.equal(e1[0].event, "error"); assert.equal(e1[0].data.code, "bad_request");
   const e2 = await collect(schemaStream({ niche: "x", asins: [asin(1), asin(2), asin(3)], listings: {} }, live, { fetchImpl: async () => res(422, "asp") }));

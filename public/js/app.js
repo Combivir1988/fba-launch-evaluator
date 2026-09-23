@@ -489,7 +489,7 @@ async function startConfigSchema(resumeJobId = null) {
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
     const chosen = modelAi();
-    const done = await runConfigJob(S.a, "config_schema", "/api/config/schema", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, asins: top, listings: freshListings(S.a.aggregates.listings, top.map((i) => i.asin), th), options: chosen ? { model: chosen } : {} },
+    const done = await runConfigJob(S.a, "config_schema", "/api/config/schema", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, asins: top, listings: freshListings(S.a.aggregates.listings, top.map((i) => i.asin), th), prevSchema: S.a.config?.schema || null, options: chosen ? { model: chosen } : {} },
       { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
     mergeListings(done.listings); ensureConfig().schema = done.schema; markDirty(); renderAll(); await persistJobResult("Схема полей");
     toast(`Схема полей: ${done.schema.fields.length} полей по ${done.schema.basedOn} листингам${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""} — проверьте и поправьте перед извлечением`, 7000);
