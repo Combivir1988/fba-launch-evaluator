@@ -136,4 +136,6 @@ test("блок «Цена вашей конфигурации» и «Промо 
   assert.ok([...el.querySelectorAll("#sec-config td.promo .chip")].some((c) => /купон 10 %/.test(c.textContent)), "чипы промо из MOCK-листингов");
   const s = draw(a, { static: true }); assert.equal(s.querySelectorAll("#sec-config .pricebox select:not([disabled]), #sec-config .pricebox button").length, 0);
   const old = withConfig(entryFixture(), { tz: false }); for (const l of Object.values(old.aggregates.listings)) delete l.promo; old.results = compute(old); const e2 = draw(old); assert.match(text(e2, "#sec-config"), /появятся после повторной загрузки страниц/);
+  const btn = e2.querySelector('#sec-config [data-action="config-promo"]'); assert.ok(btn, "кнопка «Обновить промо» при кэше без промо"); assert.match(btn.textContent, new RegExp(`Обновить промо · ${Object.keys(old.config.table.rows).length} стр`));
+  assert.equal(el.querySelector('#sec-config [data-action="config-promo"]'), null, "промо есть у всех — кнопки нет"); assert.equal(draw(old, { static: true }).querySelector('#sec-config [data-action="config-promo"]'), null, "в снимке кнопки нет");
 });

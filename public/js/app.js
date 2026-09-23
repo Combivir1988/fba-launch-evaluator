@@ -473,7 +473,7 @@ dash.addEventListener("click", (e) => { const a = e.target.closest("[data-goto]"
 function configAction(b) {
   const act = b.dataset.action;
   if (act === "config-schema") return startConfigSchema(); if (act === "config-edit") return openSchemaDialog(); if (act === "config-extract") return startConfigExtract();
-  if (act === "config-tz") return startConfigTz(); if (act === "tz-docx") return downloadTzDocx();
+  if (act === "config-tz") return startConfigTz(); if (act === "tz-docx") return downloadTzDocx(); if (act === "config-promo") return startConfigPromo();
   if (act === "price-apply") { const v = Number(b.dataset.price); if (!Number.isFinite(v)) return; S.a.inputs.price = Math.round(v * 100) / 100; markDirty(); renderAll(); return toast(`Цена ${S.a.inputs.price.toFixed(2)} $ подставлена в экономику — Gate 1/2, ROI, бюджет и деньги по месяцам пересчитаны`, 6000); }
   const T = S.a.config?.tz; if (!T) return;
   if (act === "tz-add") T.rows.push({ section: "конструкция", param: "", requirement: "", rationale: "", priority: "should", source: "вручную", unverified: false });
@@ -515,6 +515,21 @@ async function startConfigExtract(resumeJobId = null) {
     toast(`Извлечено: ${Object.keys(done.table.rows).length} листингов, среднее покрытие ${Math.round(avg * 100)} %${done.table.failed?.length ? `, не загружено ${done.table.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
     document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Извлечение: " + e.message, 8000); }
+  finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
+}
+/** Промо без данных (spec 014): страницы загружены до появления разбора промо — у записи нет поля promo. */
+function promoMissingAsins() { const L = S.a.aggregates?.listings || {}; const rows = S.a.config?.table?.rows || {}; return Object.keys(rows).filter((a) => L[a] && !L[a].error && (L[a].promo === undefined || L[a].promo === null)); }
+async function startConfigPromo(resumeJobId = null) {
+  if (S.cfgBusy) return; if (!S.a.config?.table) return toast("Сначала извлеките характеристики (шаг 2)");
+  const asins = promoMissingAsins(); if (!asins.length && !resumeJobId) return toast("Промо уже есть у всех загруженных листингов");
+  if (!resumeJobId && !confirm(`Страницы ${asins.length} листингов будут загружены заново через Scrapfly ради промо (купоны, дилы, List Price, Subscribe & Save) — ≈ ${asins.length * 30} кредитов. Таблица характеристик и ручные правки не меняются, AI не вызывается. Продолжить?`)) return;
+  S.cfgBusy = { type: "promo", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); cfgStatus("#config-status", S.cfgBusy.text);
+  const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
+  try {
+    const done = await runConfigJob(S.a, "config_promo", "/api/config/promo", { niche: S.a.niche, asins }, { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
+    mergeListings(done.listings); markDirty(); renderAll(); await persistJobResult("Промо листингов");
+    toast(`Промо обновлены: ${Object.keys(done.listings || {}).length} страниц, с промо ${done.withPromo ?? 0}${done.failed?.length ? `, не загрузилось ${done.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
+  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Промо: " + e.message, 8000); }
   finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
 async function startConfigTz(resumeJobId = null) {
@@ -602,7 +617,7 @@ function resumePendingJobs() {
   const hourAgo = Date.now() - 60 * 60 * 1000;
   const a = pendingJob.get(S.a.id, "analyze"); if (a?.jobId && a.startedAt > hourAgo) startAi(a.jobId); else if (a) pendingJob.clear(S.a.id, "analyze");
   const p = pendingJob.get(S.a.id, "patents"); if (p?.jobId && p.startedAt > hourAgo) startPatentScan(p.jobId); else if (p) pendingJob.clear(S.a.id, "patents");
-  for (const [type, fn] of [["config_schema", startConfigSchema], ["config_extract", startConfigExtract], ["config_tz", startConfigTz]]) { const j = pendingJob.get(S.a.id, type); if (j?.jobId && j.startedAt > hourAgo) fn(j.jobId); else if (j) pendingJob.clear(S.a.id, type); }
+  for (const [type, fn] of [["config_schema", startConfigSchema], ["config_extract", startConfigExtract], ["config_promo", startConfigPromo], ["config_tz", startConfigTz]]) { const j = pendingJob.get(S.a.id, type); if (j?.jobId && j.startedAt > hourAgo) fn(j.jobId); else if (j) pendingJob.clear(S.a.id, type); }
 }
 
 // ---------- save / export / new ----------

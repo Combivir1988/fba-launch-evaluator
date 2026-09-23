@@ -16,6 +16,11 @@
 Тело: `{ niche, schema, asins: [{ asin, title, brand, price, asinRevenue }], listings: { [asin]: listing }, manual: { [asin]: { [fieldId]: value } }, options: { model } }` — `asins` ≤ `maxAsins`, `listings` — свежий кэш клиента (старше `cacheDays` клиент не присылает).
 Задача `config_extract`: `stage fetch i/N` (только недостающие) → `stage ai i/M` (пачки) → `done { table, listings, cost }`. Ошибка ключа/кредитов — `job_error { code: "credits" | "auth", message, retryable: false }`; загруженное до ошибки не пропадает: перед `job_error` приходит `stage { stage: "partial", listings }`.
 
+## `POST /api/config/promo` → `202 { jobId }` (spec 014)
+
+Тело: `{ niche, asins: string[] }` — ASIN, чьи страницы в кэше клиента сохранены без поля `promo` (загружены до разбора промо). Кэш **не** учитывается: страницы грузятся заново.
+Задача `config_promo`: `stage fetch i/N` → `done { listings, failed, withPromo, cost }`, где `listings` — только успешно загруженные записи (клиент заменяет ими старые; неудачные остаются старыми записями без промо). AI не вызывается. Ошибка кредитов — как у `config_extract` (`partial` перед `job_error`).
+
 ## `POST /api/config/tz` → `202 { jobId }`
 
 Тело: `{ niche, coreKeyword, payload, options: { model } }`, где `payload` — результат `buildTzPayload(analysis)` (клиент строит из документа, как для AI-вердикта).

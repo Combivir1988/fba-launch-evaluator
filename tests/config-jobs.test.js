@@ -3,7 +3,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import zlib from "node:zlib";
-import { schemaStream, extractStream, tzStream } from "../server/config-jobs.js";
+import { schemaStream, extractStream, tzStream, promoStream } from "../server/config-jobs.js";
 import { buildTzDocx, tzFileName } from "../server/tz-docx.js";
 import { configFromEnv } from "../server/claude.js";
 import { startApp } from "./helpers/app.js";
@@ -87,6 +87,20 @@ test("AI перегружен после загрузки страниц: опл
   assert.equal(ev4.at(-1).event, "done", "извлечение: ошибка пачки не валит задачу"); assert.equal(ev4.at(-1).data.table.aiErrors.length, 1); assert.equal(Object.keys(ev4.at(-1).data.listings).length, 3);
 });
 
+test("promoStream (spec 014): страницы грузятся заново без учёта кэша и без AI; в done — только успешные записи с promo; кредиты → partial + error", async () => {
+  const html = readFileSync(new URL("./fixtures/amazon-promo-B00UOXMCBI.html", import.meta.url), "utf8"); const j = fixture("B0BZHGDPMK"); const calls = [];
+  const fetchImpl = async (u) => { calls.push(u); return u.includes(asin(3)) ? res(422, "asp") : res(200, { ...j, result: { ...j.result, content: html } }); };
+  const ev = await collect(promoStream({ niche: "x", asins: [asin(1), asin(2), asin(3)] }, live, { fetchImpl, concurrency: 1, aiJson: async () => { throw new Error("AI не должен вызываться"); } }));
+  assert.equal(calls.length, 3, "все три страницы перезагружены"); const done = ev.at(-1); assert.equal(done.event, "done");
+  assert.deepEqual(Object.keys(done.data.listings).sort(), [asin(1), asin(2)]); assert.deepEqual(done.data.failed, [asin(3)]); assert.equal(done.data.withPromo, 2);
+  assert.equal(done.data.listings[asin(1)].promo.listPrice, 125.99); assert.equal(done.data.listings[asin(1)].promo.discountPct, 15); assert.equal(done.data.cost, 52);
+  assert.ok(ev.some((e) => e.event === "stage" && e.data.stage === "fetch" && /Обновляю промо/.test(e.data.text)));
+  const none = await collect(promoStream({ niche: "x", asins: [] }, live, {})); assert.equal(none.at(-1).event, "error"); assert.equal(none.at(-1).data.code, "bad_request");
+  let k = 0; const credits = async () => (++k <= 1 ? res(200, { ...j, result: { ...j.result, content: html } }) : res(402, "quota"));
+  const ev2 = await collect(promoStream({ niche: "x", asins: [asin(1), asin(2)] }, live, { fetchImpl: credits, concurrency: 1 }));
+  assert.equal(ev2.at(-1).data.code, "credits"); const partial = last(ev2, "stage"); assert.equal(partial.stage, "partial"); assert.deepEqual(Object.keys(partial.listings), [asin(1)], "оплаченная страница с промо не пропала");
+});
+
 test("extractStream / schemaStream / tzStream в MOCK: без сети и ключей, детерминированно", async () => {
   const cfg = configFromEnv({ MOCK_AI: "1" }); const asins = [asin(1), asin(2), asin(3), asin(4)]; const deny = async () => { throw new Error("сети быть не должно"); };
   const s = await collect(schemaStream({ niche: "mock", asins, listings: {} }, cfg, { fetchImpl: deny, aiJson: deny })); assert.equal(s.at(-1).event, "done"); assert.ok(s.at(-1).data.schema.fields.length >= 3); assert.equal(s.at(-1).data.schema.model, "mock");
@@ -151,6 +165,9 @@ test("маршруты: health.scrapfly, 400 без asins/schema/payload, зад
   assert.equal((await fetch(`${base}/api/config/schema`, { method: "POST", headers: h, body: JSON.stringify({ niche: "x", asins: [] }) })).status, 400);
   assert.equal((await fetch(`${base}/api/config/extract`, { method: "POST", headers: h, body: JSON.stringify({ niche: "x", asins: [asin(1)], schema: { fields: [] } }) })).status, 400);
   assert.equal((await fetch(`${base}/api/config/tz`, { method: "POST", headers: h, body: JSON.stringify({ niche: "x" }) })).status, 400);
+  assert.equal((await fetch(`${base}/api/config/promo`, { method: "POST", headers: h, body: JSON.stringify({ niche: "x", asins: [] }) })).status, 400);
+  const rp = await fetch(`${base}/api/config/promo`, { method: "POST", headers: h, body: JSON.stringify({ niche: "x", asins: [asin(1), asin(2)] }) }); assert.equal(rp.status, 202);
+  const tp = await fetch(`${base}/api/jobs/${(await rp.json()).jobId}/events`, { headers: h }).then((x) => x.text()); const dp = JSON.parse(tp.match(/event: done\ndata: (.*)\n/)[1]); assert.deepEqual(Object.keys(dp.listings).sort(), [asin(1), asin(2)]); assert.ok("promo" in dp.listings[asin(1)]);
   assert.equal((await fetch(`${base}/api/config/schema`, { method: "POST", headers: { "content-type": "application/json", "x-requested-with": "fba" }, body: JSON.stringify({ asins: [asin(1)] }) })).status, 401);
   const asins = [asin(1), asin(2), asin(3), asin(4)].map((a, i) => ({ asin: a, title: "Mock boxing machine " + i }));
   const r = await fetch(`${base}/api/config/schema`, { method: "POST", headers: h, body: JSON.stringify({ niche: "boxing machine", asins, listings: {} }) }); assert.equal(r.status, 202);

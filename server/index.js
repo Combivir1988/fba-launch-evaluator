@@ -13,7 +13,7 @@ import { createAnalyses } from "./analyses.js";
 import { createShares } from "./shares.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
-import { schemaStream, extractStream, tzStream } from "./config-jobs.js";
+import { schemaStream, extractStream, tzStream, promoStream } from "./config-jobs.js";
 import { buildTzDocx, tzFileName } from "./tz-docx.js";
 import { startJob, getJob, subscribe, cancelJob, runningCount } from "./jobs.js";
 import { log } from "./log.js";
@@ -221,6 +221,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   };
   app.post("/api/config/schema", authed, limiter, scrapflyReady, jsonBig, configJob("config_schema", schemaStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : null)));
   app.post("/api/config/extract", authed, limiter, scrapflyReady, jsonBig, configJob("config_extract", extractStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : !b.schema?.fields?.length ? "schema обязательна" : null)));
+  app.post("/api/config/promo", authed, limiter, scrapflyReady, jsonBig, configJob("config_promo", promoStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : null))); // spec 014: перезагрузка страниц ради промо, без AI
   app.post("/api/config/tz", authed, limiter, jsonMid, configJob("config_tz", tzStream, (b) => (!b.payload || typeof b.payload !== "object" ? "payload обязателен" : null)));
   app.post("/api/tz/docx", authed, jsonMid, async (req, res) => {
     const { tz, meta } = req.body || {};

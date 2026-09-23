@@ -1,4 +1,4 @@
-// Этап 2 (spec 010, D3): три фоновые задачи — схема полей (config_schema), извлечение по листингам (config_extract), ТЗ (config_tz).
+// Этап 2 (spec 010, D3): фоновые задачи — схема полей (config_schema), извлечение по листингам (config_extract), ТЗ (config_tz), обновление промо (config_promo, spec 014).
 // Генераторы событий для startJob: stage | done | error. Страницы грузит server/scrapfly.js, AI — openrouterJson; в тестах оба подменяются.
 import { openrouterJson } from "./openrouter.js";
 import { fetchMany, totalCost } from "./scrapfly.js";
@@ -103,6 +103,21 @@ export async function* extractStream(body, cfg, deps = {}) {
     log("info", "config extract done", { asins: asins.length, loaded: ok.length, batches: batches.length, errors: errors.length, cost: got.cost, ms: Date.now() - t0 });
     yield { event: "done", data: { table, schema, listings: got.fresh, cost: got.cost, model: table.model, durationMs: Date.now() - t0 } };
   } catch (e) { log("warn", "config extract error", toErr(e)); const partial = e?.partial || fresh; if (partial && Object.keys(partial).length) yield { event: "stage", data: { stage: "partial", listings: partial } }; yield { event: "error", data: toErr(e) }; }
+}
+
+/** Обновить промо (spec 014): страницы грузятся заново (кэш игнорируется), AI не вызывается. body: { niche, asins } → done { listings (только успешные), failed, cost }.
+ *  Нужно для анализов, чьи страницы были загружены до появления разбора промо: у таких записей promo отсутствует. */
+export async function* promoStream(body, cfg, deps = {}) {
+  const t0 = Date.now(); const asins = cleanAsins(body.asins);
+  if (!asins.length) { yield { event: "error", data: { code: "bad_request", message: "Нет ASIN для обновления промо", retryable: false } }; return; }
+  let fresh = null;
+  try {
+    const got = yield* fetchMissing(asins, null, cfg, deps, "Обновляю промо"); fresh = got.fresh;
+    const ok = Object.fromEntries(Object.entries(got.fresh).filter(([, l]) => l && !l.error)); const failed = Object.keys(got.fresh).filter((a) => got.fresh[a]?.error);
+    const withPromo = Object.values(ok).filter((l) => l.promo?.hasPromo).length;
+    log("info", "config promo done", { asins: asins.length, loaded: Object.keys(ok).length, failed: failed.length, withPromo, cost: got.cost, ms: Date.now() - t0 });
+    yield { event: "done", data: { listings: ok, failed, withPromo, cost: got.cost, durationMs: Date.now() - t0 } };
+  } catch (e) { log("warn", "config promo error", toErr(e)); const partial = Object.fromEntries(Object.entries(e?.partial || fresh || {}).filter(([, l]) => l && !l.error)); if (Object.keys(partial).length) yield { event: "stage", data: { stage: "partial", listings: partial } }; yield { event: "error", data: toErr(e) }; }
 }
 
 /** ТЗ производителю: факты → AI → проверка чисел. body: { niche, coreKeyword, payload, options } */
