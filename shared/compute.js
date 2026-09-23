@@ -17,6 +17,7 @@ import { borderline } from "./borderline.js";
 import { regulatoryTriggers } from "./regulatory.js";
 import { configStats } from "./config-stats.js";
 import { configScope } from "./config-scope.js";
+import { amazonPresence } from "./amazon.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -30,10 +31,13 @@ export function compute(analysis) {
   const band = bandRes.summary;
   if (band.active) p = { ...whole, xray: bandRes.view.xray, poe: bandRes.view.poe };
   p.competition = competition(p);
+  // Amazon как продавец (spec 012): область по порогу; 1e, scorecard и чеклист смотрят туда же, куда и вердикт
+  const compAll = band.active ? competition(whole) : p.competition;
+  const amazon = amazonPresence({ whole: compAll, band: band.active ? p.competition : null, th: th.amazon, bandLabel: band.label });
+  p.competition = { ...p.competition, amazonSells: amazon.present, amazonSellsSource: amazon.source };
   p.traffic = traffic(whole);
   p.criterion1 = criterion1(p);
   if (band.active) {
-    const compAll = competition(whole);
     const c1All = criterion1({ ...whole, competition: compAll, traffic: p.traffic });
     const items = { ...p.criterion1.items };
     items["1a"] = { ...c1All.items["1a"], bandValue: band.source === "xray" ? band.revenueBand : null, bandShare: band.revenueShare };
@@ -57,7 +61,7 @@ export function compute(analysis) {
   const cpc = cpcFromCerebro ? p.traffic.cpcCore : inputs.cpc;
   p.economics = economics({ ...inputs, price, cpc }, th, { priceMedian: p.criterion1.items["1b"].value, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, dataCvr, dataCvrLabel });
   // Вход в нишу (spec 005): трафик, новички и отзывы — по ВСЕЙ нише. Опорная дата возраста листингов — дата снятия POE (анализ, открытый через год, покажет те же возрасты).
-  const compWhole = band.active ? competition(whole) : p.competition;
+  const compWhole = band.active ? compAll : p.competition;
   const refDate = new Date(whole.poe?.meta?.capturedAt || analysis.createdAt || Date.now());
   p.entry = entryFeasibility(whole, { refDate: Number.isNaN(refDate.getTime()) ? new Date() : refDate, nicheReviewMedian: compWhole.reviewBarrier?.median ?? null, leaderReviews: compWhole.reviewBarrier?.leaderReviews ?? null });
   p.cashflow = cashflow({ ...inputs, price, cpc }, th, { cohortSalesMedian: p.entry.cohort.ok ? p.entry.cohort.salesMedian : null, reviewThreshold: p.entry.reviews.threshold });
@@ -74,6 +78,7 @@ export function compute(analysis) {
     clickPrice: clickWeightedPrice(whole.poe, { priceMedian: (band.active ? band.whole?.priceMedian : null) ?? p.criterion1.items["1b"].value, myPrice: price, band }, th.entry),
     regulatory: regulatoryTriggers({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, xray: whole.xray, poe: whole.poe, cerebro: whole.cerebro }),
     dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
+    amazon,
   };
   results.config = configStats(analysis.config, whole.xray, { band, th: th.config }); // этап 2 (spec 010): null, пока таблица характеристик не извлечена
   if (whole.xray?.asins?.length) { const sc = configScope(analysis, th); results.configScope = { count: sc.asins.length, total: sc.total, excluded: sc.excluded, capped: sc.capped }; } else results.configScope = null;

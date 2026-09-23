@@ -930,7 +930,7 @@ async function openLastIfEmpty() {
 $("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
 
 // ---------- thresholds tab ----------
-const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет", traffic: "Трафик по ключам и Cerebro", poe: "POE / концентрация", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения", config: "Этап 2 — конфигурация продукта" };
+const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет", traffic: "Трафик по ключам и Cerebro", poe: "POE / концентрация", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения", config: "Этап 2 — конфигурация продукта", amazon: "Amazon как продавец" };
 // Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
 const THR_LABELS = {
   "criterion1.passCount": ["Минимум зелёных подпунктов из 8", "шт (порог прохождения Критерия 1)"],
@@ -967,10 +967,13 @@ const THR_LABELS = {
   "cashflow.horizonMonths": ["Горизонт сценария по умолчанию", "месяцев продаж"], "cashflow.rampMonths": ["Разгон до цели по умолчанию", "мес"], "cashflow.reviewRate": ["Покупателей с отзывом по умолчанию", "доля (допущение)"],
   "cashflow.vineReviews": ["Отзывов по программе Vine по умолчанию", "шт"], "cashflow.newListingCvrFactor": ["Конверсия до планки отзывов — множитель", "доля от заданного CVR"],
   "borderline.pct": ["Пограничное значение — ближе к порогу чем", "доля"],
+  "amazon.mode": ["Amazon продаёт сам в нише — что делать", "block — вердикт сразу No-Go; consider — учитывать в общей картине (1e НЕ OK, минус в scorecard, чеклист)"],
+  "amazon.scope": ["Где искать Amazon", "niche — вся ниша; band — только мой ценовой диапазон (без диапазона — вся ниша)"],
   "config.topForSchema": ["Схема полей — листингов для AI", "шт (первые по выручке)"], "config.maxAsins": ["Извлечение — максимум страниц за запуск", "шт"], "config.cacheDays": ["Кэш страниц", "дней"],
   "config.batchSize": ["Листингов на один вызов AI", "шт"], "config.numericDistinctMax": ["Числовое поле как дискретное — различных значений до", "шт (больше — интервалы)"],
   "checklist.designTestMin": ["Тест дизайна (PickFu) — минимум голосов", "%"], "checklist.lifecycleMonthsMin": ["Жизненный цикл, минимум", "мес"], "checklist.listingsHigh": ["Листингов в выдаче — высокая конкуренция от", "шт"],
 };
+const THR_OPTIONS = { "amazon.mode": [["block", "однозначно No-Go"], ["consider", "учитывать в общей картине"]], "amazon.scope": [["niche", "вся ниша"], ["band", "мой ценовой диапазон"]] };
 function renderThresholds() {
   const th = mergeThresholds(S.a.thresholds);
   const def = DEFAULT_THRESHOLDS;
@@ -979,6 +982,7 @@ function renderThresholds() {
     const [label, unit] = THR_LABELS[`${g}.${k}`] || [k, ""]; const d = def[g]?.[k]; const changed = JSON.stringify(d) !== JSON.stringify(v);
     const hint = `<small class="muted">${esc(unit)}${changed ? ` · по умолчанию ${Array.isArray(d) ? d.join(", ") : d}` : ""}</small>`;
     if (typeof v === "number") return `<div class="field"><label title="${esc(g + "." + k)}">${esc(label)}${changed ? ' <span class="chip warn">изменено</span>' : ""}</label><input type="number" step="any" data-thr="${g}.${k}" value="${v}">${hint}</div>`;
+    if (typeof v === "string") { const opts = THR_OPTIONS[`${g}.${k}`] || [[v, v]]; return `<div class="field"><label title="${esc(g + "." + k)}">${esc(label)}${changed ? ' <span class="chip warn">изменено</span>' : ""}</label><select data-thr="${g}.${k}" data-str="1">${opts.map(([val, name]) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(name)}</option>`).join("")}</select>${hint}</div>`; }
     if (Array.isArray(v)) return `<div class="field"><label title="${esc(g + "." + k)}">${esc(label)}${changed ? ' <span class="chip warn">изменено</span>' : ""}</label><input data-thr="${g}.${k}" data-arr="1" value="${v.join(", ")}">${hint}</div>`;
     return "";
   }).join("")}</div>`).join("");
@@ -1012,7 +1016,7 @@ $("#thr-delete").addEventListener("click", async () => { const p = selectedPrese
 $("#thr").addEventListener("change", (e) => {
   const el = e.target; if (!el.dataset.thr || !el.isConnected) return; // change от поля, удалённого при перерисовке (Chrome шлёт его при потере фокуса), не должен попасть в уже другой анализ
   const [g, k] = el.dataset.thr.split("."); S.a.thresholds[g] ||= {};
-  S.a.thresholds[g][k] = el.dataset.arr ? el.value.split(/[,\s]+/).filter(Boolean).map(Number) : Number(el.value);
+  S.a.thresholds[g][k] = el.dataset.arr ? el.value.split(/[,\s]+/).filter(Boolean).map(Number) : el.dataset.str ? el.value : Number(el.value);
   markDirty(); scheduleFull(); renderPresetBar(); toast("Порог изменён — пересчёт");
 });
 $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThresholds(); markDirty(); renderAll(); toast("Пороги сброшены к умолчаниям"); });

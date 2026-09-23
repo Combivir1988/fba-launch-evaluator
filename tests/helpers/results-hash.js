@@ -10,7 +10,8 @@ export function stripNew(results) {
   delete r.computedAt; delete r.methodologyVersion; delete r.priceBand; delete r.cvrHint;
   for (const s of r.priceSegments?.segments || []) delete s.selected;
   delete r.budget; delete r.verdict;
-  for (const k of ["entry", "cashflow", "clickPrice", "borderline", "regulatory", "dataNotes", "config", "configScope"]) delete r[k];
+  for (const k of ["entry", "cashflow", "clickPrice", "borderline", "regulatory", "dataNotes", "config", "configScope", "amazon"]) delete r[k];
+  if (r.competition) { delete r.competition.amazonAsins; delete r.competition.amazonRevenueShare; }
   return r;
 }
 export const resultsHash = (results) => createHash("sha256").update(JSON.stringify(stripNew(results))).digest("hex").slice(0, 16);

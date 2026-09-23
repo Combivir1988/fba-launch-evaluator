@@ -47,7 +47,9 @@ export const DEFAULT_THRESHOLDS = {
   borderline: { pct: 0.15 },
   priceBand: { smallSample: 15, minSample: 5 },
   // Этап 2 — конфигурация продукта (spec 010): область страниц, кэш, пачки AI, числовые поля как дискретные
-  config: { topForSchema: 15, maxAsins: 150, cacheDays: 30, batchSize: 6, numericDistinctMax: 12 }, // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
+  config: { topForSchema: 15, maxAsins: 150, cacheDays: 30, batchSize: 6, numericDistinctMax: 12 },
+  // Amazon как продавец (spec 012): block — однозначно No-Go, consider — учитывать в общей картине (1e, scorecard, чеклист); область: вся ниша или ценовой диапазон
+  amazon: { mode: "block", scope: "niche" }, // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
 };
 
 /** Глубокое слияние пользовательских порогов с дефолтами. */
@@ -71,9 +73,10 @@ export function thresholdOverrides(custom) {
     for (const [k, v] of Object.entries(obj)) {
       const dv = d[k]; if (dv === undefined) continue;
       const okNum = isNum(dv) && isNum(v);
+      const okStr = typeof dv === "string" && typeof v === "string" && v.length <= 40;
       const okArr = Array.isArray(dv) && Array.isArray(v) && v.length > 0 && v.every(isNum);
       const okObj = dv && typeof dv === "object" && !Array.isArray(dv) && v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length > 0 && Object.entries(v).every(([kk, vv]) => isNum(dv[kk]) && isNum(vv));
-      if (!okNum && !okArr && !okObj) continue;
+      if (!okNum && !okStr && !okArr && !okObj) continue;
       if (JSON.stringify(v) === JSON.stringify(dv)) continue;
       (out[g] ||= {})[k] = v;
     }

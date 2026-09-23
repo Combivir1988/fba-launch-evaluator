@@ -20,6 +20,7 @@ export function verdictCeiling(r) {
   let decisive = null;
   const eco = r.economics, c1 = r.criterion1, ch = r.challenger;
 
+  if (r.amazon?.blocks) { v = "no_go"; decisive ??= "Amazon в нише"; const a = r.amazon; reasons.push(`Amazon продаёт сам (${a.scopeLabel}${a.count ? `: ${a.count} листинг${a.count === 1 ? "" : a.count < 5 ? "а" : "ов"}` : ""}${typeof a.revenueShare === "number" ? `, ${Math.round(a.revenueShare * 100)} % выручки` : ""}) — порог «Amazon как продавец: однозначно No-Go»`); }
   if (eco?.gate1?.status === "no_go") { v = "no_go"; decisive ??= "Gate 1"; reasons.push("Gate 1 провален: маржа и профит/юнит ниже порогов"); }
   if (eco?.gate2?.status === "no_go") { v = "no_go"; decisive ??= "Gate 2"; reasons.push("Gate 2 провален: Net after ads < 0 даже при CVR 15 %"); }
   if (ch?.active && ch.items["6"]?.status === "fail") { v = "no_go"; decisive ??= "Критерий 6"; reasons.push("Критерий 6 (запас экономики) красный — обязательный"); }

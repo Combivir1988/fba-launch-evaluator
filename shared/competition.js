@@ -1,6 +1,7 @@
 // Конкурентная структура: доли брендов (Xray revenue / POE click share), барьер отзывов,
 // число игроков, contamination-кандидаты, Amazon как продавец.
 import { sum, mean, median, safeDiv } from "./num.js";
+import { isAmazonSeller } from "./amazon.js";
 
 /** Группировка Xray по бренду (без исключённых брендов). */
 export function brandShares(asins, excludedBrands = []) {
@@ -54,12 +55,15 @@ export function competition(p) {
   const excluded = inputs.excludedBrands || [];
   const out = { source: null, brands: [], topBrand: null, topBrandShare: null, top5Share: null, top10Share: null, top20Share: null,
     reviewBarrier: { leaderReviews: null, avg: null, median: null, tier: null }, playersOver100: null, brandsOver10pct: null,
-    amazonSells: false, amazonSellsSource: "auto", contaminationCandidates: [], poeBrands: [] };
+    amazonSells: false, amazonSellsSource: "auto", amazonAsins: [], amazonRevenueShare: null, contaminationCandidates: [], poeBrands: [] };
   // Amazon как продавец: явный ответ пользователя побеждает автоопределение по колонке Seller в Xray
+  // По листингам ПЕРЕДАННОГО вида (вся ниша или ценовой диапазон), а не по флагу всей выгрузки (spec 012)
+  const amz = (xray?.asins || []).filter(isAmazonSeller); out.amazonAsins = amz.map((a) => a.asin);
+  { const tot = sum((xray?.asins || []).map((a) => a.asinRevenue ?? 0)); out.amazonRevenueShare = tot > 0 ? sum(amz.map((a) => a.asinRevenue ?? 0)) / tot : null; }
   const az = inputs.checklist?.amazonSells;
   if (az === "yes" || az === true) { out.amazonSells = true; out.amazonSellsSource = "user"; }
   else if (az === "no") { out.amazonSells = false; out.amazonSellsSource = "user"; }
-  else { out.amazonSells = Boolean(xray?.flags?.amazonSells); out.amazonSellsSource = xray?.flags?.amazonSells ? "xray" : "auto"; }
+  else { out.amazonSells = amz.length > 0; out.amazonSellsSource = amz.length ? "xray" : "auto"; }
 
   if (poe?.asinMetrics?.length) {
     out.poeBrands = poeBrandClickShares(poe.asinMetrics, excluded);
