@@ -113,3 +113,11 @@ test("после составления ТЗ обновляются и бейд�
   el.__w.FBARender.update(el, a, {}, ["tz"]);
   assert.match(text(el, "#sec-hero [data-goto]"), /ТЗ: 1 требований/); assert.match(el.querySelector('[data-stagetabs] [data-stage="2"]').textContent, /ТЗ готово/);
 });
+
+test("деньги по месяцам: причина стартового уровня продаж — на виду (с нуля / новички / вручную)", () => {
+  const a = entryFixture({ inputs: { cogs: 4.37 } }); const el0 = draw(a); const cf = a.results.cashflow;
+  const note = text(el0, "#sec-cashflow .notice.info"); assert.ok(note, "заметка о старте есть");
+  if (cf.startSource === "cohort") assert.match(note, /стартуют с \d+ шт\/мес.*медиана продаж новичков/); else assert.match(note, /стартуют с нуля.*в нише нет новичков/);
+  const b = entryFixture({ inputs: { cogs: 4.37, startSalesMonthly: 120 } }); assert.match(text(draw(b), "#sec-cashflow .notice.info"), /заданы вручную: 120 шт\/мес/);
+  const z = entryFixture({ withXray: false, inputs: { cogs: 4.37 } }); const n = text(draw(z), "#sec-cashflow .notice.info"); assert.match(n, /стартуют с нуля/); assert.match(n, /по \d+ шт\/мес до цели \d+ шт\/мес за \d+ мес/);
+});

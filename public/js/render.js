@@ -446,6 +446,13 @@
   }
 
   // ---------- деньги по месяцам (spec 005) ----------
+  /** Откуда стартовые продажи сценария — на виду, а не в примечаниях: «почему 50 штук в первый месяц?». */
+  function startNote(c, R) {
+    const step = c.rampMonths > 0 ? Math.round(c.targetMonthly / c.rampMonths) : c.targetMonthly; const reason = R.entry?.cohort?.reason ? ` (${esc(R.entry.cohort.reason)})` : "";
+    if (c.startSource === "zero") return `<div class="notice info" style="margin-top:.6rem"><b>Продажи стартуют с нуля</b> и растут по ${fmtN(step)} шт/мес до цели ${fmtN(c.targetMonthly)} шт/мес за ${fmtN(c.rampMonths)} мес: в нише нет новичков, на чей уровень можно опереться${reason}. Знаете стартовый уровень — впишите «Стартовые продажи, шт/мес» в панели «Экономика и бюджет».</div>`;
+    if (c.startSource === "cohort") return `<div class="notice info" style="margin-top:.6rem"><b>Продажи стартуют с ${fmtN(c.startSales)} шт/мес</b> — медиана продаж новичков ниши — и растут до цели ${fmtN(c.targetMonthly)} шт/мес за ${fmtN(c.rampMonths)} мес. Другой старт — поле «Стартовые продажи, шт/мес» в панели.</div>`;
+    return `<div class="notice info" style="margin-top:.6rem"><b>Стартовые продажи заданы вручную: ${fmtN(c.startSales)} шт/мес</b>, разгон до ${fmtN(c.targetMonthly)} шт/мес за ${fmtN(c.rampMonths)} мес.</div>`;
+  }
   function secCashflow(A, R) {
     const c = R.cashflow; if (!c) return "";
     if (c.pending) return `<h2>Деньги по месяцам <span class="chip pending">ожидает данных</span></h2><div class="notice info">${esc(c.reason || "")}.</div>`;
@@ -458,6 +465,7 @@
         <div class="card ${c.paybackMonth !== null ? "ok" : "fail"}"><h4>Деньги вернулись</h4><div class="big">${c.paybackMonth !== null ? "месяц " + c.paybackMonth : "нет"}</div><div class="muted">${c.paybackMonth !== null ? "после него итог больше не уходит в минус" : "на горизонте сценария итог остаётся в минусе"}</div></div>
         <div class="card"><h4>Итог на конец</h4><div class="big">${fmtMoney(c.endCum)}</div><div class="muted">плюс товар на складе: ${fmtN(c.stockUnitsEnd)} шт на ${fmtMoney(c.stockValueEnd)} по себестоимости${c.stockoutMonths ? ` · месяцев без товара: ${c.stockoutMonths}` : ""}</div></div>
       </div>
+      ${startNote(c, R)}
       <div class="stack" style="margin-top:.8rem"><div class="chartbox"><canvas id="ch-cash"></canvas></div>
       <div class="tablewrap" style="max-height:420px;overflow:auto"><table class="cashtable"><thead><tr><th>Месяц</th><th class="num">Заказ, шт</th><th class="num">Оплата партии</th><th class="num">Продано</th><th class="num">Поступления</th><th class="num">Реклама</th><th class="num">За месяц</th><th class="num">Итог</th><th class="num">Склад</th><th class="num">Отзывы</th></tr></thead><tbody>${rows}</tbody></table></div></div>
       <p class="muted" style="font-size:.8rem">Поступления — выручка минус комиссия Amazon и FBA. Себестоимость списывается один раз, при оплате партии, и с продаж повторно не вычитается. Допущения сценария: ${esc(c.assumptions.join("; "))}. Горизонт, разгон, первая партия и стартовые расходы задаются в панели «Экономика и бюджет». Критерий 2 считает свои 90 дней на целевом уровне продаж; здесь продажи идут по разгону — обе цифры показаны рядом в строках 2g–2i.</p>`;
