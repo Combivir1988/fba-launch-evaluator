@@ -309,3 +309,5 @@ td.editable select, td.editable input { font-size: .85rem; padding: .1rem .3rem;
 .filecard { min-width: 0; } .filecard .muted { min-width: 0; overflow-wrap: anywhere; }
 .side details, .side .body, .side .field, .side .slider { min-width: 0; max-width: 100%; }
 .slider label small { display: block; font-weight: 400; }
+
+td.unlisted { font-style: italic; }

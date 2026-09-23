@@ -24,7 +24,8 @@ export function normalizeValue(field, raw) {
   const exact = opts.find((o) => normKey(o) === k); if (exact !== undefined) return { value: exact };
   const partial = opts.filter((o) => { const ok = normKey(o); return ok && k && (k.includes(ok) || ok.includes(k)); });
   if (partial.length === 1) return { value: partial[0] };
-  return { value: null, raw: String(raw).slice(0, 80) };
+  // значение есть в тексте, но его нет в списке схемы: сохраняем как есть с пометкой — оно попадёт в диаграммы своей группой, менеджер может добавить его в список или объединить
+  return { value: String(raw).trim().slice(0, 60), unlisted: true };
 }
 
 /** Значения без дублей (первое написание побеждает), без пустых, не больше 12. */
@@ -66,7 +67,7 @@ export function mergeExtraction({ schema, prevTable = null, items = [], listings
       if (row.values[f.id]?.source === "manual") continue;
       const v = vals.get(f.id); const n = normalizeValue(f, v?.value);
       const source = n.value !== null && SOURCES.includes(v?.source) && v.source !== "manual" ? v.source : null;
-      row.values[f.id] = n.raw !== undefined ? { value: n.value, source, raw: n.raw } : { value: n.value, source };
+      row.values[f.id] = n.unlisted ? { value: n.value, source, unlisted: true } : { value: n.value, source };
     }
   }
   return { rows, extractedAt: now, model, cost: (prevTable?.cost || 0) + (cost || 0), coverage: coverage({ rows }, schema), failed: Object.entries(rows).filter(([, r]) => r.status === "failed").map(([a]) => a).sort() };
@@ -82,8 +83,8 @@ export function coverage(table, schema) {
 /** Ручная правка клетки → новая таблица (чистая функция). */
 export function setCell(table, schema, asin, fieldId, raw) {
   const f = (schema?.fields || []).find((x) => x.id === fieldId); if (!f) return table;
-  const n = normalizeValue(f, raw); const v = f.type === "choice" && n.value === null && raw !== null && raw !== "" ? String(raw).trim() : n.value;
-  const rows = { ...table.rows, [asin]: { status: table.rows?.[asin]?.status || "ok", values: { ...(table.rows?.[asin]?.values || {}), [fieldId]: { value: v, source: "manual" } } } };
+  const n = normalizeValue(f, raw);
+  const rows = { ...table.rows, [asin]: { status: table.rows?.[asin]?.status || "ok", values: { ...(table.rows?.[asin]?.values || {}), [fieldId]: n.unlisted ? { value: n.value, source: "manual", unlisted: true } : { value: n.value, source: "manual" } } } };
   const out = { ...table, rows }; out.coverage = coverage(out, schema); return out;
 }
 
@@ -97,8 +98,17 @@ export function renameOption(schema, table, fieldId, from, to) {
   const rows = {};
   for (const [asin, r] of Object.entries(table?.rows || {})) {
     const c = r.values?.[fieldId];
-    rows[asin] = c && c.value === from ? { ...r, values: { ...r.values, [fieldId]: { ...c, value: String(to || "").trim() || null } } } : r;
+    if (c && c.value === from) { const { unlisted, ...rest } = c; rows[asin] = { ...r, values: { ...r.values, [fieldId]: { ...rest, value: String(to || "").trim() || null } } }; } else rows[asin] = r;
   }
   const out = { ...table, rows }; const sch = { ...schema, fields, editedAt: new Date().toISOString() }; out.coverage = coverage(out, sch);
   return { schema: sch, table: out };
+}
+
+/** Значения полей-выбора, встреченные в таблице вне списка схемы: { [fieldId]: [{ value, count }] } — подсказка менеджеру, что добавить в список. */
+export function unlistedValues(schema, table) {
+  const out = {};
+  for (const f of schema?.fields || []) { if (f.type !== "choice") continue; const m = new Map();
+    for (const r of Object.values(table?.rows || {})) { const c = r.values?.[f.id]; if (c && c.value !== null && c.value !== undefined && !f.options.includes(c.value)) m.set(c.value, (m.get(c.value) || 0) + 1); }
+    if (m.size) out[f.id] = [...m.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count); }
+  return out;
 }

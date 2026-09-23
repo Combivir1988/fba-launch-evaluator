@@ -45,7 +45,7 @@ test("normalizeValue: выбор только из списка (регистр,
   assert.deepEqual(normalizeValue(f, "bluetooth"), { value: "Bluetooth" });
   assert.deepEqual(normalizeValue(f, "Bluetooth 5.0 app"), { value: "Bluetooth" });
   assert.deepEqual(normalizeValue(f, "нет данных"), { value: null }); assert.deepEqual(normalizeValue(f, ""), { value: null }); assert.deepEqual(normalizeValue(f, null), { value: null });
-  assert.deepEqual(normalizeValue(f, "USB-C"), { value: null, raw: "USB-C" });
+  assert.deepEqual(normalizeValue(f, "USB-C"), { value: "USB-C", unlisted: true }, "значение вне списка сохраняется с пометкой, а не теряется");
   const n = schema.fields[1];
   assert.deepEqual(normalizeValue(n, "9 зон"), { value: 9 }); assert.deepEqual(normalizeValue(n, "12.5 lb"), { value: 12.5 }); assert.deepEqual(normalizeValue(n, "1,5 кг"), { value: 1.5 }); assert.deepEqual(normalizeValue(n, 7), { value: 7 });
   assert.deepEqual(normalizeValue(n, "много"), { value: null, raw: "много" });
@@ -66,7 +66,7 @@ test("sanitizeSchema: id латиницей и уникальные, ≤ 25 по
 
 function listingsFor(asins) { return Object.fromEntries(asins.map((a) => [a, { asin: a, fetchedAt: "2026-09-22T00:00:00Z", title: "t", bullets: [], specs: [] }])); }
 
-test("mergeExtraction: нормализация, источник, failed для незагруженных, ручные клетки сохраняются, покрытие", () => {
+test("mergeExtraction: нормализация, источник, failed для незагруженных, ручные клетки сохраняются, покрытие", async () => {
   const asins = [asin(1), asin(2), asin(3), asin(4)];
   const listings = listingsFor([asin(1), asin(2), asin(3)]); // 4-й не загрузился
   const items = [
@@ -76,12 +76,15 @@ test("mergeExtraction: нормализация, источник, failed для
   const t = mergeExtraction({ schema, items, listings, asins, model: "m", cost: 90 });
   assert.deepEqual(t.rows[asin(1)].values.conn, { value: "Bluetooth", source: "bullets" }); assert.deepEqual(t.rows[asin(1)].values.zones, { value: 9, source: "specs" });
   assert.deepEqual(t.rows[asin(1)].values.note, { value: null, source: null });
-  assert.deepEqual(t.rows[asin(2)].values.conn, { value: null, source: null, raw: "USB" });
+  assert.deepEqual(t.rows[asin(2)].values.conn, { value: "USB", source: "specs", unlisted: true });
   assert.equal(t.rows[asin(2)].values.zones.source, null, "источник manual от AI не принимается");
   assert.equal(t.rows[asin(3)].status, "failed", "загружен, но AI ничего не вернул → failed"); assert.equal(t.rows[asin(4)].status, "failed"); assert.deepEqual(t.failed, [asin(3), asin(4)]);
-  assert.equal(t.coverage.conn, 0.25); assert.equal(t.coverage.zones, 0.5); assert.equal(t.cost, 90);
+  assert.equal(t.coverage.conn, 0.5, "значение вне списка — тоже данные"); assert.equal(t.coverage.zones, 0.5); assert.equal(t.cost, 90);
   // ручная правка и повторное извлечение
   const t2 = setCell(t, schema, asin(2), "conn", "проводное"); assert.deepEqual(t2.rows[asin(2)].values.conn, { value: "проводное", source: "manual" }); assert.equal(t2.coverage.conn, 0.5);
+  assert.deepEqual(setCell(t, schema, asin(2), "conn", "оптика").rows[asin(2)].values.conn, { value: "оптика", source: "manual", unlisted: true });
+  const { unlistedValues } = await import("../shared/config-extract.js"); assert.deepEqual(unlistedValues(schema, t), { conn: [{ value: "USB", count: 1 }] });
+  const adopted = renameOption(schema, t, "conn", "USB", "USB"); assert.ok(adopted.schema.fields[0].options.includes("USB")); assert.equal(adopted.table.rows[asin(2)].values.conn.unlisted, undefined, "добавили в список — пометка снята"); assert.deepEqual(unlistedValues(adopted.schema, adopted.table), {});
   const t3 = mergeExtraction({ schema, prevTable: t2, items: [{ asin: asin(2), values: [{ field: "conn", value: "Bluetooth", source: "title" }] }], listings, asins: [asin(2)], cost: 30 });
   assert.equal(t3.rows[asin(2)].values.conn.value, "проводное", "ручное значение не перезаписано"); assert.equal(t3.cost, 120); assert.equal(t3.rows[asin(1)].values.conn.value, "Bluetooth", "прежние строки сохранены");
   // переименование/объединение значения

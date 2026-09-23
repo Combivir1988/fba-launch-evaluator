@@ -9,7 +9,7 @@ import { detectAndParse } from "./files.js";
 import { history, localHistory } from "./history.js";
 import { runAi, runPatentScan, runConfigJob, pendingJob } from "./ai.js";
 import { configScope, topForSchema, freshListings } from "/shared/config-scope.js";
-import { sanitizeSchema, setCell, renameOption } from "/shared/config-extract.js";
+import { sanitizeSchema, setCell, renameOption, unlistedValues } from "/shared/config-extract.js";
 import { buildTzPayload } from "/shared/tz-payload.js";
 import { api, goLogin } from "/js/api.js";
 import { startIdleWatch } from "./idle.js";
@@ -563,15 +563,16 @@ dash.addEventListener("change", (e) => { const el = e.target.closest("select[dat
 dash.addEventListener("focusout", (e) => { const el = e.target.closest("[data-tz], [data-tz-summary], [data-tz-q]"); if (el && el.tagName !== "SELECT" && S.a.config?.tz) R().update(dash, S.a, renderOpts(), ["tz"]); });
 // диалог схемы полей
 const slugId = (name) => String(name).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "f" + Date.now().toString(36);
-const schemaRow = (f, i) => `<tr data-fi="${i}"><td><input data-sf="name" value="${esc(f?.name || "")}" placeholder="Название поля"></td><td><select data-sf="type">${["choice", "number", "text"].map((t) => `<option value="${t}" ${(f?.type || "text") === t ? "selected" : ""}>${{ choice: "выбор", number: "число", text: "текст" }[t]}</option>`).join("")}</select></td><td><input data-sf="unit" value="${esc(f?.unit || "")}" style="width:5rem" placeholder="шт, см"></td><td><textarea data-sf="options" rows="2" placeholder="значения через запятую (для типа «выбор»)">${esc((f?.options || []).join(", "))}</textarea></td><td><button type="button" data-sf-del title="Удалить поле">×</button></td></tr>`;
+const schemaRow = (f, i, unl = []) => `<tr data-fi="${i}"><td><input data-sf="name" value="${esc(f?.name || "")}" placeholder="Название поля"></td><td><select data-sf="type">${["choice", "number", "text"].map((t) => `<option value="${t}" ${(f?.type || "text") === t ? "selected" : ""}>${{ choice: "выбор", number: "число", text: "текст" }[t]}</option>`).join("")}</select></td><td><input data-sf="unit" value="${esc(f?.unit || "")}" style="width:5rem" placeholder="шт, см"></td><td><textarea data-sf="options" rows="2" placeholder="значения через запятую (для типа «выбор»)">${esc((f?.options || []).join(", "))}</textarea>${unl.length ? `<div class="muted" style="font-size:.75rem;margin-top:.2rem">Вне списка в таблице: ${unl.slice(0, 8).map((u) => `<button type="button" class="chip" data-sf-add="${esc(u.value)}" title="Добавить в список">${esc(u.value)} · ${u.count}</button>`).join(" ")}</div>` : ""}</td><td><button type="button" data-sf-del title="Удалить поле">×</button></td></tr>`;
 function openSchemaDialog() {
   const C = S.a.config; if (!C?.schema) return;
-  $("#schema-rows").innerHTML = C.schema.fields.map(schemaRow).join("");
+  const unl = unlistedValues(C.schema, C.table); $("#schema-rows").innerHTML = C.schema.fields.map((f, i) => schemaRow(f, i, unl[f.id] || [])).join("");
   $("#schema-note").textContent = C.table ? "Таблица уже извлечена: переименованное значение перенесётся в клетки, удалённое станет «нет данных», новое поле заполнится при повторном извлечении." : "После правки запустите извлечение (шаг 2). Значения поля «выбор» — только из этого списка; синонимы объединяйте здесь.";
   $("#schema-dlg").showModal();
 }
 $("#schema-add").addEventListener("click", () => $("#schema-rows").insertAdjacentHTML("beforeend", schemaRow(null, "new")));
-$("#schema-rows").addEventListener("click", (e) => { const b = e.target.closest("[data-sf-del]"); if (b) b.closest("tr").remove(); });
+$("#schema-rows").addEventListener("click", (e) => { const b = e.target.closest("[data-sf-del]"); if (b) return b.closest("tr").remove();
+  const add = e.target.closest("[data-sf-add]"); if (add) { const ta = add.closest("tr").querySelector('[data-sf="options"]'); const cur = ta.value.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean); if (!cur.includes(add.dataset.sfAdd)) ta.value = [...cur, add.dataset.sfAdd].join(", "); add.remove(); } });
 $("#schema-close").addEventListener("click", () => $("#schema-dlg").close());
 $("#schema-save").addEventListener("click", () => {
   const C = S.a.config; if (!C?.schema) return; const oldFields = C.schema.fields; let table = C.table;
