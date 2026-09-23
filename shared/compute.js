@@ -18,6 +18,8 @@ import { regulatoryTriggers } from "./regulatory.js";
 import { configStats } from "./config-stats.js";
 import { configScope } from "./config-scope.js";
 import { amazonPresence } from "./amazon.js";
+import { promoStats } from "./promo-stats.js";
+import { priceByConfig } from "./price-config.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -66,6 +68,9 @@ export function compute(analysis) {
   p.entry = entryFeasibility(whole, { refDate: Number.isNaN(refDate.getTime()) ? new Date() : refDate, nicheReviewMedian: compWhole.reviewBarrier?.median ?? null, leaderReviews: compWhole.reviewBarrier?.leaderReviews ?? null });
   p.cashflow = cashflow({ ...inputs, price, cpc }, th, { cohortSalesMedian: p.entry.cohort.ok ? p.entry.cohort.salesMedian : null, reviewThreshold: p.entry.reviews.threshold });
   p.budget = budget({ ...inputs, price }, th, { cash: p.cashflow, roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value, revenueSource: p.criterion1.items["1a"].source });
+  // Промо по нише (spec 014): если чеклист «Купоны/дилы» не заполнен вручную — берём из промо листингов этапа 2
+  const promo = analysis.config?.table ? promoStats(agg.listings, whole.xray?.asins, Object.keys(analysis.config.table.rows)) : null;
+  if (promo?.saturation && (inputs.checklist?.couponsDealsSaturation ?? "unknown") === "unknown") { p.inputs = { ...p.inputs, checklist: { ...p.inputs.checklist, couponsDealsSaturation: promo.saturation } }; promo.appliedToChecklist = true; }
   p.challenger = challenger(p);
   p.scorecard = scorecard(p);
   const g0 = gate0(whole);
@@ -81,6 +86,7 @@ export function compute(analysis) {
     amazon,
   };
   results.config = configStats(analysis.config, whole.xray, { band, th: th.config }); // этап 2 (spec 010): null, пока таблица характеристик не извлечена
+  if (results.config) { results.config.promo = promo; results.priceConfig = priceByConfig({ config: analysis.config, stats: results.config.whole, xray: whole.xray, listings: agg.listings || {}, choice: analysis.config.priceChoice || {}, inputs, th: { minAnalogs: th.config.minAnalogs, marginMin: th.economics.marginMin } }); } else results.priceConfig = null; // spec 013/014
   if (whole.xray?.asins?.length) { const sc = configScope(analysis, th); results.configScope = { count: sc.asins.length, total: sc.total, excluded: sc.excluded, capped: sc.capped }; } else results.configScope = null;
   results.borderline = borderline(results, th);
   results.verdict = verdictCeiling(results);

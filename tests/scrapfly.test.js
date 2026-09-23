@@ -23,7 +23,7 @@ test("normalizeProduct: только текст — тайтл, буллеты, 
 test("scrapflyUrl: параметры пробы + cost_budget; ключ только в запросе к Scrapfly", () => {
   const u = new URL(scrapflyUrl("B0BZHHSV52", "k-1")); assert.equal(u.origin + u.pathname, "https://api.scrapfly.io/scrape");
   assert.equal(u.searchParams.get("key"), "k-1"); assert.equal(u.searchParams.get("url"), "https://www.amazon.com/dp/B0BZHHSV52");
-  assert.equal(u.searchParams.get("asp"), "true"); assert.equal(u.searchParams.get("country"), "us"); assert.equal(u.searchParams.get("render_js"), "false"); assert.equal(u.searchParams.get("extraction_model"), "product"); assert.equal(u.searchParams.get("cost_budget"), "60");
+  assert.equal(u.searchParams.get("asp"), "true"); assert.equal(u.searchParams.get("country"), "us"); assert.equal(u.searchParams.get("render_js"), "false"); assert.equal(u.searchParams.get("extraction_model"), "product"); assert.equal(u.searchParams.get("cost_budget"), "80");
 });
 
 test("classifyScrapfly: ключ/кредиты — не повторять, 429/5xx — повторять", () => {

@@ -311,3 +311,8 @@ td.editable select, td.editable input { font-size: .85rem; padding: .1rem .3rem;
 .slider label small { display: block; font-weight: 400; }
 
 td.unlisted { font-style: italic; }
+
+/* цена конфигурации (spec 013) */
+.pfgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .5rem .8rem; margin-top: .4rem; }
+.pf span { display: block; font-size: .78rem; color: var(--text-2); margin-bottom: .15rem; } .pf select { width: 100%; }
+td.promo .chip { font-size: .72rem; padding: 0 .4rem; }

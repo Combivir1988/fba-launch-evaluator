@@ -47,7 +47,7 @@ export const DEFAULT_THRESHOLDS = {
   borderline: { pct: 0.15 },
   priceBand: { smallSample: 15, minSample: 5 },
   // Этап 2 — конфигурация продукта (spec 010): область страниц, кэш, пачки AI, числовые поля как дискретные
-  config: { topForSchema: 40, maxAsins: 150, cacheDays: 30, batchSize: 6, numericDistinctMax: 12 },
+  config: { topForSchema: 40, maxAsins: 150, cacheDays: 30, batchSize: 6, numericDistinctMax: 12, minAnalogs: 5 },
   // Amazon как продавец (spec 012): block — однозначно No-Go, consider — учитывать в общей картине (1e, scorecard, чеклист); область: вся ниша или ценовой диапазон
   amazon: { mode: "block", scope: "niche" }, // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
 };

@@ -30,6 +30,8 @@ export function buildTzPayload(analysis) {
     regulatory: (R.regulatory?.triggers || []).map((t) => ({ agency: t.agency, kind: t.kind === "claim" ? "обещание в листингах" : "тип товара", title: t.title, meaning: t.meaning })),
     patents: analysis?.patents ? { status: analysis.patents.status, summary: analysis.patents.summary, items: (analysis.patents.items || []).slice(0, 5).map((x) => ({ number: x.number, risk: x.risk, overlap: x.overlap, designAround: x.designAround })) } : null,
     differentiation: (analysis?.ai?.differentiation || []).slice(0, 6).map((d) => ({ hypothesis: d.hypothesis, evidence: d.evidence, specRequirement: d.specRequirement })),
+    pricing: R.priceConfig && R.priceConfig.market !== null ? { marketPrice: r2(R.priceConfig.market), entryPrice: r2(R.priceConfig.entry), ceilingPrice: r2(R.priceConfig.ceiling), marketPriceWithCoupons: r2(R.priceConfig.marketEff), analogs: R.priceConfig.analogs, matchedFieldsPct: pct(R.priceConfig.tier), cogsCeilingForMinMargin: r2(R.priceConfig.cogsCeiling), minMarginPct: pct(R.priceConfig.marginMin) } : null,
+    promo: R.config?.promo?.known ? { listings: R.config.promo.known, couponRevSharePct: pct(R.config.promo.coupon.revShare), avgCouponPct: r2(R.config.promo.coupon.avgValuePct), dealRevSharePct: pct(R.config.promo.deal.revShare), discountRevSharePct: pct(R.config.promo.discount.revShare), avgDiscountPct: r2(R.config.promo.discount.avgPct), saturation: R.config.promo.saturation } : null,
     batch: { units: R.budget?.batchUnits ?? null, unitsPerDay: inp.unitsPerDay ?? null, leadDays: R.budget?.leadDays ?? null },
     myBrand: inp.myBrand || "",
   };

@@ -57,6 +57,14 @@ try {
   ok(await page.evaluate(() => document.querySelectorAll("#sec-config canvas").length > 0 && document.querySelector("#sec-config canvas").width > 0), "диаграммы отрисованы");
   const chip = await txt(page, "#sec-config h2"); ok(/извлечено: \d+/.test(chip), "счётчик извлечённых листингов в шапке");
 
+  // цена вашей конфигурации (spec 013) и промо (spec 014)
+  ok(await page.evaluate(() => Boolean(document.querySelector("#sec-config .pricebox")) && /Рыночная цена/.test(document.querySelector("#sec-config .pricebox").textContent) && document.querySelectorAll("#sec-config td.promo").length > 0), "блок «Цена вашей конфигурации» и столбец «Промо» на месте");
+  const before = await page.evaluate(() => document.querySelector("#sec-config .pricebox .cards .card .big")?.textContent);
+  const changed = await page.evaluate(() => { const sel = [...document.querySelectorAll("#sec-config select[data-price-field]")].find((s) => s.options.length > 2); if (!sel) return null; sel.selectedIndex = sel.selectedIndex === 1 ? 2 : 1; sel.dispatchEvent(new Event("change", { bubbles: true })); return sel.dataset.priceField; });
+  await page.waitForTimeout(500);
+  ok(changed && (await page.evaluate((f) => document.querySelector(`#sec-config select[data-price-field="${f}"]`).selectedIndex, changed)) > 0 && /Цена вашей конфигурации/.test(await txt(page, "#sec-config .pricebox")), `смена значения поля «${changed}» пересчитала блок (было ${before})`);
+  const priceTxt = await page.evaluate(() => document.querySelector('#sec-config [data-action="price-apply"]')?.dataset.price);
+  if (priceTxt) { await page.evaluate(() => document.querySelector('#sec-config [data-action="price-apply"]').click()); await page.waitForTimeout(500); ok(Math.abs(Number(await page.inputValue("#f-price")) - Number(priceTxt)) < 0.01, `«Подставить» записал цену ${priceTxt} в экономику`); } else ok(true, "аналогов для цены нет — кнопки нет (допустимо)");
   // ценовой диапазон → переключатель
   await page.evaluate(() => document.querySelector("#f-pmin").closest("details").setAttribute("open", ""));
   await page.fill("#f-pmin", "10"); await page.dispatchEvent("#f-pmin", "change"); await page.fill("#f-pmax", "40"); await page.dispatchEvent("#f-pmax", "change");

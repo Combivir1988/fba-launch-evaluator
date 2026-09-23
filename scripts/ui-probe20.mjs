@@ -26,7 +26,7 @@ try {
   await page.fill("#f-niche", "urinal screen deodorizer"); await page.fill("#f-core", "urinal screen deodorizer"); await page.setInputFiles("#file-input", [POE, xrayPath]);
   await page.waitForFunction(() => document.querySelectorAll(".filecard").length >= 2, null, { timeout: 20000 }); await saved(page);
   const hero = await txt(page, "#sec-hero .verdict"); ok(/No-Go/.test(hero) && /Amazon в нише/.test(hero), "шапка: No-Go, решающий «Amazon в нише» — " + hero.slice(0, 90));
-  const chip = await txt(page, "#sec-competitors h2"); ok(/Amazon продаёт сам · 1 ASIN · \d+ % выручки · No-Go/.test(chip), "чип в конкурентной карте: " + chip.replace(/^Конкурентная карта/, "").trim());
+  const chip = await txt(page, "#sec-competitors h2"); ok(/Amazon продаёт сам( в нише| в диапазоне)? · 1 ASIN · \d+ % выручки · No-Go/.test(chip), "чип в конкурентной карте: " + chip.replace(/^Конкурентная карта/, "").trim());
   ok(/Amazon продаёт сам/.test(await txt(page, "#sec-checklist")) && /по всей нише · однозначно No-Go/.test(await txt(page, "#sec-checklist")), "чеклист: область и режим");
   ok(/Amazon продаёт сам/.test(await txt(page, "#sec-conclusion")) || /Amazon/.test(await txt(page, "#sec-hero")), "причина видна в заключении/шапке");
   // пороги: режим «учитывать в общей картине»
@@ -34,7 +34,7 @@ try {
   ok((await page.$$eval('select[data-thr="amazon.mode"] option', (o) => o.map((x) => x.textContent).join("|"))) === "однозначно No-Go|учитывать в общей картине", "порог-строка показан списком с понятными названиями");
   await page.selectOption('select[data-thr="amazon.mode"]', "consider"); await page.waitForTimeout(600);
   await tab(page, "analysis"); const hero2 = await txt(page, "#sec-hero .verdict"); ok(!/Amazon в нише/.test(hero2), "режим «учитывать»: решающий гейт уже не Amazon — " + hero2.slice(0, 80));
-  ok(/Amazon продаёт сам · 1 ASIN/.test(await txt(page, "#sec-competitors h2")) && !/No-Go/.test(await txt(page, "#sec-competitors h2")), "чип остался, но без «No-Go»");
+  ok(/Amazon продаёт сам( в нише| в диапазоне)? · 1 ASIN/.test(await txt(page, "#sec-competitors h2")) && !/No-Go/.test(await txt(page, "#sec-competitors h2")), "чип остался, но без «No-Go»");
   ok(/изменено порогов: 1/.test(await (async () => { await tab(page, "thresholds"); await page.waitForTimeout(200); return txt(page, "#thr-preset-note"); })()), "строковый порог учтён как изменённый");
   // область «мой ценовой диапазон» без Amazon внутри
   await page.selectOption('select[data-thr="amazon.mode"]', "block"); await page.selectOption('select[data-thr="amazon.scope"]', "band"); await page.waitForTimeout(500);

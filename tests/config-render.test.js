@@ -127,3 +127,13 @@ test("схема изменилась после извлечения: секц�
   const el = draw(a); assert.match(text(el, "#sec-config .notice"), /Схема изменилась после извлечения.*«Новое поле».*Извлечь заново.*кредиты Scrapfly не тратятся/);
   const ok = withConfig(entryFixture(), { tz: false }); assert.doesNotMatch(text(draw(ok), "#sec-config"), /Схема изменилась/);
 });
+
+test("блок «Цена вашей конфигурации» и «Промо в нише»: селекты, карточки, кнопка в экономику; в static — без селектов и кнопки; столбец «Промо»", () => {
+  const a = withConfig(entryFixture(), { tz: false }); const el = draw(a);
+  const pb = el.querySelector("#sec-config .pricebox"); assert.ok(pb); assert.match(text(el, "#sec-config .pricebox h3"), /Цена вашей конфигурации/);
+  assert.ok(pb.querySelectorAll("select[data-price-field]").length >= 2); assert.ok(pb.querySelector('[data-action="price-apply"]')); assert.match(text(el, "#sec-config .pricebox"), /Рыночная цена.*Вход \/ потолок.*С учётом купонов.*Ориентир себестоимости/);
+  assert.match(text(el, "#sec-config"), /Промо в нише/); assert.ok(el.querySelectorAll("#sec-config td.promo").length === Object.keys(a.config.table.rows).length, "столбец «Промо» в каждой строке");
+  assert.ok([...el.querySelectorAll("#sec-config td.promo .chip")].some((c) => /купон 10 %/.test(c.textContent)), "чипы промо из MOCK-листингов");
+  const s = draw(a, { static: true }); assert.equal(s.querySelectorAll("#sec-config .pricebox select:not([disabled]), #sec-config .pricebox button").length, 0);
+  const old = withConfig(entryFixture(), { tz: false }); for (const l of Object.values(old.aggregates.listings)) delete l.promo; old.results = compute(old); const e2 = draw(old); assert.match(text(e2, "#sec-config"), /появятся после повторной загрузки страниц/);
+});

@@ -409,7 +409,7 @@ function renderChallengerUser() {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // ---------- AI ----------
-dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const cb = e.target.closest("[data-action^=\"config-\"], [data-action^=\"tz-\"]"); if (cb) return configAction(cb); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); const sb = e.target.closest('[data-action="settings"]'); if (sb) { e.preventDefault(); showTab("settings"); } });
+dash.addEventListener("click", (e) => { const b = e.target.closest('[data-action="ai"]'); if (b) startAi(); const cb = e.target.closest("[data-action^=\"config-\"], [data-action^=\"tz-\"], [data-action=\"price-apply\"]"); if (cb) return configAction(cb); const pb = e.target.closest('[data-action="patents"]'); if (pb) startPatentScan(); const sb = e.target.closest('[data-action="settings"]'); if (sb) { e.preventDefault(); showTab("settings"); } });
 $("#btn-patents").addEventListener("click", () => startPatentScan());
 $("#btn-ai").addEventListener("click", () => startAi());
 async function startAi(resumeJobId = null) {
@@ -474,6 +474,7 @@ function configAction(b) {
   const act = b.dataset.action;
   if (act === "config-schema") return startConfigSchema(); if (act === "config-edit") return openSchemaDialog(); if (act === "config-extract") return startConfigExtract();
   if (act === "config-tz") return startConfigTz(); if (act === "tz-docx") return downloadTzDocx();
+  if (act === "price-apply") { const v = Number(b.dataset.price); if (!Number.isFinite(v)) return; S.a.inputs.price = Math.round(v * 100) / 100; markDirty(); renderAll(); return toast(`Цена ${S.a.inputs.price.toFixed(2)} $ подставлена в экономику — Gate 1/2, ROI, бюджет и деньги по месяцам пересчитаны`, 6000); }
   const T = S.a.config?.tz; if (!T) return;
   if (act === "tz-add") T.rows.push({ section: "конструкция", param: "", requirement: "", rationale: "", priority: "should", source: "вручную", unverified: false });
   if (act === "tz-del") T.rows.splice(Number(b.dataset.i), 1);
@@ -560,6 +561,13 @@ function tzEdit(el) {
 }
 dash.addEventListener("input", (e) => { const el = e.target.closest("[data-tz], [data-tz-summary], [data-tz-q]"); if (el && el.tagName !== "SELECT") tzEdit(el); });
 dash.addEventListener("change", (e) => { const el = e.target.closest("select[data-tz]"); if (el) { tzEdit(el); R().update(dash, S.a, renderOpts(), ["tz"]); } });
+// цена вашей конфигурации (spec 013): выбор значений полей хранится с анализом
+dash.addEventListener("change", (e) => {
+  const el = e.target.closest("select[data-price-field]"); const C = S.a.config; if (!el || !C?.schema) return;
+  const f = C.schema.fields.find((x) => x.id === el.dataset.priceField); if (!f) return;
+  C.priceChoice = { ...(C.priceChoice || {}) }; C.priceChoice[f.id] = el.value === "" ? null : f.type === "number" ? Number(el.value) : el.value;
+  markDirty(); renderConfig(["config"]);
+});
 dash.addEventListener("focusout", (e) => { const el = e.target.closest("[data-tz], [data-tz-summary], [data-tz-q]"); if (el && el.tagName !== "SELECT" && S.a.config?.tz) R().update(dash, S.a, renderOpts(), ["tz"]); });
 // диалог схемы полей
 const slugId = (name) => String(name).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "f" + Date.now().toString(36);
@@ -971,7 +979,7 @@ const THR_LABELS = {
   "amazon.mode": ["Amazon продаёт сам в нише — что делать", "block — вердикт сразу No-Go; consider — учитывать в общей картине (1e НЕ OK, минус в scorecard, чеклист)"],
   "amazon.scope": ["Где искать Amazon", "niche — вся ниша; band — только мой ценовой диапазон (без диапазона — вся ниша)"],
   "config.topForSchema": ["Схема полей — листингов для AI", "шт (первые по выручке)"], "config.maxAsins": ["Извлечение — максимум страниц за запуск", "шт"], "config.cacheDays": ["Кэш страниц", "дней"],
-  "config.batchSize": ["Листингов на один вызов AI", "шт"], "config.numericDistinctMax": ["Числовое поле как дискретное — различных значений до", "шт (больше — интервалы)"],
+  "config.batchSize": ["Листингов на один вызов AI", "шт"], "config.numericDistinctMax": ["Числовое поле как дискретное — различных значений до", "шт (больше — интервалы)"], "config.minAnalogs": ["Цена конфигурации — аналогов для надёжного ориентира", "шт (меньше — ослабляем совпадение полей до 80 % и 60 %)"],
   "checklist.designTestMin": ["Тест дизайна (PickFu) — минимум голосов", "%"], "checklist.lifecycleMonthsMin": ["Жизненный цикл, минимум", "мес"], "checklist.listingsHigh": ["Листингов в выдаче — высокая конкуренция от", "шт"],
 };
 const THR_OPTIONS = { "amazon.mode": [["block", "однозначно No-Go"], ["consider", "учитывать в общей картине"]], "amazon.scope": [["niche", "вся ниша"], ["band", "мой ценовой диапазон"]] };

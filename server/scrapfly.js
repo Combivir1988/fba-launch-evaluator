@@ -1,9 +1,10 @@
 // Этап 2 (spec 010, D2): загрузка страниц Amazon через Scrapfly — ТОЛЬКО на сервере, ключ из окружения.
 // Ответ модели извлечения «product» сводится к текстовой записи листинга (без HTML, картинок и отзывов) для кэша в анализе.
 import { log } from "./log.js";
+import { parsePromo } from "./promo-parse.js";
 
 export const SCRAPFLY_URL = "https://api.scrapfly.io/scrape";
-const COST_BUDGET = 60; // кредитов на страницу — страховка от неожиданной надбавки за размер HTML (норма 26–31)
+const COST_BUDGET = 80; // кредитов на страницу — страховка от неожиданной надбавки за размер HTML (норма 26–31)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -13,7 +14,7 @@ export function scrapflyUrl(asin, key) {
 }
 
 /** Данные модели «product» → запись листинга для кэша анализа (только текст). */
-export function normalizeProduct(asin, data = {}, { cost = null, fetchedAt = new Date().toISOString() } = {}) {
+export function normalizeProduct(asin, data = {}, { cost = null, fetchedAt = new Date().toISOString(), html = null } = {}) {
   const bullets = String(data.description || "").split(/\n+/).map((s) => s.trim()).filter(Boolean).slice(0, 12).map((s) => s.slice(0, 600));
   const specs = (Array.isArray(data.specifications) ? data.specifications : []).map((s) => ({ k: String(s?.name || "").trim().slice(0, 80), v: String(s?.value ?? "").trim().slice(0, 300) })).filter((s) => s.k && s.v).slice(0, 40);
   const variants = [...new Set((Array.isArray(data.variants) ? data.variants : []).map((v) => [v?.color, v?.size, v?.style].filter(Boolean).join(" / ")).filter(Boolean))].slice(0, 20);
@@ -21,7 +22,8 @@ export function normalizeProduct(asin, data = {}, { cost = null, fetchedAt = new
   const aplus = String(data.aplus_text || data.a_plus || "").trim().slice(0, 2000); // модель «product» A+ почти не отдаёт (картинки) — поле оставлено на будущее
   return { asin, fetchedAt, cost: isNum(cost) ? cost : null, title: String(data.name || "").trim().slice(0, 400), brand: String(data.brand || "").trim().slice(0, 80), bullets, specs, aplus,
     price: isNum(price) ? price : null, rating: isNum(rating.rating_value) ? rating.rating_value : null, ratingCount: isNum(rating.review_count) ? rating.review_count : null,
-    variants, imageCount: Array.isArray(data.images) ? data.images.length : 0, category: String(data.main_category || "").trim().slice(0, 80) };
+    variants, imageCount: Array.isArray(data.images) ? data.images.length : 0, category: String(data.main_category || "").trim().slice(0, 80),
+    promo: parsePromo(html) }; // купоны, дилы, List Price, Subscribe & Save — из сырого HTML того же ответа (spec 014); null — HTML не было
 }
 
 /** Ошибка Scrapfly → { code, message, retryable }. 401/402/403 — ключ или кредиты: задача останавливается. */
@@ -53,7 +55,7 @@ export async function fetchListing(asin, cfg, { fetchImpl = fetch, signal, retri
     const j = await res.json().catch(() => null);
     const data = j?.result?.extracted_data?.data; const cost = j?.context?.cost?.total ?? j?.result?.cost?.total ?? null;
     if (!data || !data.name) { last = { code: "empty", message: "Scrapfly вернул страницу без данных товара", retryable: attempt < retries }; if (isNum(cost)) last.cost = cost; continue; }
-    return normalizeProduct(asin, data, { cost });
+    return normalizeProduct(asin, data, { cost, html: j?.result?.content || null });
   }
   return { asin, fetchedAt: new Date().toISOString(), cost: last?.cost ?? null, error: { code: last?.code || "unknown", message: last?.message || "не удалось загрузить" } };
 }
@@ -85,5 +87,6 @@ export function mockListing(asin, title = "") {
   return { asin, fetchedAt: new Date().toISOString(), cost: 0, title: t, brand: t.split(" ")[0] || "Mock", category: "Mock",
     bullets: [`Material: ${material} — durable ${t.toLowerCase()}`, `Pack of ${1 + (n % 3)} pieces`, `Color: ${color}`, `Weight: ${(1 + (n % 5) * 0.5).toFixed(1)} lb`],
     specs: [{ k: "Brand Name", v: t.split(" ")[0] || "Mock" }, { k: "Material", v: material }, { k: "Number of Items", v: String(1 + (n % 3)) }, { k: "Color", v: color }, { k: "Item Weight", v: `${(1 + (n % 5) * 0.5).toFixed(1)} Pounds` }],
-    aplus: "", price: 10 + (n % 50), rating: 4 + (n % 10) / 10, ratingCount: 50 + n, variants: n % 2 ? [color, "Green"] : [], imageCount: 5 + (n % 5) };
+    aplus: "", price: 10 + (n % 50), rating: 4 + (n % 10) / 10, ratingCount: 50 + n, variants: n % 2 ? [color, "Green"] : [], imageCount: 5 + (n % 5),
+    promo: n % 3 === 0 ? { price: 10 + (n % 50), listPrice: Math.round((10 + (n % 50)) * 1.25 * 100) / 100, discountPct: 20, coupon: { text: "Save 10% with coupon", value: 10, unit: "%" }, deal: n % 6 === 0 ? "Limited time deal" : null, sns: n % 9 === 0 ? { min: 5, max: 15 } : null, promotions: [], hasPromo: true } : { price: 10 + (n % 50), listPrice: null, discountPct: null, coupon: null, deal: null, sns: null, promotions: [], hasPromo: false } };
 }
