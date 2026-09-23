@@ -29,7 +29,7 @@ export function normalizeValue(field, raw) {
 }
 
 /** Значения без дублей (первое написание побеждает), без пустых, не больше 12. */
-function uniqOptions(list) { const seen = new Set(); const out = []; for (const o of list || []) { const t = String(o ?? "").trim().slice(0, 60); const k = normKey(t); if (!t || seen.has(k)) continue; seen.add(k); out.push(t); if (out.length >= 12) break; } return out; }
+function uniqOptions(list) { const seen = new Set(); const out = []; for (const o of list || []) { const t = String(o ?? "").trim().slice(0, 60); const k = normKey(t); if (!t || seen.has(k)) continue; seen.add(k); out.push(t); if (out.length >= 20) break; } return out; }
 
 /** Схема после правок менеджера/AI: уникальные id, не больше 25 полей, значения без дублей и пустых. */
 export function sanitizeSchema(schema) {

@@ -55,7 +55,7 @@ async function* fetchMissing(asins, cached, cfg, deps, label = "Загружаю
 /** Схема полей: топ-листинги → AI. body: { niche, coreKeyword, asins, listings, options } */
 export async function* schemaStream(body, cfg, deps = {}) {
   const aiJson = deps.aiJson || openrouterJson; const t0 = Date.now();
-  const asins = cleanAsins(body.asins).slice(0, 25); const model = pickModel(body.options, cfg);
+  const asins = cleanAsins(body.asins).slice(0, 60); /* до 60 листингов: страницы всё равно нужны для извлечения — лишних кредитов нет, растёт только запрос к AI */ const model = pickModel(body.options, cfg);
   if (!asins.length) { yield { event: "error", data: { code: "bad_request", message: "Нет ASIN для схемы — загрузите Xray", retryable: false } }; return; }
   let fresh = null;
   try {
