@@ -44,7 +44,7 @@ test("модель OpenRouter по-прежнему идёт в OpenRouter со 
 });
 
 test("понятные сообщения Google: 429 — лимит, 503 — перегрузка, 403 — ключ; без ключа — ошибка без запроса", async () => {
-  const run = async (status, bodyText) => (await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, cfg(), { fetchImpl: async () => new Response(bodyText, { status }) }))).at(-1).data;
+  const run = async (status, bodyText) => (await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, { ...cfg(), aiRetryWaitsMs: [] }, { fetchImpl: async () => new Response(bodyText, { status }) }))).at(-1).data;
   const e429 = await run(429, "{}"); assert.equal(e429.code, "rate_limited"); assert.match(e429.message, /Google AI Studio: исчерпан бесплатный лимит/); assert.equal(e429.retryable, true);
   const e503 = await run(503, JSON.stringify([{ error: { code: 503, message: "high demand" } }])); assert.equal(e503.code, "upstream"); assert.match(e503.message, /перегружена/);
   assert.equal((await run(403, "{}")).code, "auth");
@@ -58,4 +58,47 @@ test("openrouterJson (патентный скан) тоже маршрутизи
   const fetchImpl = async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200 }); };
   const out = await openrouterJson({ cfg: cfg(), model: "aistudio/gemini-3.5-flash-lite", system: "s", user: "u", schema, fetchImpl });
   assert.deepEqual(out, { ok: true }); assert.equal(calls.length, 1); assert.equal(calls[0].url, GOOGLE_AI_URL); assert.equal(calls[0].body.model, "gemini-3.5-flash-lite"); assert.equal(calls[0].body.response_format.type, "json_object");
+});
+
+test("перегрузка бесплатного уровня: повтор того же запроса, затем переход на другую бесплатную модель Google", async () => {
+  const c = { ...cfg({ OPENROUTER_MODELS: "aistudio/gemini-3.5-flash-lite,aistudio/gemini-3.5-flash,nvidia/x:free" }), aiRetryWaitsMs: [0, 0] };
+  const busy = () => new Response(JSON.stringify([{ error: { code: 503, message: "high demand" } }]), { status: 503 });
+  // 1. первая попытка 503 → повтор → ответ
+  const seen = []; let n = 0;
+  const flaky = async (url, init) => { seen.push(JSON.parse(init.body).model); return ++n === 1 ? busy() : sse(JSON.stringify(verdict)); };
+  const ev = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c, { fetchImpl: flaky }));
+  assert.equal(ev.at(-1).event, "done", JSON.stringify(ev.at(-1)).slice(0, 200));
+  assert.deepEqual(seen, ["gemini-3.5-flash-lite", "gemini-3.5-flash-lite"], "повтор той же модели, без смены");
+  assert.ok(ev.some((e) => e.event === "thinking" && /Повтор через/.test(e.data.text)), "человеку видно, что идёт повтор");
+
+  // 2. модель перегружена всегда → запасная бесплатная модель того же ключа
+  const models = [];
+  const fallback = async (url, init) => { const m = JSON.parse(init.body).model; models.push(m); return m === "gemini-3.5-flash-lite" ? busy() : sse(JSON.stringify(verdict), "gemini-3.5-flash"); };
+  const ev2 = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c, { fetchImpl: fallback }));
+  const done = ev2.at(-1); assert.equal(done.event, "done"); assert.equal(done.data.model, "aistudio/gemini-3.5-flash", "ответила запасная модель, и это видно в результате");
+  assert.ok(models.filter((m) => m === "gemini-3.5-flash-lite").length >= 3, "сначала исчерпали повторы основной модели");
+  assert.ok(ev2.some((e) => e.event === "thinking" && /перехожу на aistudio\/gemini-3\.5-flash/.test(e.data.text)), "переход объяснён");
+
+  // 3. платные модели OpenRouter в запасные не берём (деньги), ошибка ключа не повторяется
+  const c2 = { ...cfg({ OPENROUTER_MODELS: "aistudio/gemini-3.5-flash-lite,google/gemini-3.8-flash" }), aiRetryWaitsMs: [0] };
+  const tried = [];
+  const dead = async (url, init) => { tried.push(JSON.parse(init.body).model); return busy(); };
+  const ev3 = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c2, { fetchImpl: dead }));
+  assert.equal(ev3.at(-1).event, "error"); assert.match(ev3.at(-1).data.message, /перегружена/);
+  assert.deepEqual([...new Set(tried)], ["gemini-3.5-flash-lite"], "на платную модель не переключаемся");
+  const auth = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c, { fetchImpl: async () => new Response("{}", { status: 403 }) }));
+  assert.equal(auth.at(-1).data.code, "auth"); assert.equal(auth.filter((e) => e.event === "thinking").length, 0, "неверный ключ не повторяем и модель не меняем");
+});
+
+test("openrouterJson: перегруженная модель уступает место запасной бесплатной; ошибка ключа не переключает", async () => {
+  const c = cfg({ OPENROUTER_MODELS: "aistudio/gemini-3.5-flash-lite,aistudio/gemini-3.5-flash" });
+  const body = (o) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(o) } }] }), { status: 200, headers: { "content-type": "application/json" } });
+  const models = [];
+  const impl = async (url, init) => { const m = JSON.parse(init.body).model; models.push(m); return m === "gemini-3.5-flash-lite" ? new Response("[{\"error\":{\"code\":503,\"message\":\"high demand\"}}]", { status: 503 }) : body(verdict); };
+  const got = await openrouterJson({ cfg: c, model: "aistudio/gemini-3.5-flash-lite", system: "s", user: "u", schema: c.schema, fetchImpl: impl });
+  assert.equal(got.verdict, verdict.verdict); assert.ok(models.includes("gemini-3.5-flash"), "ответила запасная модель: " + models.join(", "));
+  const models2 = [];
+  const auth = async (url, init) => { models2.push(JSON.parse(init.body).model); return new Response("{}", { status: 403 }); };
+  await assert.rejects(() => openrouterJson({ cfg: c, model: "aistudio/gemini-3.5-flash-lite", system: "s", user: "u", schema: c.schema, fetchImpl: auth }), (e) => e.code === "auth");
+  assert.deepEqual([...new Set(models2)], ["gemini-3.5-flash-lite"], "с неверным ключом другие модели не пробуем");
 });
