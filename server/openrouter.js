@@ -97,8 +97,8 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
     const modes = ep.google ? allModes.filter((m) => m.name !== "json_schema") : allModes;
     for (const mode of modes) {
       // reasoning-модели тратят на размышления тысячи токенов из того же лимита → запас 32k
-      let compact = false;
-      const reqBody = () => ({ model: ep.model, messages: [{ role: "system", content: mode.sys }, { role: "user", content: userText(compact) }], stream: true, temperature: 0.2, max_tokens: 32000,
+      let compact = false, capTokens = 0; // capTokens: модель с коротким окном сама скажет, сколько ей оставить на ответ
+      const reqBody = () => ({ model: ep.model, messages: [{ role: "system", content: mode.sys }, { role: "user", content: userText(compact) }], stream: true, temperature: 0.2, max_tokens: capTokens || 32000,
         ...(ep.google ? {} : { usage: { include: true } }), ...(mode.response_format ? { response_format: mode.response_format } : {}), ...(cfg.openrouterReasoning && !ep.google ? { reasoning: { effort } } : {}) });
       const req = reqBody();
       let res = null, degrade = false;
@@ -108,6 +108,16 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         const err = classify(res.status, txt, ep.label);
+        // окно модели меньше нашего запроса (GLM-5.2 free: 32k) — просим столько, сколько влезет, и повторяем
+        const ctxM = res.status === 400 && /maximum context length/i.test(txt) ? /maximum context length is (\d+)[\s\S]*?\((\d+) of text input/i.exec(txt) : null;
+        if (ctxM && !capTokens) {
+          capTokens = Math.max(2000, Number(ctxM[1]) - Number(ctxM[2]) - 512);
+          log("warn", "ai: сокращаю лимит ответа под окно модели", { model: ep.model, ctx: Number(ctxM[1]), input: Number(ctxM[2]), maxTokens: capTokens });
+          yield { event: "thinking", data: { text: `
+↧ Окно модели ${Number(ctxM[1])} т. — прошу ${capTokens} т. на ответ и повторяю…
+` } };
+          res = null; continue;
+        }
         // неподдерживаемый формат ответа → следующий режим каскада
         if (res.status === 400 && /response_format|json_schema|structured|schema/i.test(txt) && mode.name !== "text") { log("warn", "openrouter: response_format не поддержан, деградация", { model, mode: mode.name }); lastErr = err; degrade = true; break; }
         if (res.status === 404 && /provider|no endpoints|not found/i.test(txt) && mode.name !== "text" && req.response_format) { log("warn", "openrouter: нет провайдера с structured outputs, деградация", { model, mode: mode.name }); lastErr = err; degrade = true; break; }

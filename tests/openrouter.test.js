@@ -80,3 +80,13 @@ test("openrouter: усечённый ответ слабой модели нор
   assert.equal(bad.at(-1).event, "error"); assert.equal(bad.at(-1).data.code, "parse");
   assert.ok(VERDICT_SCHEMA.required.length >= 10);
 });
+
+test("окно модели меньше запроса: просим ровно столько токенов, сколько влезает, и повторяем", async () => {
+  const err = JSON.stringify({ error: { message: "This endpoint's maximum context length is 32768 tokens. However, you requested about 45000 tokens (13000 of text input, 32000 in the output). Please reduce the length of either one.", code: 400 } });
+  const asked = []; let n = 0;
+  const impl = async (url, init) => { asked.push(JSON.parse(init.body).max_tokens); return ++n === 1 ? new Response(err, { status: 400 }) : sseResponse([{ content: JSON.stringify(verdict) }]); };
+  const ev = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k" }, { ...cfg(), aiRetryWaitsMs: [] }, { fetchImpl: impl }));
+  assert.equal(ev.at(-1).event, "done", JSON.stringify(ev.at(-1)).slice(0, 200));
+  assert.equal(asked[0], 32000); assert.equal(asked[1], 32768 - 13000 - 512, "просим остаток окна");
+  assert.ok(ev.some((e) => e.event === "thinking" && /Окно модели/.test(e.data.text)), "объяснили человеку");
+});
