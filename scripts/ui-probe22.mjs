@@ -43,6 +43,17 @@ try {
   await p2.waitForFunction(() => /бездейств/i.test(document.querySelector("#login-msg")?.textContent || ""), null, { timeout: 10000 });
   ok(/бездейств/i.test(await p2.textContent("#login-msg")), "страница входа объясняет причину: " + (await p2.textContent("#login-msg")).trim());
   ok(/next=%2F/.test(p2.url()) && !/reason=/.test(p2.url()), "адрес возврата сохранён, причина из адреса убрана после показа");
+  // 4. Вердикт в истории: у каждого значения свой цвет (Go — зелёный, не серый)
+  const colors = await page.evaluate(() => {
+    const row = document.createElement("div"); row.className = "histrow"; document.body.append(row);
+    const out = {};
+    for (const v of ["go", "go_conditional", "rework", "no_go"]) { const el = document.createElement("span"); el.className = "status vchip " + v; el.textContent = v; row.append(el); out[v] = [getComputedStyle(el).backgroundColor, getComputedStyle(el).color].join(" | "); }
+    row.remove(); return out;
+  });
+  const plain = (c) => /rgba\(0, 0, 0, 0\)|transparent/.test(c.split(" | ")[0]);
+  ok(!plain(colors.go), "вердикт Go окрашен: " + colors.go);
+  ok(new Set(Object.values(colors)).size === 4 && !Object.values(colors).some(plain), "все четыре вердикта различимы по цвету: " + Object.entries(colors).map(([k, v]) => k + " " + v.split(" | ")[0]).join(", "));
+
   ok(logs.length === 0, "ошибок консоли нет" + (logs.length ? ": " + logs.join(" | ").slice(0, 300) : ""));
 } catch (e) { console.error("PROBE FAILED:", e); process.exitCode = 1; }
 finally { await browser.close(); srv.kill(); }
