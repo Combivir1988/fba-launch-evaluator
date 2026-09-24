@@ -626,14 +626,22 @@
   }
   /** Листинги таблицы, чьи страницы сохранены без данных о промо (загружены до spec 014). */
   const promoMissing = (A, C) => { const L = A.aggregates?.listings || {}; return Object.keys(C?.table?.rows || {}).filter((a) => L[a] && !L[a].error && (L[a].promo === undefined || L[a].promo === null)).length; };
+  /** Из чего складывается промо в нише: купонная война или мягкие акции. */
+  function promoMix(P) {
+    const hot = P.hotRevShare || 0, act = P.activeRevShare ?? hot, soft = (P.promotions?.revShare || 0) + (P.discount?.revShare || 0);
+    if (!act) return '<p class="muted" style="font-size:.8rem">Активных скидок на страницах не нашлось: цена в нише держится тегом.</p>';
+    if (!hot && soft) return '<p class="muted" style="font-size:.8rem">Купонов и дилов в нише нет — скидки идут акциями «купи N» и ценой ниже List Price: это мягче купонной войны, но ваш тег всё равно сравнивают с такой ценой.</p>';
+    return `<p class="muted" style="font-size:.8rem">Купоны и дилы — ${fmtPct(hot)} выручки, остальное дают акции «купи N» и цена ниже List Price.</p>`;
+  }
   /** Промо по нише (spec 014). */
   function promoBlock(P, o = {}) {
     if (!P) return "";
     if (!P.known) return `<p class="muted" style="font-size:.8rem;margin-top:.6rem">Промо (купоны, дилы, скидки от List Price, Subscribe & Save) появятся после повторной загрузки страниц: текущий кэш сохранён без данных о промо${o.static ? "" : " — кнопка «Обновить промо» выше (≈ 30 кредитов Scrapfly за страницу)"}.</p>`;
     const c = (x, label, extra = "") => `<div class="card"><h4>${label}</h4><div class="big">${fmtPct(x.revShare)}</div><div class="muted">выручки · ${fmtN(x.count)} из ${fmtN(P.known)} листингов${extra}</div></div>`;
     const sat = { high: ["fail", "массово"], mid: ["warn", "умеренно"], low: ["ok", "мало"] }[P.saturation] || ["na", "—"];
-    return `<div style="margin-top:.8rem"><h3>Промо в нише <span class="chip ${sat[0]}" title="Купон или дил у ≥ 50 % выручки — массово, ≥ 20 % — умеренно">${sat[1]}</span>${P.appliedToChecklist ? '<span class="chip" title="Подставлено в чеклист «Купоны/дилы», пока там не выбрано вручную">→ чеклист</span>' : ""}</h3>
-      <div class="cards">${c(P.coupon, "Купон", isNum(P.coupon.avgValuePct) ? ` · в среднем ${fmtN(P.coupon.avgValuePct)} %` : "")}${c(P.deal, "Дил")}${c(P.discount, "Скидка от List Price", isNum(P.discount.avgPct) ? ` · в среднем −${fmtN(P.discount.avgPct)} %` : "")}${c(P.sns, "Subscribe & Save")}</div>
+    return `<div style="margin-top:.8rem"><h3>Промо в нише <span class="chip ${sat[0]}" title="Доля выручки, которая продаётся хоть с какой-то активной скидкой: купон, дил, акция «купи N» или цена ниже List Price. Subscribe & Save не считается — это подписка, а не борьба ценой. ≥ 50 % — массово, ≥ 20 % — умеренно">${sat[1]} · ${fmtPct(P.activeRevShare ?? P.hotRevShare)} выручки со скидкой</span>${P.appliedToChecklist ? '<span class="chip" title="Подставлено в чеклист «Купоны/дилы», пока там не выбрано вручную">→ чеклист</span>' : ""}</h3>
+      <div class="cards">${c(P.coupon, "Купон", isNum(P.coupon.avgValuePct) ? ` · в среднем ${fmtN(P.coupon.avgValuePct)} %` : "")}${c(P.deal, "Дил")}${c(P.promotions, "Акции «купи N»")}${c(P.discount, "Скидка от List Price", isNum(P.discount.avgPct) ? ` · в среднем −${fmtN(P.discount.avgPct)} %` : "")}${c(P.sns, "Subscribe & Save")}</div>
+      ${promoMix(P)}
       <p class="muted" style="font-size:.8rem">Снимок на ${fmtDate(P.snapshotAt)}: купоны и дилы временные, страница смотрелась без входа в аккаунт. Доли — по выручке ASIN из Xray.</p></div>`;
   }
   /** Цена вашей конфигурации (spec 013). */
@@ -652,7 +660,16 @@
     const apply = o.static || !isNum(pc.market) ? "" : `<div class="row noprint" style="margin-top:.5rem;flex-wrap:wrap"><button data-action="price-apply" data-price="${pc.market}">Подставить ${fmtMoney(pc.market, 2)} в экономику</button>${outside ? `<span class="chip warn">вне вашего ценового диапазона ${esc(band.label)}</span>` : ""}<span class="muted" style="font-size:.8rem">Ориентир, не формула: бренд и отзывы влияют на цену не меньше конфигурации.</span></div>`;
     return `<div class="pricebox" style="margin-top:.8rem"><h3>Цена вашей конфигурации</h3><div class="pfgrid">${sel}</div>${cards}${contrib}${apply}</div>`;
   }
-  const promoChips = (p) => (p === undefined || p === null ? '<span class="muted" title="нет данных о промо: страница загружена до появления этой функции — нажмите «Обновить промо»">—</span>' : [isNum(p.discountPct) && p.discountPct > 0 ? `<span class="chip warn" title="скидка от List Price ${fmtMoney(p.listPrice, 2)}">−${p.discountPct} %</span>` : "", p.coupon ? `<span class="chip fail" title="${esc(p.coupon.text)}">купон ${p.coupon.unit === "%" ? p.coupon.value + " %" : "$" + p.coupon.value}</span>` : "", p.deal ? `<span class="chip fail">${esc(p.deal)}</span>` : "", p.sns ? `<span class="chip">S&S ${p.sns.min}${p.sns.max !== p.sns.min ? "–" + p.sns.max : ""} %</span>` : "", ...(p.promotions || []).map((t) => `<span class="chip">${esc(t)}</span>`)].filter(Boolean).join(" ") || '<span class="muted">нет</span>');
+  /** Акция со страницы — коротко для узкого столбца; полный текст остаётся подсказкой. */
+  const shortPromo = (t) => {
+    const s = String(t); let m = /Save (\d{1,2})% on (\d+) select item/i.exec(s) || /(\d{1,2})% off when you buy (\d+)/i.exec(s);
+    if (m) return `−${m[1]} % от ${m[2]} шт`;
+    m = /Buy (\d+),? (?:save|get) (.{1,20})/i.exec(s); if (m) return `купи ${m[1]} · ${m[2].trim()}`;
+    m = /Get (\d+) for the price of (\d+)/i.exec(s); if (m) return `${m[1]} по цене ${m[2]}`;
+    m = /Extra (\d{1,2})% off/i.exec(s); if (m) return `ещё −${m[1]} %`;
+    return s.length > 24 ? s.slice(0, 23) + "…" : s;
+  };
+  const promoChips = (p) => (p === undefined || p === null ? '<span class="muted" title="нет данных о промо: страница загружена до появления этой функции — нажмите «Обновить промо»">—</span>' : [isNum(p.discountPct) && p.discountPct > 0 ? `<span class="chip warn" title="скидка от List Price ${fmtMoney(p.listPrice, 2)}">−${p.discountPct} %</span>` : "", p.coupon ? `<span class="chip fail" title="${esc(p.coupon.text)}">купон ${p.coupon.unit === "%" ? p.coupon.value + " %" : "$" + p.coupon.value}</span>` : "", p.deal ? `<span class="chip fail">${esc(p.deal)}</span>` : "", p.sns ? `<span class="chip">S&S ${p.sns.min}${p.sns.max !== p.sns.min ? "–" + p.sns.max : ""} %</span>` : "", ...(p.promotions || []).map((t) => `<span class="chip" title="${esc(t)}">${esc(shortPromo(t))}</span>`)].filter(Boolean).join(" ") || '<span class="muted">нет</span>');
   function cfgTable(A, C, o) {
     const byAsin = new Map((A.aggregates.xray?.asins || []).map((a) => [a.asin, a])); const fields = C.schema.fields;
     const rows = Object.entries(C.table.rows).sort((x, y) => revenueOf(byAsin.get(y[0])) - revenueOf(byAsin.get(x[0])));
@@ -711,7 +728,7 @@
     "tz|Приоритет": "Обязательно — без этого товар не соответствует доминирующей конфигурации или требованиям рынка; желательно — отличие или улучшение.",
     "tz|Источник": "Откуда факт: поле схемы, отзывы POE, регуляторный триггер, патентный скан, цены.",
     "Цена вашей конфигурации": "Сколько стоят листинги ниши с такой же конфигурацией, как ваша: медиана их цен (вес — выручка), вход P25 и потолок P75, цена с учётом купонов и ориентир себестоимости. Значения полей меняются в списках выше.",
-    "Промо в нише": "Какая часть выручки ниши продаётся с купонами, дилами, скидками от List Price и Subscribe & Save — по страницам листингов на дату загрузки. Массово — идёт борьба ценой.",
+    "Промо в нише": "Какая часть выручки ниши продаётся со скидкой — купон, дил, акция «купи N» или цена ниже List Price (Subscribe & Save показан отдельно и в оценку не входит). По страницам листингов на дату загрузки. Массово — идёт борьба ценой.",
     "config|Промо": "Промо на странице листинга: −N % — скидка от List Price, купон, дил, S&S — Subscribe & Save, акции «купи N». Снимок на дату загрузки страницы.",
     "config|Ваше значение": "Значение поля, выбранное для вашего товара в списках выше (по умолчанию — доминанта ниши).",
     "config|Доминанта": "Значение поля с наибольшей выручкой ниши.",

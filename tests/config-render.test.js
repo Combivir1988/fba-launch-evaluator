@@ -133,6 +133,13 @@ test("блок «Цена вашей конфигурации» и «Промо 
   const pb = el.querySelector("#sec-config .pricebox"); assert.ok(pb); assert.match(text(el, "#sec-config .pricebox h3"), /Цена вашей конфигурации/);
   assert.ok(pb.querySelectorAll("select[data-price-field]").length >= 2); assert.ok(pb.querySelector('[data-action="price-apply"]')); assert.match(text(el, "#sec-config .pricebox"), /Рыночная цена.*Вход \/ потолок.*С учётом купонов.*Ориентир себестоимости/);
   assert.match(text(el, "#sec-config"), /Промо в нише/); assert.ok(el.querySelectorAll("#sec-config td.promo").length === Object.keys(a.config.table.rows).length, "столбец «Промо» в каждой строке");
+  const pm = text(el, "#sec-config"); assert.match(pm, /Акции «купи N»/, "акции «купи N» — отдельная карточка, а не только чип в таблице");
+  const withPromos = withConfig(entryFixture(), { tz: false }); const firstAsin = Object.keys(withPromos.config.table.rows)[0];
+  withPromos.aggregates.listings[firstAsin].promo = { ...withPromos.aggregates.listings[firstAsin].promo, promotions: ["Save 5% on 4 select item(s)"], hasPromo: true };
+  withPromos.results = compute(withPromos);
+  const cellChip = [...draw(withPromos).querySelectorAll("#sec-config td.promo .chip")].find((c) => /от 4 шт/.test(c.textContent));
+  assert.ok(cellChip, "длинная акция показана коротко: «−5 % от 4 шт»"); assert.match(cellChip.getAttribute("data-tip") || cellChip.getAttribute("title") || "", /Save 5% on 4 select item/, "полный текст акции — в подсказке при наведении");
+  assert.match(pm, /выручки со скидкой/, "в чипе — доля выручки со скидкой");
   assert.ok([...el.querySelectorAll("#sec-config td.promo .chip")].some((c) => /купон 10 %/.test(c.textContent)), "чипы промо из MOCK-листингов");
   const s = draw(a, { static: true }); assert.equal(s.querySelectorAll("#sec-config .pricebox select:not([disabled]), #sec-config .pricebox button").length, 0);
   const old = withConfig(entryFixture(), { tz: false }); for (const l of Object.values(old.aggregates.listings)) delete l.promo; old.results = compute(old); const e2 = draw(old); assert.match(text(e2, "#sec-config"), /появятся после повторной загрузки страниц/);

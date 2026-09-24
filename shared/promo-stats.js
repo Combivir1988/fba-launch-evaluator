@@ -23,7 +23,9 @@ export function promoStats(listings, xrayAsins, asins) {
   const deal = agg((p) => Boolean(p.deal)); const discount = agg((p) => isNum(p.discountPct) && p.discountPct > 0); discount.avgPct = mean(known.filter((r) => isNum(r.l.promo.discountPct) && r.l.promo.discountPct > 0).map((r) => r.l.promo.discountPct));
   const sns = agg((p) => Boolean(p.sns)); const promotions = agg((p) => (p.promotions || []).length > 0); const withPromo = agg((p) => Boolean(p.hasPromo));
   const hot = agg((p) => Boolean(p.coupon || p.deal));
-  const saturation = !known.length ? null : hot.revShare >= 0.5 ? "high" : hot.revShare >= 0.2 ? "mid" : "low"; // как значения чеклиста «Купоны/дилы»
+  // Насыщенность — по всем активным скидкам: купон, дил, акция «купи N» и зачёркнутая цена. Subscribe & Save не считается: это подписка, а не борьба ценой.
+  const active = agg((p) => Boolean(p.coupon || p.deal || (p.promotions || []).length || (isNum(p.discountPct) && p.discountPct > 0)));
+  const saturation = !known.length ? null : active.revShare >= 0.5 ? "high" : active.revShare >= 0.2 ? "mid" : "low"; // как значения чеклиста «Купоны/дилы»
   const snapshotAt = known.map((r) => r.l.fetchedAt).filter(Boolean).sort().at(-1) || null;
-  return { n: list.length, known: known.length, withPromo, coupon, deal, discount, sns, promotions, hotRevShare: hot.revShare, saturation, snapshotAt };
+  return { n: list.length, known: known.length, withPromo, coupon, deal, discount, sns, promotions, active, hotRevShare: hot.revShare, activeRevShare: active.revShare, saturation, snapshotAt };
 }

@@ -45,6 +45,14 @@ test("promoStats: доли по выручке, средняя скидка, н�
   const s = promoStats(listings, xray, asins);
   assert.equal(s.n, 4); assert.equal(s.known, 3); assert.equal(s.coupon.count, 1); assert.ok(Math.abs(s.coupon.revShare - 50000 / 90000) < 1e-9); assert.equal(s.coupon.avgValuePct, 10);
   assert.equal(s.deal.count, 1); assert.equal(s.discount.avgPct, 20); assert.ok(Math.abs(s.hotRevShare - 80000 / 90000) < 1e-9); assert.equal(s.saturation, "high"); assert.equal(s.snapshotAt, "2026-09-23T10:00:00Z");
+  assert.ok(Math.abs(s.activeRevShare - 80000 / 90000) < 1e-9, "активные скидки: купон + дил");
+  // Ниша без купонов и дилов, но с акциями «купи N» и ценой ниже List Price: насыщенность считается по ним, а не «мало» (basswood sheets, 2026-09-24)
+  const soft = { A1: { fetchedAt: "2026-09-24T10:00:00Z", promo: P({ promotions: ["Save 5% on 4 select item(s)"], hasPromo: true }) }, A2: { fetchedAt: "2026-09-24T10:00:00Z", promo: P({ listPrice: 25, discountPct: 20, hasPromo: true }) }, A3: { fetchedAt: "2026-09-24T10:00:00Z", promo: P({ sns: { min: 5, max: 5 }, hasPromo: true }) } };
+  const s2 = promoStats(soft, xray, ["A1", "A2", "A3"]);
+  assert.equal(s2.hotRevShare, 0, "купонов и дилов нет"); assert.equal(s2.promotions.count, 1); assert.ok(Math.abs(s2.activeRevShare - 80000 / 90000) < 1e-9, "акция и скидка от List Price считаются");
+  assert.equal(s2.saturation, "high", "по активным скидкам, а не по одним купонам");
+  const snsOnly = promoStats({ A1: { fetchedAt: "2026-09-24T10:00:00Z", promo: P({ sns: { min: 5, max: 5 }, hasPromo: true }) } }, xray, ["A1"]);
+  assert.equal(snsOnly.activeRevShare, 0, "Subscribe & Save — подписка, в насыщенность не идёт"); assert.equal(snsOnly.saturation, "low");
   assert.equal(promoStats({}, xray, asins), null); assert.equal(promoStats({ A1: { fetchedAt: "x" } }, xray, ["A1"]).known, 0);
 });
 
