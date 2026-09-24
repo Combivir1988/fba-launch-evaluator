@@ -253,6 +253,15 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
 
   // Кэш: vendor (Chart.js, PapaParse) — долго; файлы приложения — всегда ревалидация по ETag (no-cache),
   // иначе после деплоя пользователь до часа видит старую версию.
+  // Главная страница без действующего сеанса ведёт на вход сразу ответом сервера: иначе браузер успевает показать оболочку приложения и «мигнуть» ею перед переходом.
+  const pageGuard = async (req, res, next) => {
+    const token = readCookie(req);
+    try { if (token && (await sessions.resolveSession(token))) return next(); }
+    catch { return next(); } // хранилище недоступно — отдаём приложение, оно объяснит само
+    const back = req.originalUrl.startsWith("/index.html") ? "/" + req.originalUrl.slice("/index.html".length) : req.originalUrl;
+    res.set("Cache-Control", "no-store").redirect(302, "/login.html?next=" + encodeURIComponent(back));
+  };
+  app.get("/", pageGuard); app.get("/index.html", pageGuard);
   app.use("/vendor", express.static(join(root, "public", "vendor"), { maxAge: "7d", immutable: false, etag: true }));
   const noCache = { etag: true, lastModified: true, setHeaders: (res) => res.set("Cache-Control", "no-cache") };
   app.use("/shared", express.static(join(root, "shared"), { extensions: ["js"], ...noCache }));

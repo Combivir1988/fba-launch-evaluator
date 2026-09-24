@@ -11,7 +11,7 @@ import { runAi, runPatentScan, runConfigJob, pendingJob } from "./ai.js";
 import { configScope, topForSchema, freshListings } from "/shared/config-scope.js";
 import { sanitizeSchema, setCell, renameOption, unlistedValues } from "/shared/config-extract.js";
 import { buildTzPayload } from "/shared/tz-payload.js";
-import { api, goLogin } from "/js/api.js";
+import { api, goLogin, isLeaving } from "/js/api.js";
 import { startIdleWatch } from "./idle.js";
 import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml, download } from "./export.js";
 
@@ -1046,6 +1046,7 @@ $("#thr").addEventListener("change", (e) => {
 $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThresholds(); markDirty(); renderAll(); toast("Пороги сброшены к умолчаниям"); });
 
 // ---------- init ----------
+const showApp = () => document.body.classList.remove("booting");
 (async function init() {
   const startTab = wantedTab(); // до загрузки анализа: она сама переключает на «Анализ»
   try { R().initTips(); R().annotateInputs($(".side")); } catch (e) { console.warn("tips", e); } // подсказки у полей панели (spec 006)
@@ -1053,7 +1054,9 @@ $("#thr-reset").addEventListener("click", () => { S.a.thresholds = {}; renderThr
   try { const h = await fetch("/api/health").then((r) => r.json()); S.models = Array.isArray(h.models) ? h.models : []; S.provider = h.provider; S.scrapfly = h.scrapfly !== false; } catch {}
   if (!window.Chart) toast("Chart.js не загрузился — графики не будут отрисованы. Проверьте блокировщик скриптов.", 10000);
 
-  try { await initUser(); } catch { return; } // без сеанса api() уже увёл на страницу входа
+  // Оболочку показываем только после проверки сеанса: без него api() уже уводит на страницу входа, и мигать приложением незачем.
+  try { await initUser(); } catch (e) { if (!isLeaving()) { showApp(); toast("Не удалось проверить сеанс: " + (e?.message || e), 9000); } return; }
+  showApp();
   updateHistCount();
   localStorage.removeItem("fba_last"); // прежняя привязка к браузеру — больше не используется
   const last = S.user?.settings?.lastAnalysisId; lastSent = last || null;

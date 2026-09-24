@@ -9,8 +9,13 @@ const MESSAGES = {
   storage_unavailable: "Хранилище недоступно — изменения не сохранены. Работа во вкладке продолжается, на всякий случай скачайте JSON",
 };
 
+let leaving = false;
+/** Идёт переход на страницу входа — приложение показывать не нужно (иначе оболочка мигает). */
+export const isLeaving = () => leaving;
+
 export function goLogin(hash = "", reason = "") {
   if (location.pathname.endsWith("/login.html")) return;
+  leaving = true;
   const next = location.pathname + location.search;
   location.replace("/login.html?next=" + encodeURIComponent(next) + (reason ? "&reason=" + encodeURIComponent(reason) : "") + hash);
 }

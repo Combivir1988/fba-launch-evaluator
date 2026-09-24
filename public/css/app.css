@@ -46,6 +46,11 @@ label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: 
 .hidden { display: none !important; }
 .sr-only { position: absolute; left: -9999px; }
 
+/* Пока не подтверждён сеанс, оболочка приложения не показывается: иначе она успевает мигнуть перед переходом на страницу входа. */
+body.booting > *:not(#boot) { visibility: hidden; }
+#boot { display: none; }
+body.booting #boot { display: flex; position: fixed; inset: 0; align-items: center; justify-content: center; color: var(--muted); font-size: .9rem; }
+
 /* Shell */
 .topbar { position: sticky; top: 0; z-index: 20; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: .8rem; padding: .55rem 16px; }
 .topbar .brand { font-weight: 700; letter-spacing: .01em; white-space: nowrap; }

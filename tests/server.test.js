@@ -33,8 +33,14 @@ test("createApp без БД — понятная ошибка", async () => {
   assert.throws(() => createApp({}), /нужна БД/);
 });
 
-test("статика: index.html и shared-модули отдаются", async () => {
-  assert.equal((await fetch(`${base}/`)).status, 200);
+test("статика: index.html с сеансом, без сеанса — сразу переход на вход (оболочка не мигает); shared-модули отдаются", async () => {
+  const anon = await fetch(`${base}/`, { redirect: "manual" });
+  assert.equal(anon.status, 302); assert.equal(anon.headers.get("location"), "/login.html?next=%2F");
+  const anon2 = await fetch(`${base}/index.html?tab=history`, { redirect: "manual" });
+  assert.equal(anon2.headers.get("location"), "/login.html?next=%2F%3Ftab%3Dhistory", "адрес запомнен для возврата после входа");
+  const dead = await fetch(`${base}/`, { headers: { cookie: "fba_sid=no-such-token" }, redirect: "manual" }); assert.equal(dead.status, 302);
+  const ok = await fetch(`${base}/`, { headers: h, redirect: "manual" });
+  assert.equal(ok.status, 200); assert.match(await ok.text(), /class="booting"/);
   const r = await fetch(`${base}/shared/compute.js`);
   assert.equal(r.status, 200);
   assert.match(r.headers.get("content-type"), /javascript/);
