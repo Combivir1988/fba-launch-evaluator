@@ -2,6 +2,7 @@
 // Генератор отдаёт те же события, что и anthropic-путь: meta | thinking | delta | done | error.
 // Каскад надёжности: json_schema (strict) → json_object + схема в промпте → без response_format + извлечение JSON из текста.
 import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
+import { compactPayload } from "../shared/ai-payload.js";
 import { validateVerdict, apiSchema } from "../shared/validate-verdict.js";
 import { normalizeVerdict } from "../shared/verdict-normalize.js";
 import { log } from "./log.js";
@@ -76,12 +77,16 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
   if (ep.error) { yield { event: "error", data: ep.error }; return; }
   const effort = ["low", "medium", "high"].includes(options.effort) ? options.effort : (["low", "medium", "high"].includes(cfg.effort) ? cfg.effort : "medium");
   const schema = apiSchema(cfg.schema);
-  const baseMessages = [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: buildUserMessage({ niche, coreKeyword, payload }) }];
+  const userFull = buildUserMessage({ niche, coreKeyword, payload });
+  let userSmall = null; // строится только если понадобится повтор сокращённым запросом
+  const userText = (compact) => (compact ? (userSmall ??= buildUserMessage({ niche, coreKeyword, payload: compactPayload(payload) })) : userFull);
+  const BIG_CHARS = 18000; // меньше этого сокращать нечего
 
+  const hint = (extra) => SYSTEM_PROMPT + "\n\nОтвечай СТРОГО одним JSON-объектом по этой JSON Schema" + extra + ":\n" + JSON.stringify(schema);
   const allModes = [
-    { name: "json_schema", response_format: { type: "json_schema", json_schema: { name: "AIVerdict", strict: true, schema } }, messages: baseMessages },
-    { name: "json_object", response_format: { type: "json_object" }, messages: [{ role: "system", content: SYSTEM_PROMPT + "\n\nОтвечай СТРОГО одним JSON-объектом по этой JSON Schema (без markdown):\n" + JSON.stringify(schema) }, baseMessages[1]] },
-    { name: "text", response_format: undefined, messages: [{ role: "system", content: SYSTEM_PROMPT + "\n\nОтвечай СТРОГО одним JSON-объектом по этой JSON Schema, без пояснений и без markdown:\n" + JSON.stringify(schema) }, baseMessages[1]] },
+    { name: "json_schema", response_format: { type: "json_schema", json_schema: { name: "AIVerdict", strict: true, schema } }, sys: SYSTEM_PROMPT },
+    { name: "json_object", response_format: { type: "json_object" }, sys: hint(" (без markdown)") },
+    { name: "text", response_format: undefined, sys: hint(", без пояснений и без markdown") },
   ];
 
   /** Один проход по модели: каскад режимов ответа и повторы при перегрузке. → ошибка или null (успех, done уже отдан). */
@@ -92,13 +97,13 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
     const modes = ep.google ? allModes.filter((m) => m.name !== "json_schema") : allModes;
     for (const mode of modes) {
       // reasoning-модели тратят на размышления тысячи токенов из того же лимита → запас 32k
-      const req = { model: ep.model, messages: mode.messages, stream: true, temperature: 0.2, max_tokens: 32000 };
-      if (!ep.google) req.usage = { include: true }; // расширение OpenRouter; Google такого поля не знает
-      if (mode.response_format) req.response_format = mode.response_format;
-      if (cfg.openrouterReasoning && !ep.google) req.reasoning = { effort };
+      let compact = false;
+      const reqBody = () => ({ model: ep.model, messages: [{ role: "system", content: mode.sys }, { role: "user", content: userText(compact) }], stream: true, temperature: 0.2, max_tokens: 32000,
+        ...(ep.google ? {} : { usage: { include: true } }), ...(mode.response_format ? { response_format: mode.response_format } : {}), ...(cfg.openrouterReasoning && !ep.google ? { reasoning: { effort } } : {}) });
+      const req = reqBody();
       let res = null, degrade = false;
       for (let attempt = 0; ; attempt++) {
-      try { res = await fetchImpl(ep.url, { method: "POST", headers: ep.headers, body: JSON.stringify(req), signal }); }
+      try { res = await fetchImpl(ep.url, { method: "POST", headers: ep.headers, body: JSON.stringify(reqBody()), signal }); }
       catch (e) { if (e?.name === "AbortError") { return { code: "aborted", message: "Запрос отменён", retryable: false }; } return { code: "upstream", message: "OpenRouter недоступен: " + (e?.message || e), retryable: true }; }
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
@@ -108,6 +113,12 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
         if (res.status === 404 && /provider|no endpoints|not found/i.test(txt) && mode.name !== "text" && req.response_format) { log("warn", "openrouter: нет провайдера с structured outputs, деградация", { model, mode: mode.name }); lastErr = err; degrade = true; break; }
         lastErr = err;
         if (!err.retryable || attempt >= waits.length) return err; // не повторяется или повторы кончились
+        if (!compact && userFull.length > BIG_CHARS && (err.code === "upstream" || err.code === "rate_limited")) {
+          compact = true; // бесплатный уровень отказывает объёму: повторяем тем же запросом, но с сокращёнными данными
+          log("warn", "ai: повтор сокращённым запросом", { model: ep.model, code: err.code, was: userFull.length, now: userText(true).length });
+          yield { event: "thinking", data: { text: `\n✂ ${err.message}\nПовтор с сокращёнными данными (${Math.round(userFull.length / 1024)} КБ → ${Math.round(userText(true).length / 1024)} КБ)…\n` } };
+          res = null; continue;
+        }
         const wait = waits[attempt];
         log("warn", "ai: повтор после ошибки", { model: ep.model, code: err.code, attempt: attempt + 1, waitMs: wait });
         yield { event: "thinking", data: { text: `\n⏳ ${err.message}\nПовтор через ${Math.round(wait / 1000)} с…\n` } };
@@ -143,14 +154,18 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
       const u = usage || {};
       const out = { input: u.prompt_tokens ?? 0, output: u.completion_tokens ?? 0, cacheRead: u.prompt_tokens_details?.cached_tokens ?? 0, cacheWrite: 0, reasoning: u.completion_tokens_details?.reasoning_tokens ?? 0, cost: typeof u.cost === "number" ? u.cost : null };
       log("info", "analyze done", { provider: ep.google ? "google-ai-studio" : "openrouter", model: gotModel, mode: mode.name, ...out, durationMs: Date.now() - t0 });
-      yield { event: "done", data: { verdict, usage: out, durationMs: Date.now() - t0, model: gotModel, provider: ep.google ? "google-ai-studio" : "openrouter" } };
+      yield { event: "done", data: { verdict, usage: out, durationMs: Date.now() - t0, model: gotModel, provider: ep.google ? "google-ai-studio" : "openrouter", ...(compact ? { compacted: true } : {}) } };
       return null;
     }
     return lastErr;
   }
 
   // Бесплатный уровень Google в часы пик отвечает 503/429: сначала повторяем, потом переходим на другую бесплатную модель того же ключа (фикс 2026-09-24).
-  const candidates = [model, ...(cfg.googleKey ? allowed.filter((m) => m !== model && m.startsWith(AISTUDIO_PREFIX)) : [])].slice(0, 3);
+  const spare = (list) => [
+    ...(cfg.googleKey ? list.filter((m) => m !== model && m.startsWith(AISTUDIO_PREFIX)) : []), // свой ключ Google — отдельные лимиты
+    ...(cfg.openrouterKey ? list.filter((m) => m !== model && !m.startsWith(AISTUDIO_PREFIX) && m.endsWith(":free")) : []), // последний резерв: бесплатные модели OpenRouter (платные требуют кредитов)
+  ];
+  const candidates = [model, ...spare(allowed)].slice(0, 4);
   let lastErr = null;
   for (const cur of candidates) {
     if (signal?.aborted) break;
@@ -159,7 +174,8 @@ export async function* openrouterStream(body, cfg, { signal, fetchImpl = fetch }
     if (cur !== model) { log("warn", "ai: переход на запасную модель", { from: model, to: cur, code: lastErr?.code }); yield { event: "thinking", data: { text: `\n↪ ${model} не отвечает — перехожу на ${cur}…\n` } }; }
     const err = yield* streamModel(epCur);
     if (!err) return; // успех: событие done уже отдано
-    lastErr = err;
+    if (cur === model) lastErr = err; // человеку показываем отказ ВЫБРАННОЙ модели: он понятнее, чем отказ запасной
+    else lastErr = lastErr || err;
     if (["aborted", "auth", "billing", "refusal", "bad_request"].includes(err.code) || err.retryable === false) break;
   }
   yield { event: "error", data: lastErr || { code: "upstream", message: "OpenRouter: не удалось получить ответ", retryable: true } };
@@ -186,12 +202,16 @@ function classify(status, txt, label = "OpenRouter") {
 export async function openrouterJson(args) {
   const { cfg, model } = args;
   const chosen = model || cfg.openrouterModel;
-  const candidates = [chosen, ...(cfg.googleKey ? (cfg.openrouterModels || []).filter((m) => m !== chosen && m.startsWith(AISTUDIO_PREFIX)) : [])].slice(0, 3);
+  const list = cfg.openrouterModels || [];
+  const candidates = [chosen,
+    ...(cfg.googleKey ? list.filter((m) => m !== chosen && m.startsWith(AISTUDIO_PREFIX)) : []),
+    ...(cfg.openrouterKey ? list.filter((m) => m !== chosen && !m.startsWith(AISTUDIO_PREFIX) && m.endsWith(":free")) : []),
+  ].slice(0, 4);
   let last = null;
   for (const cur of candidates) {
     try { return await openrouterJsonOnce({ ...args, model: cur }); }
     catch (e) {
-      last = e;
+      last = cur === chosen ? e : last || e; // наверх идёт отказ выбранной модели
       if (["auth", "billing", "refusal", "bad_request", "aborted"].includes(e?.code) || e?.retryable === false || signalAborted(args.signal)) throw e;
       if (cur !== candidates.at(-1)) log("warn", "ai json: переход на запасную модель", { from: cur, code: e?.code });
     }

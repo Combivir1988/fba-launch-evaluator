@@ -70,7 +70,7 @@ export async function runAi(analysis, { onThinking, onProgress, onMeta, onReconn
   try {
     const done = await waitJob(jobId, { onThinking, onProgress, onMeta, onReconnect });
     const ai = reconcile(done.verdict, analysis.results.verdict, analysis.results);
-    return { ...ai, model: done.model, provider: done.provider || null, usage: done.usage, durationMs: done.durationMs, createdAt: new Date().toISOString(), staleSince: null, jobId };
+    return { ...ai, model: done.model, provider: done.provider || null, usage: done.usage, durationMs: done.durationMs, createdAt: new Date().toISOString(), staleSince: null, jobId, ...(done.compacted ? { compacted: true } : {}) };
   } finally { pendingJob.clear(analysis.id, "analyze"); }
 }
 

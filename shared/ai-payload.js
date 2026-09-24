@@ -93,3 +93,21 @@ function topAsins(agg, inp, band) {
   return [];
 }
 function pick(o, keys) { const out = {}; for (const k of keys) if (o && o[k]) out[k] = o[k]; return out; }
+
+/**
+ * Сокращённый пейлоад для повтора: бесплатный уровень Google в часы пик отказывает запросам больше ~20 КБ (проверено 2026-09-24),
+ * а расчёты, пороги и статусы гейтов тут не трогаются — режется только «длинный хвост» примеров.
+ */
+export function compactPayload(payload) {
+  const p = { ...payload, compacted: true };
+  if (p.poe) {
+    p.poe = { ...p.poe,
+      terms: (p.poe.terms || []).slice(0, 8).map(({ topClicked, ...t }) => t),
+      insights: Object.fromEntries(Object.entries(p.poe.insights || {}).slice(0, 3).map(([k, v]) => [k, String(v).slice(0, 300)])),
+      reviews: p.poe.reviews ? { negative: (p.poe.reviews.negative || []).slice(0, 5), positive: (p.poe.reviews.positive || []).slice(0, 3), returns: (p.poe.reviews.returns || []).slice(0, 5) } : null };
+  }
+  if (Array.isArray(p.topAsins)) p.topAsins = p.topAsins.slice(0, 10).map(({ title, ...a }) => ({ ...a, title: String(title || "").slice(0, 50) }));
+  if (Array.isArray(p.sqp)) p.sqp = p.sqp.slice(0, 8);
+  if (Array.isArray(p.keywords)) p.keywords = p.keywords.slice(0, 10);
+  return p;
+}

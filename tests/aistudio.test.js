@@ -86,6 +86,13 @@ test("перегрузка бесплатного уровня: повтор т�
   const ev3 = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c2, { fetchImpl: dead }));
   assert.equal(ev3.at(-1).event, "error"); assert.match(ev3.at(-1).data.message, /перегружена/);
   assert.deepEqual([...new Set(tried)], ["gemini-3.5-flash-lite"], "на платную модель не переключаемся");
+  // последний резерв — бесплатные модели OpenRouter; наверх всё равно идёт отказ выбранной модели
+  const c3 = { ...cfg({ OPENROUTER_MODELS: "aistudio/gemini-3.5-flash-lite,nvidia/x:free" }), aiRetryWaitsMs: [0] };
+  const seen3 = [];
+  const impl3 = async (url, init) => { const m = JSON.parse(init.body).model; seen3.push(m); return m === "nvidia/x:free" ? sse(JSON.stringify(verdict), "nvidia/x:free") : busy(); };
+  const ev4 = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c3, { fetchImpl: impl3 }));
+  assert.equal(ev4.at(-1).event, "done"); assert.equal(ev4.at(-1).data.model, "nvidia/x:free", "ответила бесплатная модель OpenRouter");
+  assert.ok(seen3.includes("nvidia/x:free"));
   const auth = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c, { fetchImpl: async () => new Response("{}", { status: 403 }) }));
   assert.equal(auth.at(-1).data.code, "auth"); assert.equal(auth.filter((e) => e.event === "thinking").length, 0, "неверный ключ не повторяем и модель не меняем");
 });
@@ -101,4 +108,21 @@ test("openrouterJson: перегруженная модель уступает �
   const auth = async (url, init) => { models2.push(JSON.parse(init.body).model); return new Response("{}", { status: 403 }); };
   await assert.rejects(() => openrouterJson({ cfg: c, model: "aistudio/gemini-3.5-flash-lite", system: "s", user: "u", schema: c.schema, fetchImpl: auth }), (e) => e.code === "auth");
   assert.deepEqual([...new Set(models2)], ["gemini-3.5-flash-lite"], "с неверным ключом другие модели не пробуем");
+});
+
+test("большой запрос отклонён объёмом: повтор сокращёнными данными той же моделью, пометка в результате", async () => {
+  const big = { ...payload, poe: { terms: Array.from({ length: 20 }, (_, i) => ({ term: "ключ " + i + " ".repeat(400), svT360: 1000 + i, topClicked: ["B0" + i] })), insights: { a: "и".repeat(1200), b: "б".repeat(1200), c: "ц".repeat(1200), d: "д".repeat(1200) }, reviews: { negative: Array.from({ length: 20 }, (_, i) => "минус " + i), positive: [], returns: [] } }, topAsins: Array.from({ length: 20 }, (_, i) => ({ asin: "B0" + i, title: "товар ".repeat(30), revenue: 1000 })) };
+  const c = { ...cfg({ OPENROUTER_MODELS: "aistudio/gemini-3.5-flash-lite" }), aiRetryWaitsMs: [0, 0] };
+  const sizes = []; let n = 0;
+  const impl = async (url, init) => { sizes.push(init.body.length); return ++n === 1 ? new Response(JSON.stringify([{ error: { code: 503, message: "high demand" } }]), { status: 503 }) : sse(JSON.stringify(verdict)); };
+  const ev = await collect(openrouterStream({ payload: big, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c, { fetchImpl: impl }));
+  const done = ev.at(-1); assert.equal(done.event, "done", JSON.stringify(done).slice(0, 200));
+  assert.equal(done.data.compacted, true, "в результате видно, что данные сокращали");
+  assert.ok(sizes[1] < sizes[0] * 0.7, `второй запрос меньше: ${sizes[0]} → ${sizes[1]}`);
+  assert.ok(ev.some((e) => e.event === "thinking" && /сокращ/i.test(e.data.text)), "человеку сказано, что запрос сокращён");
+  // маленький запрос не сокращаем — просто повторяем
+  const small = []; let k = 0;
+  const impl2 = async (url, init) => { small.push(init.body.length); return ++k === 1 ? new Response(JSON.stringify([{ error: { code: 503, message: "high demand" } }]), { status: 503 }) : sse(JSON.stringify(verdict)); };
+  const ev2 = await collect(openrouterStream({ payload, niche: "n", coreKeyword: "k", options: { model: "aistudio/gemini-3.5-flash-lite" } }, c, { fetchImpl: impl2 }));
+  assert.equal(ev2.at(-1).event, "done"); assert.equal(ev2.at(-1).data.compacted, undefined); assert.equal(small[0], small[1], "тот же самый запрос");
 });
