@@ -143,6 +143,23 @@ export function annotateKeywords(keywords, opts = {}) {
   });
 }
 
+/**
+ * Что даёт порог «минимум конкурентов» прямо сейчас: сколько фраз под него подходит и сколько из них возьмёт автовыбор.
+ * Нужно, потому что сам по себе порог не меняет список ключей — он работает только при нажатии «Автовыбор».
+ * perfect — фразы с Competitor Performance Score 10 (в Cerebro это фильтр Competitor Performance): у них конкуренты стоят высоко, а не просто «где-то ранжируются».
+ */
+export function competitorStats(keywords, { minCompetitors = 3, minSv = 100 } = {}) {
+  const clean = (keywords || []).filter((k) => !k.isAsin && !k.isBranded);
+  const fits = clean.filter((k) => (k.rankingCompetitors ?? 0) >= minCompetitors);
+  const hasScore = clean.some((k) => typeof k.performanceScore === "number" && k.performanceScore > 0);
+  return {
+    fits: fits.length,
+    fitsBySv: fits.filter((k) => k.sv >= minSv).length,
+    perfect: hasScore ? clean.filter((k) => (k.performanceScore ?? 0) >= 10).length : null,
+    max: clean.reduce((m, k) => Math.max(m, k.rankingCompetitors ?? 0), 0),
+  };
+}
+
 /** Экспорт Cerebro по нескольким ASIN? (есть колонка Ranking Competitors) */
 export const isMultiAsin = (keywords) => keywords.some((k) => typeof k.rankingCompetitors === "number");
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCerebro, suggestCluster, isCerebroHeaders } from "../shared/parse-cerebro.js";
+import { parseCerebro, suggestCluster, isCerebroHeaders, competitorStats } from "../shared/parse-cerebro.js";
 import { readCsv, CEREBRO } from "./helpers.js";
 
 const rows = readCsv(CEREBRO);
@@ -73,4 +73,15 @@ test("брендовые запросы: бренды с апострофом и
   assert.deepEqual(kb, ["KILMAT", "Floroom", "Yatim"]);
   const c = parseCerebro([{ "Keyword Phrase": "floroom artificial flowers", "Search Volume": "591" }, { "Keyword Phrase": "artificial flowers", "Search Volume": "9000" }], { coreKeyword: "artificial flowers", brands: kb });
   assert.deepEqual(Object.fromEntries(c.keywords.map((k) => [k.phrase, k.isBranded])), { "floroom artificial flowers": true, "artificial flowers": false });
+});
+
+test("competitorStats: сколько фраз подходит под порог и сколько у них Competitor Performance Score 10", () => {
+  const kw = (phrase, rc, sv, score, extra = {}) => ({ phrase, rankingCompetitors: rc, sv, performanceScore: score, isAsin: false, isBranded: false, ...extra });
+  const list = [kw("a", 9, 5000, 10), kw("b", 9, 50, 10), kw("c", 8, 900, 4), kw("d", 3, 900, 0), kw("e", 9, 900, 10, { isBranded: true }), kw("f", 9, 900, 10, { isAsin: true })];
+  const s9 = competitorStats(list, { minCompetitors: 9, minSv: 100 });
+  assert.equal(s9.fits, 2, "бренды и ASIN не считаются"); assert.equal(s9.fitsBySv, 1, "фраза с SV 50 отсеяна");
+  assert.equal(s9.perfect, 2, "score 10 — то же, что фильтр Competitor Performance в Cerebro"); assert.equal(s9.max, 9);
+  assert.equal(competitorStats(list, { minCompetitors: 8, minSv: 100 }).fits, 3);
+  assert.equal(competitorStats([kw("a", 5, 900, 0)], { minCompetitors: 3 }).perfect, null, "без колонки score — нечего показывать");
+  assert.equal(competitorStats([], {}).fits, 0);
 });

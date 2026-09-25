@@ -2,7 +2,7 @@
 import { newAnalysis, migrate, splitDoc, coreSignature } from "/shared/analysis.js";
 import { compute } from "/shared/compute.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION, thresholdOverrides, PRESET_LIMITS } from "/shared/thresholds.js";
-import { suggestCluster, annotateKeywords, defaultMinCompetitors, knownBrands } from "/shared/parse-cerebro.js";
+import { suggestCluster, annotateKeywords, defaultMinCompetitors, knownBrands, competitorStats } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
 import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
 import { detectAndParse } from "./files.js";
@@ -376,7 +376,13 @@ function renderCluster() {
   const th = mergeThresholds(S.a.thresholds).traffic; const minSv = S.a.inputs.clusterMinSv ?? th.minSv;
   const multi = Boolean(c.flags?.multiAsin);
   $("#kw-multi").classList.toggle("hidden", !multi);
-  if (multi) { const def = defaultMinCompetitors(c, th.minCompetitors); $("#kw-mincomp").value = S.a.inputs.clusterMinCompetitors ?? def; $("#kw-multi-note").textContent = `Cerebro по ${c.flags.maxCompetitors} ASIN: релевантны фразы, по которым ранжируются ≥ N конкурентов (по умолчанию ${def} — все, кроме одного)`; }
+  if (multi) {
+    const def = defaultMinCompetitors(c, th.minCompetitors); const cur = Number($("#kw-mincomp").value) || S.a.inputs.clusterMinCompetitors || def;
+    $("#kw-mincomp").value = S.a.inputs.clusterMinCompetitors ?? def;
+    const st = competitorStats(c.keywords, { minCompetitors: cur, minSv });
+    const perfect = st.perfect === null ? "" : ` · с Competitor Performance Score 10 — ${st.perfect} (это и есть фильтр Competitor Performance в самом Cerebro)`;
+    $("#kw-multi-note").textContent = `По одной фразе ранжируются максимум ${st.max} конкурентов (по умолчанию порог ${def} — все, кроме одного). Порог ${cur}: подходит ${st.fits} фраз, из них с SV ≥ ${minSv} — ${st.fitsBySv}${perfect}. Порог применяется сразу: кластер пересобирается автовыбором, но берёт не больше 60 фраз — поэтому число выбранных ключей почти не меняется. Список ключей ниже порог не фильтрует.`;
+  }
   const ms = $("#kw-minsv"); ms.value = minSv; ms.parentElement.querySelector("output").textContent = String(minSv);
   const sort = $("#kw-sort").value; const by = { sv: (k) => k.sv, sales: (k) => k.keywordSales ?? -1, comp: (k) => (k.rankingCompetitors ?? -1) * 1e6 + k.sv, rel: (k) => k.relevance * 1e7 + k.sv }[sort] || ((k) => k.sv);
   const list = c.keywords.filter((k) => (S.kwShowAll || sel.has(k.phrase) || (!k.isAsin && !k.isBranded)) && (!q || k.phrase.toLowerCase().includes(q))).sort((a, b) => by(b) - by(a)).slice(0, 400);
