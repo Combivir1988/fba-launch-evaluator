@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCerebro, suggestCluster, isCerebroHeaders, competitorStats } from "../shared/parse-cerebro.js";
+import { parseCerebro, suggestCluster, isCerebroHeaders, competitorStats, suggestClusterInfo, hasPerfScore, effectiveScore } from "../shared/parse-cerebro.js";
 import { readCsv, CEREBRO } from "./helpers.js";
 
 const rows = readCsv(CEREBRO);
@@ -78,10 +78,29 @@ test("брендовые запросы: бренды с апострофом и
 test("competitorStats: сколько фраз подходит под порог и сколько у них Competitor Performance Score 10", () => {
   const kw = (phrase, rc, sv, score, extra = {}) => ({ phrase, rankingCompetitors: rc, sv, performanceScore: score, isAsin: false, isBranded: false, ...extra });
   const list = [kw("a", 9, 5000, 10), kw("b", 9, 50, 10), kw("c", 8, 900, 4), kw("d", 3, 900, 0), kw("e", 9, 900, 10, { isBranded: true }), kw("f", 9, 900, 10, { isAsin: true })];
-  const s9 = competitorStats(list, { minCompetitors: 9, minSv: 100 });
-  assert.equal(s9.fits, 2, "бренды и ASIN не считаются"); assert.equal(s9.fitsBySv, 1, "фраза с SV 50 отсеяна");
-  assert.equal(s9.perfect, 2, "score 10 — то же, что фильтр Competitor Performance в Cerebro"); assert.equal(s9.max, 9);
-  assert.equal(competitorStats(list, { minCompetitors: 8, minSv: 100 }).fits, 3);
-  assert.equal(competitorStats([kw("a", 5, 900, 0)], { minCompetitors: 3 }).perfect, null, "без колонки score — нечего показывать");
+  const s10 = competitorStats(list, { minScore: 10, minSv: 100 });
+  assert.equal(s10.fits, 2, "бренды и ASIN не считаются"); assert.equal(s10.fitsBySv, 1, "фраза с SV 50 отсеяна");
+  assert.equal(s10.perfect, 2, "score 10 — то же, что фильтр Competitor Performance в Cerebro"); assert.equal(s10.maxCompetitors, 9);
+  assert.equal(competitorStats(list, { minScore: 4, minSv: 100 }).fits, 3, "под 4 проходит и фраза со score 4");
   assert.equal(competitorStats([], {}).fits, 0);
+});
+
+test("кластер по Competitor Performance Score: берём фразы, где конкуренты стоят высоко, порог сам смягчается", () => {
+  const kw = (phrase, score, sv, extra = {}) => ({ phrase, performanceScore: score, sv, rankingCompetitors: 9, relevance: 1, isAsin: false, isBranded: false, isCore: false, ...extra });
+  const many = [...Array(20)].map((_, i) => kw("fraza " + i, 10, 500 + i));
+  const info = suggestClusterInfo([...many, kw("mus", 2, 5000)], { coreKeyword: "fraza", minSv: 100, minScore: 10, want: 15 });
+  assert.equal(info.byScore, true); assert.equal(info.score, 10); assert.equal(info.steppedDown, false);
+  assert.equal(info.phrases.length, 20, "фраза со score 2 не попала"); assert.ok(!info.phrases.includes("mus"));
+
+  // в узкой нише десятки почти нет — порог смягчается сам
+  const narrow = [kw("a", 10, 900), ...[...Array(18)].map((_, i) => kw("b" + i, 6, 300 + i)), kw("c", 2, 800)];
+  const soft = suggestClusterInfo(narrow, { coreKeyword: "a b c", minSv: 100, minScore: 10, want: 15 });
+  assert.equal(soft.steppedDown, true); assert.equal(soft.score, 6, "ступень 10 → 8 → 6");
+  assert.equal(soft.phrases.length, 19); assert.ok(!soft.phrases.includes("c"), "score 2 всё равно за бортом");
+
+  // старая выгрузка без колонки score — прежнее правило по числу конкурентов
+  const old = [{ phrase: "x", sv: 900, rankingCompetitors: 9, relevance: 1, isAsin: false, isBranded: false, isCore: false },
+               { phrase: "y", sv: 900, rankingCompetitors: 2, relevance: 1, isAsin: false, isBranded: false, isCore: false }];
+  const legacy = suggestClusterInfo(old, { coreKeyword: "x y", minSv: 100, minCompetitors: 8 });
+  assert.equal(legacy.byScore, false); assert.deepEqual(legacy.phrases, ["x"]);
 });

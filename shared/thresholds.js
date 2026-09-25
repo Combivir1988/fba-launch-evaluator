@@ -26,7 +26,7 @@ export const DEFAULT_THRESHOLDS = {
     periodDays: 90,                                                         // горизонт 2g–2k
   },
   budget: { receivingDays: 15, batches: 2 },                                // бюджет первой закупки
-  traffic: { top2ShareMax: 0.80, relevantMin: 30, minSv: 100, groupsMin: 3, minCompetitors: 3, clusterLimit: 40 }, // трафик по ключам + Cerebro multi-ASIN
+  traffic: { top2ShareMax: 0.80, relevantMin: 30, minSv: 100, groupsMin: 3, minCompetitors: 3, minPerfScore: 8, clusterWant: 15, clusterLimit: 40 }, // трафик по ключам + Cerebro multi-ASIN
   poe: { searchConvLow: 0.01, sponsoredHigh: 0.80, top20ProductsHigh: 0.70 },  // концентрация по POE
   challenger: {
     activateTopBrand: 0.25, passCount: 6,

@@ -261,7 +261,7 @@
   function secTraffic(A, R) {
     const tr = R.traffic; if (!tr.source) return `<h2>Трафик по ключам</h2><div class="empty">Загрузите Cerebro (или POE) — распределение трафика и Adj. SV.</div>`;
     const multi = Boolean(tr.multiAsin); const hasSales = tr.cluster.some((k) => isNum(k.keywordSales));
-    const rows = tr.cluster.slice(0, 25).map((k) => `<tr><td>${esc(k.phrase)}</td><td class="num">${fmtN(k.sv)}</td>${hasSales ? `<td class="num">${fmtN(k.keywordSales)}</td>` : ""}${multi ? `<td class="num">${isNum(k.rankingCompetitors) ? k.rankingCompetitors : "—"}${isNum(k.competitorRankAvg) ? ` <small class="muted">(ср. ${fmtN(k.competitorRankAvg)})</small>` : ""}</td>` : ""}<td class="num">${isNum(k.svTrend) ? (k.svTrend > 0 ? "+" : "") + fmtN(k.svTrend) + " %" : "—"}</td><td class="num">${isNum(k.bid) ? fmtMoney(k.bid, 2) : "—"}</td><td class="num">${isNum(k.competingProducts) ? (k.competingIsBound ? ">" : "") + fmtN(k.competingProducts) : "—"}</td><td class="num">${isNum(k.abaClickShare) ? fmtN(k.abaClickShare, 1) + (tr.source === "poe" ? "" : " %") : "—"}</td></tr>`).join("");
+    const rows = tr.cluster.slice(0, 25).map((k) => `<tr><td>${esc(k.phrase)}</td><td class="num">${fmtN(k.sv)}</td>${hasSales ? `<td class="num">${fmtN(k.keywordSales)}</td>` : ""}${multi ? `<td class="num">${isNum(k.rankingCompetitors) ? k.rankingCompetitors : "—"}${isNum(k.competitorRankAvg) ? ` <small class="muted">(ср. ${fmtN(k.competitorRankAvg)})</small>` : ""}</td>` : ""}<td class="num">${fmtTrend(k.svTrend)}</td><td class="num">${isNum(k.bid) ? fmtMoney(k.bid, 2) : "—"}</td><td class="num">${isNum(k.competingProducts) ? (k.competingIsBound ? ">" : "") + fmtN(k.competingProducts) : "—"}</td><td class="num">${isNum(k.abaClickShare) ? fmtN(k.abaClickShare, 1) + (tr.source === "poe" ? "" : " %") : "—"}</td></tr>`).join("");
     const pc = tr.poeConcentration;
     return `<h2>Трафик по ключам${bandChip(R, "whole")} <span class="chip ${tr.status === "ok" ? "ok" : tr.status === "fail" ? "fail" : "warn"}">${tr.source === "cerebro" ? "Cerebro" : "POE"} · ${STATUS_LABEL[tr.status]}</span></h2>
       <div class="tiles">
@@ -594,6 +594,12 @@
   const PIE_MAX = 8;
   const revenueOf = (a) => (isNum(a?.asinRevenue) ? a.asinRevenue : isNum(a?.price) && isNum(a?.asinSales) ? a.price * a.asinSales : 0);
   /** Секторы диаграммы: до 8 значений + «прочее» + «нет данных» — сумма всегда 100 %. */
+  /** Тренд поиска: в Helium 10 это рост к прошлому году, у «взлетевших» фраз бывают тысячи процентов — такие читаются как «×96», а не «+9 500 %». */
+  function fmtTrend(v) {
+    if (!isNum(v)) return "—";
+    if (Math.abs(v) >= 500) return "×" + fmtN(Math.round((100 + v) / 100));
+    return (v > 0 ? "+" : "") + fmtN(v) + " %";
+  }
   function pieRows(f) {
     const vals = f.values.slice(0, PIE_MAX); const rest = f.values.slice(PIE_MAX);
     if (rest.length) vals.push({ label: `прочее (${rest.length})`, share: rest.reduce((s, v) => s + v.share, 0), revenue: rest.reduce((s, v) => s + v.revenue, 0), count: rest.reduce((s, v) => s + v.count, 0), avgPrice: null, other: true });
@@ -817,7 +823,7 @@
     "Топ-20 продуктов": "Какая доля кликов достаётся двадцати самым кликаемым товарам. Выше 70 % — новичку мало что остаётся.",
     "Запрос": "Поисковая фраза покупателя.",
     "SV/мес": "Сколько раз в месяц ищут эту фразу.",
-    "Тренд": "Изменение поискового объёма за последние месяцы.",
+    "Тренд": "Рост поискового объёма фразы к прошлому году (колонка Search Volume Trend в Helium 10). Рост больше чем в шесть раз показан множителем: «×96» значит, что год назад объём был почти нулевой и вырос примерно в 96 раз.",
     "Bid": "Рекомендованная ставка за клик в рекламе Amazon по этой фразе. Ставка главного ключа подставляется как CPC по умолчанию.",
     "Конкур. товаров": "Сколько товаров Amazon показывает по этой фразе.",
     "Click share": "Доля кликов покупателей, которая достаётся товару или запросу внутри ниши.",

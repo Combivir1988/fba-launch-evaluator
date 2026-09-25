@@ -148,16 +148,38 @@ export function annotateKeywords(keywords, opts = {}) {
  * Нужно, потому что сам по себе порог не меняет список ключей — он работает только при нажатии «Автовыбор».
  * perfect — фразы с Competitor Performance Score 10 (в Cerebro это фильтр Competitor Performance): у них конкуренты стоят высоко, а не просто «где-то ранжируются».
  */
-export function competitorStats(keywords, { minCompetitors = 3, minSv = 100 } = {}) {
+export function competitorStats(keywords, { minScore = 8, minSv = 100 } = {}) {
   const clean = (keywords || []).filter((k) => !k.isAsin && !k.isBranded);
-  const fits = clean.filter((k) => (k.rankingCompetitors ?? 0) >= minCompetitors);
-  const hasScore = clean.some((k) => typeof k.performanceScore === "number" && k.performanceScore > 0);
+  const fits = clean.filter((k) => (k.performanceScore ?? 0) >= minScore);
   return {
     fits: fits.length,
     fitsBySv: fits.filter((k) => k.sv >= minSv).length,
-    perfect: hasScore ? clean.filter((k) => (k.performanceScore ?? 0) >= 10).length : null,
-    max: clean.reduce((m, k) => Math.max(m, k.rankingCompetitors ?? 0), 0),
+    perfect: clean.filter((k) => (k.performanceScore ?? 0) >= 10).length,
+    maxCompetitors: clean.reduce((m, k) => Math.max(m, k.rankingCompetitors ?? 0), 0),
   };
+}
+
+/** Есть ли в выгрузке колонка Competitor Performance Score (Cerebro по нескольким ASIN её отдаёт). */
+export const hasPerfScore = (keywords) => (keywords || []).some((k) => typeof k.performanceScore === "number" && k.performanceScore > 0);
+
+/** Ступени смягчения порога: в узкой нише даже у лидеров score редко доходит до 10, и жёсткий порог оставил бы пустой кластер. */
+export const SCORE_STEPS = [10, 8, 6, 4, 2];
+
+/**
+ * Какой порог Competitor Performance Score реально применить: заданный, а если под него попало меньше `want` фраз
+ * с нужным объёмом поиска — ближайшая ступень ниже. Возвращает { score, fits, steppedDown }.
+ */
+export function effectiveScore(keywords, { minScore = 8, minSv = 100, want = 15 } = {}) {
+  const clean = (keywords || []).filter((k) => !k.isAsin && !k.isBranded);
+  const count = (sc) => clean.filter((k) => (k.performanceScore ?? 0) >= sc && k.sv >= minSv).length;
+  const first = count(minScore);
+  if (first >= want) return { score: minScore, fits: first, steppedDown: false };
+  for (const sc of SCORE_STEPS.filter((x) => x < minScore)) {
+    const n = count(sc);
+    if (n >= want) return { score: sc, fits: n, steppedDown: true };
+  }
+  const last = SCORE_STEPS[SCORE_STEPS.length - 1];
+  return { score: Math.min(minScore, last), fits: count(Math.min(minScore, last)), steppedDown: minScore > last };
 }
 
 /** Экспорт Cerebro по нескольким ASIN? (есть колонка Ranking Competitors) */
@@ -171,22 +193,34 @@ export function defaultMinCompetitors(cerebro, fallback = 3) {
 
 /**
  * Автопредложение кластера.
- * Multi-ASIN Cerebro (правило отбора): фраза релевантна, если по ней ранжируются ≥ minCompetitors из заданных
- * конкурентов (по умолчанию 3) — и хотя бы одно слово core-ключа совпадает (страховка от мусора).
+ * Multi-ASIN Cerebro (правило отбора, 2026-09-25): фраза релевантна, если Competitor Performance Score ≥ minScore —
+ * то есть конкуренты по ней стоят ВЫСОКО, а не просто «где-то ранжируются» (это же считает фильтр Competitor Performance в Cerebro);
+ * плюс хотя бы одно слово core-ключа совпадает. Если под порог попало мало фраз, он сам смягчается по ступеням SCORE_STEPS.
+ * Выгрузки без колонки score (старые) считаются по числу ранжирующихся конкурентов, как раньше.
  * Single-ASIN: релевантность ≥ 2/3 токенов core-ключа (для core из 1–2 слов — все).
  * Всегда: не ASIN, не бренд, SV ≥ minSv. Возвращает фразы (≤ limit) по убыванию SV.
  */
-export function suggestCluster(keywords, opts = {}) {
+export function suggestClusterInfo(keywords, opts = {}) {
   const minSv = opts.minSv ?? 100;
   const limit = opts.limit ?? 40;
-  const minComp = opts.minCompetitors ?? 3;
   const coreLen = tokens(opts.coreKeyword || "").length;
   const minRel = coreLen <= 2 ? 0.999 : 2 / 3 - 1e-9;
   const multi = isMultiAsin(keywords);
-  return keywords
-    .filter((k) => !k.isAsin && !k.isBranded && k.sv >= minSv && (k.isCore || (multi
-      ? (k.rankingCompetitors ?? 0) >= minComp && (coreLen === 0 || k.relevance > 0)
-      : k.relevance >= minRel)))
-    .slice(0, multi ? Math.max(limit, 60) : limit)
+  const byScore = multi && hasPerfScore(keywords);
+  const eff = byScore ? effectiveScore(keywords, { minScore: opts.minScore ?? 8, minSv, want: opts.want ?? 15 }) : null;
+  const relevant = (k) => (byScore
+    ? (k.performanceScore ?? 0) >= eff.score && (coreLen === 0 || k.relevance > 0)
+    : multi
+      ? (k.rankingCompetitors ?? 0) >= (opts.minCompetitors ?? 3) && (coreLen === 0 || k.relevance > 0)
+      : k.relevance >= minRel);
+  const cap = multi ? Math.max(limit, 60) : limit;
+  const phrases = keywords
+    .filter((k) => !k.isAsin && !k.isBranded && k.sv >= minSv && (k.isCore || relevant(k)))
+    .slice(0, cap)
     .map((k) => k.phrase);
+  return { phrases, byScore, score: eff?.score ?? null, steppedDown: Boolean(eff?.steppedDown), fits: eff?.fits ?? null, cap };
+}
+
+export function suggestCluster(keywords, opts = {}) {
+  return suggestClusterInfo(keywords, opts).phrases;
 }

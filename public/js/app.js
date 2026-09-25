@@ -2,7 +2,7 @@
 import { newAnalysis, migrate, splitDoc, coreSignature } from "/shared/analysis.js";
 import { compute } from "/shared/compute.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds, METHODOLOGY_VERSION, thresholdOverrides, PRESET_LIMITS } from "/shared/thresholds.js";
-import { suggestCluster, annotateKeywords, defaultMinCompetitors, knownBrands, competitorStats } from "/shared/parse-cerebro.js";
+import { annotateKeywords, defaultMinCompetitors, knownBrands, competitorStats, suggestClusterInfo, hasPerfScore } from "/shared/parse-cerebro.js";
 import { toNum } from "/shared/num.js";
 import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
 import { detectAndParse } from "./files.js";
@@ -331,10 +331,12 @@ function reannotateCerebro() {
   const before = S.a.inputs.clusterKeywords.length; S.a.inputs.clusterKeywords = S.a.inputs.clusterKeywords.filter((p) => !branded.has(p));
   const dropped = before - S.a.inputs.clusterKeywords.length; if (dropped) toast(`Из кластера убрано брендовых запросов: ${dropped}`, 5000);
 }
-function autoCluster() { const c = S.a.aggregates.cerebro; if (!c) return; const th = mergeThresholds(S.a.thresholds).traffic; S.a.inputs.clusterKeywords = suggestCluster(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minCompetitors: S.a.inputs.clusterMinCompetitors ?? defaultMinCompetitors(c, th.minCompetitors), limit: th.clusterLimit }); }
+function autoCluster() { const c = S.a.aggregates.cerebro; if (!c) return; const th = mergeThresholds(S.a.thresholds).traffic;
+  const info = suggestClusterInfo(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minScore: S.a.inputs.clusterMinScore ?? th.minPerfScore, want: th.clusterWant, minCompetitors: S.a.inputs.clusterMinCompetitors ?? th.minCompetitors, limit: th.clusterLimit });
+  S.a.inputs.clusterKeywords = info.phrases; S.lastCluster = info; }
 $("#kw-minsv").addEventListener("input", (e) => { $("#kw-minsv").parentElement.querySelector("output").textContent = e.target.value; });
 $("#kw-minsv").addEventListener("change", (e) => { S.a.inputs.clusterMinSv = Number(e.target.value); autoCluster(); markDirty(); renderAll(); });
-$("#kw-mincomp").addEventListener("change", (e) => { S.a.inputs.clusterMinCompetitors = Math.max(1, Number(e.target.value) || 3); autoCluster(); markDirty(); renderAll(); });
+$("#kw-mincomp").addEventListener("change", (e) => { const c = S.a.aggregates.cerebro; const byScore = hasPerfScore(c?.keywords || []); const v = Number(e.target.value); if (byScore) S.a.inputs.clusterMinScore = Math.min(10, Math.max(0, Number.isFinite(v) ? v : 8)); else S.a.inputs.clusterMinCompetitors = Math.max(1, v || 3); autoCluster(); markDirty(); renderAll(); });
 $("#kw-sort").addEventListener("change", renderCluster);
 $("#kw-auto").addEventListener("click", () => { autoCluster(); markDirty(); renderAll(); });
 $("#kw-none").addEventListener("click", () => { S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); });
@@ -377,11 +379,21 @@ function renderCluster() {
   const multi = Boolean(c.flags?.multiAsin);
   $("#kw-multi").classList.toggle("hidden", !multi);
   if (multi) {
-    const def = defaultMinCompetitors(c, th.minCompetitors); const cur = S.a.inputs.clusterMinCompetitors ?? def; // из анализа, а не из поля: при первой отрисовке в поле ещё стоит значение из вёрстки
-    $("#kw-mincomp").value = cur;
-    const st = competitorStats(c.keywords, { minCompetitors: cur, minSv });
-    const perfect = st.perfect === null ? "" : ` · с Competitor Performance Score 10 — ${st.perfect} (это и есть фильтр Competitor Performance в самом Cerebro)`;
-    $("#kw-multi-note").textContent = `По одной фразе ранжируются максимум ${st.max} конкурентов (по умолчанию порог ${def} — все, кроме одного). Порог ${cur}: подходит ${st.fits} фраз, из них с SV ≥ ${minSv} — ${st.fitsBySv}${perfect}. Порог применяется сразу: кластер пересобирается автовыбором, но берёт не больше 60 фраз — поэтому число выбранных ключей почти не меняется. Список ключей ниже порог не фильтрует.`;
+    const byScore = hasPerfScore(c.keywords);
+    const lbl = $('label[for="kw-mincomp"]'); const inp = $("#kw-mincomp");
+    if (byScore) {
+      const cur = S.a.inputs.clusterMinScore ?? th.minPerfScore;
+      lbl.textContent = "Мин. Competitor Performance Score (Cerebro)"; inp.min = 0; inp.max = 10; inp.step = 2; inp.value = cur;
+      const st = competitorStats(c.keywords, { minScore: cur, minSv });
+      const info = suggestClusterInfo(c.keywords, { coreKeyword: S.a.coreKeyword, minSv, minScore: cur, want: th.clusterWant, limit: th.clusterLimit });
+      const soft = info.steppedDown ? ` Под порог ${cur} попало мало фраз, поэтому взят ${info.score} — в узкой нише даже у лидеров score редко доходит до 10.` : "";
+      $("#kw-multi-note").textContent = `Score — та же метрика, что фильтр Competitor Performance в Cerebro: высокая там, где конкуренты стоят на первых местах. Порог ${cur}: подходит ${st.fits} фраз, из них с SV ≥ ${minSv} — ${st.fitsBySv} (со score 10 — ${st.perfect}).${soft} Порог сразу пересобирает кластер автовыбором (не больше 60 фраз); список ключей ниже он не фильтрует.`;
+    } else {
+      const def = defaultMinCompetitors(c, th.minCompetitors); const cur = S.a.inputs.clusterMinCompetitors ?? def;
+      lbl.textContent = "Мин. конкурентов в топе (multi-ASIN Cerebro)"; inp.min = 1; inp.max = 20; inp.step = 1; inp.value = cur;
+      const fits = c.keywords.filter((k) => !k.isAsin && !k.isBranded && (k.rankingCompetitors ?? 0) >= cur);
+      $("#kw-multi-note").textContent = `В этой выгрузке нет колонки Competitor Performance Score, считаем по числу ранжирующихся конкурентов (максимум по одной фразе — ${c.flags.maxCompetitors}). Порог ${cur}: подходит ${fits.length} фраз, из них с SV ≥ ${minSv} — ${fits.filter((k) => k.sv >= minSv).length}. Порог сразу пересобирает кластер автовыбором (не больше 60 фраз).`;
+    }
   }
   const ms = $("#kw-minsv"); ms.value = minSv; ms.parentElement.querySelector("output").textContent = String(minSv);
   const sort = $("#kw-sort").value; const by = { sv: (k) => k.sv, sales: (k) => k.keywordSales ?? -1, comp: (k) => (k.rankingCompetitors ?? -1) * 1e6 + k.sv, rel: (k) => k.relevance * 1e7 + k.sv }[sort] || ((k) => k.sv);
