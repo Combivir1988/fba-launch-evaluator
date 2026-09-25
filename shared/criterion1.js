@@ -65,7 +65,7 @@ export function criterion1(p) {
     const it = item({ unit: "%", threshold: `Top Brand < ${Math.round(t.topBrandShare * 100)} % и нет Amazon как продавца`, pct: true });
     if (comp?.topBrandShare !== null && comp?.topBrandShare !== undefined) {
       it.value = comp.topBrandShare; it.source = comp.source; it.brand = comp.topBrand;
-      it.note = `${comp.topBrand}: ${(comp.topBrandShare * 100).toFixed(1)} % ${comp.source === "xray" ? "выручки" : "кликов (прокси)"}`;
+      it.note = `${comp.topBrand}: ${(comp.topBrandShare * 100).toFixed(1)} % ${comp.source === "xray" ? "выручки" : "кликов (прокси)"}${comp.incumbent ? " · ваш бренд не считается барьером (вы уже в нише)" : ""}`;
       if (comp.amazonSells) it.note += `; Amazon продаёт сам (${comp.amazonSellsSource === "user" ? "указано вручную" : "по Xray, колонка Seller"}) — НЕ OK независимо от доли`;
     }
     items["1e"] = finalize(it, mo["1e"], (v) => v < t.topBrandShare && !comp?.amazonSells, (v) => v >= t.topBrandShare || Boolean(comp?.amazonSells));
@@ -75,7 +75,7 @@ export function criterion1(p) {
     const it = item({ unit: "%", threshold: `< ${Math.round(t.top5Ok * 100)} % OK · > ${Math.round(t.top5Fail * 100)} % НЕ OK`, pct: true });
     if (comp?.top5Share !== null && comp?.top5Share !== undefined) {
       it.value = comp.top5Share; it.source = comp.source;
-      it.note = comp.source === "xray" ? "доля выручки топ-5 БРЕНДОВ (не продуктов)" : "top5BrandsClickShareT360 (POE, бренды — не путать с продуктами)";
+      it.note = comp.source === "xray" ? "доля выручки топ-5 БРЕНДОВ (не продуктов)" + (comp.incumbent ? ", без вашего бренда" : "") : "top5BrandsClickShareT360 (POE, бренды — не путать с продуктами)";
       const poeTop5 = poe?.launchPotential?.top5BrandsClickShareT360?.current;
       if (comp.source === "xray" && typeof poeTop5 === "number") { it.proxyValue = poeTop5; it.proxyDelta = relDelta(it.value, poeTop5); }
     }

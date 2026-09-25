@@ -310,16 +310,23 @@
         ${cmpTile("Отзывы (ср. / мед.)", `${fmtN(rb.avg)} / ${fmtN(rb.median)}`, `${fmtN(wh.reviewsAvg)} / ${fmtN(wh.reviewsMedian)}`)}
       </div>` : "";
     const az = R.amazon; const azChip = az?.present ? `<span class="chip ${az.blocks ? "fail" : "warn"}" title="${esc(az.blocks ? "Порог «Amazon как продавец»: однозначно No-Go. Область: " + az.scopeLabel : "Порог «Amazon как продавец»: учитывается в общей картине (1e, scorecard). Область: " + az.scopeLabel)}${az.note ? ". " + esc(az.note) : ""}">Amazon продаёт сам${az.scope === "band" ? " в диапазоне" : " в нише"}${az.count ? ` · ${az.count} ASIN` : ""}${isNum(az.revenueShare) ? ` · ${fmtPct(az.revenueShare)} выручки` : ""}${az.blocks ? " · No-Go" : ""}</span>` : "";
-    return `<h2>Конкурентная карта${bandChip(R, "band")} <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${azChip}</h2>
+    const inc = comp.incumbent ? '<span class="chip ok has-tip" data-tip="Галочка «Оценивать как новый вход» снята: ваш бренд убран из метрик концентрации и из планки отзывов — барьер создают чужие. В размере рынка ваша выручка осталась.">вы уже в нише</span>' : "";
+    const ownBlock = !comp.own ? "" : `<div class="tiles" style="margin-top:.6rem">
+        <div class="tile ok"><div class="k">Мои листинги в нише</div><div class="v">${fmtN(comp.own.listings)}</div><div class="s">${esc(comp.own.brands.join(", ") || "—")}</div></div>
+        <div class="tile ok"><div class="k">Моя выручка</div><div class="v">${fmtK(comp.own.revenue)}</div><div class="s">${fmtPct(comp.own.share, 1)} ниши${comp.incumbent ? " · в метрики конкурентов не входит" : " · сейчас считается как у конкурента"}</div></div>
+        <div class="tile ok"><div class="k">Мои отзывы</div><div class="v">${fmtN(comp.own.reviewsMax)}</div><div class="s">медиана ${fmtN(comp.own.reviewsMedian)} · это мой актив, а не барьер</div></div>
+        <div class="tile ok"><div class="k">Моя цена</div><div class="v">${fmtMoney(comp.own.priceMedian, 2)}</div><div class="s">медиана моих листингов</div></div>
+      </div>`;
+    return `<h2>Конкурентная карта${bandChip(R, "band")} <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${azChip}${inc}</h2>${ownBlock}
       <div class="tiles">
-        <div class="tile ${comp.dominant ? "fail" : "ok"}"><div class="k">Лидер</div><div class="v">${esc(comp.topBrand || "—")}</div><div class="s">${fmtPct(comp.topBrandShare, 1)} ${comp.source === "xray" ? "выручки" : "кликов"}</div></div>
+        <div class="tile ${comp.dominant ? "fail" : "ok"}"><div class="k">Лидер${comp.incumbent ? " (без меня)" : ""}</div><div class="v">${esc(comp.topBrand || "—")}</div><div class="s">${fmtPct(comp.topBrandShare, 1)} ${comp.source === "xray" ? "выручки" : "кликов"}</div></div>
         <div class="tile ${rb.tier === "moat" ? "fail" : rb.tier === "medium" ? "warn" : "ok"}"><div class="k">Отзывов у лидера</div><div class="v">${fmtN(rb.leaderReviews)}</div><div class="s">${rb.tier === "moat" ? "> 2000 — практически непробиваем" : rb.tier === "medium" ? "500–2000 — нужен дифференциатор + Vine" : rb.tier === "breakable" ? "< 500 — пробиваемый ров" : "—"}</div></div>
         <div class="tile"><div class="k">Игроков с ≥100 отзывов</div><div class="v">${fmtN(comp.playersOver100)}</div><div class="s">брендов с долей > 10 %: ${fmtN(comp.brandsOver10pct)}</div></div>
         <div class="tile"><div class="k">Топ-5 / топ-10 / топ-20</div><div class="v">${fmtPct(comp.top5Share)}</div><div class="s">${fmtPct(comp.top10Share)} / ${fmtPct(comp.top20Share)}</div></div>
       </div>${cmp}
       <div class="stack" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-brands"></canvas></div>
       <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${cont}
-      ${my.size || myBrand ? '<p class="muted" style="font-size:.8rem">Строки, подсвеченные жёлтым — ваш бренд/ASIN. При оценке «нового входа» он считается инкумбентом, как и остальные.</p>' : ""}`;
+      ${my.size || myBrand ? `<p class="muted" style="font-size:.8rem">Строки, подсвеченные жёлтым — ваш бренд или ASIN. ${comp.incumbent ? "Галочка «Оценивать как новый вход» снята: в долях брендов, топ-5 и планке отзывов вашего бренда нет — там только чужие. Размер рынка считается по всей нише, включая вашу выручку." : "Галочка «Оценивать как новый вход» стоит: ваш бренд считается обычным конкурентом — это сценарий «как если бы мы заходили с нуля». Снимите её, если оцениваете расширение внутри своей ниши."}</p>` : ""}`;
   }
   function drawCompetitors(container, R) {
     const top = R.competition.brands.slice(0, 10); if (!top.length) return;
@@ -958,7 +965,7 @@
     coreKeyword: "Главный поисковый запрос товара: тот, по которому первая страница Amazon на 80 % состоит из таких же товаров. Не самый объёмный, а самый точный.",
     myBrand: "Если вы уже продаёте в этой нише — укажите бренд: он подсветится в таблицах.",
     myAsins: "Ваши ASIN в этой нише, через запятую.",
-    evaluateAsNewEntrant: "Включено — ваш бренд считается таким же конкурентом, как остальные (оценка нового входа). Выключено — рекомендации формулируются как «усилить позицию».",
+    evaluateAsNewEntrant: "Включено — ваш бренд считается обычным конкурентом: оценка «как если бы заходили с нуля». Выключено — вы уже в нише: бренд убирается из доли топ-бренда, топ-5 и планки отзывов (барьер создают чужие), но его выручка остаётся в размере рынка, а позиции видны отдельным блоком.",
     priceMin: "Нижняя граница цен, в которых вы собираетесь продавать. Конкуренты дешевле в расчёт не попадут.",
     priceMax: "Верхняя граница цен. Конкуренты дороже в расчёт не попадут. Спрос и размер рынка всегда считаются по всей нише.",
     price: "Цена, по которой вы будете продавать. Пусто — берётся медиана проверенных конкурентов.",

@@ -50,9 +50,40 @@ export function reviewTier(reviews, th) {
 /**
  * @param {object} p {xray, poe, inputs, thresholds}
  */
+/** Нормализация названия бренда для сравнения (регистр, пробелы, кавычки). */
+const normBrand = (b) => String(b || "").toLowerCase().replace(/[’'`"]/g, "").replace(/\s+/g, " ").trim();
+
+/**
+ * Свои листинги в нише: по названию бренда и по списку своих ASIN (второе важно, если бренд в Xray написан иначе).
+ * @returns {{ brands: string[], asins: Set<string>, rows: object[] }}
+ */
+export function ownListings(asins, inputs = {}) {
+  const wanted = normBrand(inputs.myBrand);
+  const mine = new Set((inputs.myAsins || []).map((a) => String(a).toUpperCase().trim()).filter(Boolean));
+  const rows = (asins || []).filter((a) => (wanted && normBrand(a.brand) === wanted) || mine.has(String(a.asin || "").toUpperCase()));
+  return { brands: [...new Set(rows.map((a) => a.brand).filter(Boolean))], asins: new Set(rows.map((a) => a.asin)), rows };
+}
+
+/** Итог по своим листингам: выручка, доля ниши, отзывы, цена — показываем отдельно, а не как барьер. */
+export function ownPosition(asins, inputs = {}) {
+  const { rows, brands } = ownListings(asins, inputs);
+  if (!rows.length) return null;
+  const total = sum((asins || []).map((a) => a.asinRevenue ?? 0));
+  const revenue = sum(rows.map((a) => a.asinRevenue ?? 0));
+  const revs = rows.map((a) => a.reviews ?? 0);
+  return { brands, listings: rows.length, revenue, share: safeDiv(revenue, total), sales: sum(rows.map((a) => a.asinSales ?? 0)),
+    reviewsMax: Math.max(0, ...revs), reviewsMedian: median(revs), priceMedian: median(rows.map((a) => a.price).filter((x) => x !== null && x !== undefined)),
+    asins: rows.map((a) => a.asin) };
+}
+
 export function competition(p) {
   const { xray, poe, inputs, thresholds: th } = p;
   const excluded = inputs.excludedBrands || [];
+  // Режим «я уже в нише» (галочка «Оценивать как новый вход» снята): свой бренд — не барьер, а актив.
+  // Из метрик концентрации и планки отзывов он убирается, но в размере рынка (1a) остаётся: его выручка — часть ниши.
+  const own = ownPosition(xray?.asins || [], inputs);
+  const incumbent = inputs.evaluateAsNewEntrant === false && Boolean(own);
+  const barrierExcluded = incumbent ? [...excluded, ...own.brands] : excluded;
   const out = { source: null, brands: [], topBrand: null, topBrandShare: null, top5Share: null, top10Share: null, top20Share: null,
     reviewBarrier: { leaderReviews: null, avg: null, median: null, tier: null }, playersOver100: null, brandsOver10pct: null,
     amazonSells: false, amazonSellsSource: "auto", amazonAsins: [], amazonRevenueShare: null, contaminationCandidates: [], poeBrands: [] };
@@ -66,10 +97,10 @@ export function competition(p) {
   else { out.amazonSells = amz.length > 0; out.amazonSellsSource = amz.length ? "xray" : "auto"; }
 
   if (poe?.asinMetrics?.length) {
-    out.poeBrands = poeBrandClickShares(poe.asinMetrics, excluded);
+    out.poeBrands = poeBrandClickShares(poe.asinMetrics, barrierExcluded);
   }
   if (xray?.asins?.length) {
-    const { brands, rows } = brandShares(xray.asins, excluded);
+    const { brands, rows } = brandShares(xray.asins, barrierExcluded);
     out.source = "xray";
     out.brands = brands;
     out.topBrand = brands[0]?.brand ?? null;
@@ -101,6 +132,7 @@ export function competition(p) {
     out.playersOver100 = pb.filter((b) => b.reviewsMax >= 100).length;
     out.brandsOver10pct = pb.filter((b) => b.share > th.challenger.playerShareMin).length;
   }
+  out.own = own; out.incumbent = incumbent;
   out.dominant = out.topBrandShare !== null && out.topBrandShare > th.challenger.activateTopBrand;
   return out;
 }
