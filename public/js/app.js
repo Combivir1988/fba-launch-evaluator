@@ -377,8 +377,8 @@ function renderCluster() {
   const multi = Boolean(c.flags?.multiAsin);
   $("#kw-multi").classList.toggle("hidden", !multi);
   if (multi) {
-    const def = defaultMinCompetitors(c, th.minCompetitors); const cur = Number($("#kw-mincomp").value) || S.a.inputs.clusterMinCompetitors || def;
-    $("#kw-mincomp").value = S.a.inputs.clusterMinCompetitors ?? def;
+    const def = defaultMinCompetitors(c, th.minCompetitors); const cur = S.a.inputs.clusterMinCompetitors ?? def; // из анализа, а не из поля: при первой отрисовке в поле ещё стоит значение из вёрстки
+    $("#kw-mincomp").value = cur;
     const st = competitorStats(c.keywords, { minCompetitors: cur, minSv });
     const perfect = st.perfect === null ? "" : ` · с Competitor Performance Score 10 — ${st.perfect} (это и есть фильтр Competitor Performance в самом Cerebro)`;
     $("#kw-multi-note").textContent = `По одной фразе ранжируются максимум ${st.max} конкурентов (по умолчанию порог ${def} — все, кроме одного). Порог ${cur}: подходит ${st.fits} фраз, из них с SV ≥ ${minSv} — ${st.fitsBySv}${perfect}. Порог применяется сразу: кластер пересобирается автовыбором, но берёт не больше 60 фраз — поэтому число выбранных ключей почти не меняется. Список ключей ниже порог не фильтрует.`;
