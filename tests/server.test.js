@@ -41,6 +41,10 @@ test("статика: index.html с сеансом, без сеанса — ср
   const dead = await fetch(`${base}/`, { headers: { cookie: "fba_sid=no-such-token" }, redirect: "manual" }); assert.equal(dead.status, 302);
   const ok = await fetch(`${base}/`, { headers: h, redirect: "manual" });
   assert.equal(ok.status, 200); assert.match(await ok.text(), /class="booting"/);
+  const login = await fetch(`${base}/login.html`); const loginHtml = await login.text();
+  assert.equal(login.status, 200); assert.equal(login.headers.get("cache-control"), "no-store");
+  assert.match(loginHtml, /theme-boot\.js/, "тема ставится до первой отрисовки — иначе страница мигает");
+  assert.doesNotMatch(loginHtml, /data-google="1"/, "без настроенного Google кнопки нет и места она не занимает");
   const r = await fetch(`${base}/shared/compute.js`);
   assert.equal(r.status, 200);
   assert.match(r.headers.get("content-type"), /javascript/);

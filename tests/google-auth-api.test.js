@@ -75,3 +75,10 @@ test("вход через Google не настроен: кнопки нет, sta
   try { assert.equal((await (await fetch(P.base + "/api/health")).json()).googleLogin, false); assert.equal((await fetch(P.base + "/api/auth/google/start", { redirect: "manual" })).status, 404); }
   finally { await P.close(); }
 });
+
+test("страница входа приходит уже с включённым Google: кнопка не «доезжает» после первой отрисовки", async () => {
+  const r = await fetch(`${T.base}/login.html`); const html = await r.text();
+  assert.match(html, /<html lang="ru" data-google="1">/, "состояние Google — атрибутом в <html>, до отрисовки");
+  assert.match(html, /theme-boot\.js/, "тема ставится до первой отрисовки");
+  assert.doesNotMatch(html, /<div id="google-box" class="hidden">/, "блок не прячется классом — им управляет CSS по атрибуту");
+});

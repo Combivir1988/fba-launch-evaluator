@@ -43,7 +43,20 @@ try {
   await p2.waitForFunction(() => /бездейств/i.test(document.querySelector("#login-msg")?.textContent || ""), null, { timeout: 10000 });
   ok(/бездейств/i.test(await p2.textContent("#login-msg")), "страница входа объясняет причину: " + (await p2.textContent("#login-msg")).trim());
   ok(/next=%2F/.test(p2.url()) && !/reason=/.test(p2.url()), "адрес возврата сохранён, причина из адреса убрана после показа");
-  // 4. Вердикт в истории: у каждого значения свой цвет (Go — зелёный, не серый)
+  // 4. Страница входа не мигает: тема и кнопка Google известны до первой отрисовки
+  const ctx3 = await browser.newContext({ colorScheme: "dark" }); const p3 = await ctx3.newPage();
+  await p3.addInitScript(() => { try { localStorage.setItem("fba_theme", "light"); } catch {} });
+  await p3.goto(base + "/login.html", { waitUntil: "load" });
+  const boot = await p3.evaluate(() => { const sc = document.querySelector('head script[src*="theme-boot"]'); const css = document.querySelector('head link[rel="stylesheet"]'); return sc && css ? { before: Boolean(sc.compareDocumentPosition(css) & Node.DOCUMENT_POSITION_FOLLOWING), blocking: !sc.defer && !sc.async && sc.type !== "module" } : null; });
+  ok(boot?.before && boot?.blocking, "тема ставится обычным скриптом в <head> до стилей — страница не успевает мигнуть");
+  ok(await p3.evaluate(() => document.documentElement.getAttribute("data-theme")) === "light", "сохранённая светлая тема пережила тёмную системную");
+  ok(await p3.evaluate(() => getComputedStyle(document.body).backgroundColor) === "rgb(246, 246, 244)", "фон сразу светлый, без тёмной вспышки");
+  const gbox = await p3.evaluate(() => { const el = document.querySelector("#google-box"); return el ? getComputedStyle(el).display : "нет"; });
+  ok(gbox === "none", "без настроенного Google блок не занимает места и не появляется рывком");
+  ok(await p3.evaluate(() => Boolean(document.querySelector("#login-form"))), "форма логина на месте");
+  await ctx3.close();
+
+  // 5. Вердикт в истории: у каждого значения свой цвет (Go — зелёный, не серый)
   const colors = await page.evaluate(() => {
     const row = document.createElement("div"); row.className = "histrow"; document.body.append(row);
     const out = {};

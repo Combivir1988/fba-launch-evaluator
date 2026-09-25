@@ -30,7 +30,9 @@ async function initGoogle() {
   const reason = params.get("reason");
   if (reason && REASONS[reason]) { show($("#login-msg"), REASONS[reason]); params.delete("reason"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); }
   if (err && GOOGLE_ERRORS[err]) { show($("#login-msg"), GOOGLE_ERRORS[err]); params.delete("error"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); }
-  try { const h = await fetch("/api/health").then((r) => r.json()); if (h.googleLogin) { $("#google-btn").href = "/api/auth/google/start?next=" + encodeURIComponent(nextUrl()); $("#google-box").classList.remove("hidden"); } } catch {}
+  $("#google-btn").href = "/api/auth/google/start?next=" + encodeURIComponent(nextUrl());
+  if (document.documentElement.dataset.google === "1") return; // сервер уже сказал: блок нарисован сразу, ничего не двигаем
+  try { const h = await fetch("/api/health").then((r) => r.json()); if (h.googleLogin) document.documentElement.dataset.google = "1"; } catch {}
 }
 
 async function init() {

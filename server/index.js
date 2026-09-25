@@ -1,5 +1,6 @@
 // FBA Launch Evaluator — сервер: статика + /api (health, учётные записи, фоновые AI-задачи с SSE).
 import express from "express";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { rateLimiter } from "./auth.js";
@@ -254,6 +255,13 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   // Кэш: vendor (Chart.js, PapaParse) — долго; файлы приложения — всегда ревалидация по ETag (no-cache),
   // иначе после деплоя пользователь до часа видит старую версию.
   // Главная страница без действующего сеанса ведёт на вход сразу ответом сервера: иначе браузер успевает показать оболочку приложения и «мигнуть» ею перед переходом.
+  // Страница входа отдаётся уже зная, включён ли вход через Google: иначе кнопка «доезжает» после ответа /api/health и страница прыгает.
+  let loginHtml = null;
+  app.get("/login.html", (req, res) => {
+    if (loginHtml === null) loginHtml = readFileSync(join(root, "public", "login.html"), "utf8");
+    const html = google.enabled ? loginHtml.replace("<html lang=\"ru\">", '<html lang="ru" data-google="1">') : loginHtml;
+    res.set({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }).send(html);
+  });
   const pageGuard = async (req, res, next) => {
     const token = readCookie(req);
     try { if (token && (await sessions.resolveSession(token))) return next(); }
