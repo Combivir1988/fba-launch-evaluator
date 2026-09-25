@@ -675,7 +675,7 @@ async function renderHistory() {
     <div class="m who">${who} · ${esc(t(h.updatedAt))}</div>
     <div class="m">ключ: ${esc(h.coreKeyword || "—")} · Критерий 1: ${h.c1 ?? "—"}/8 · scorecard ${h.score != null ? Math.round(h.score) + " %" : "—"} · ${h.sources.join(", ") || "без файлов"}</div></div>
     <div class="b"><button data-open="${h.id}" class="primary">Открыть</button><button data-share="${h.id}" data-niche="${esc(h.niche || "")}">🔗 Поделиться</button><button data-json="${h.id}">JSON</button><button data-versions="${h.id}" data-niche="${esc(h.niche || "")}" title="Прежние состояния анализа — можно вернуть любое"${h.versions ? "" : " disabled"}>🕘 Версии</button>${canDelete ? `<button data-del="${h.id}" class="danger">Удалить</button>` : ""}</div></div>`;
-  }).join("") || `<div class="empty">${$("#hist-search").value || $("#hist-mine").value === "1" ? "Ничего не найдено." : "История пуста. Анализы сохраняются сюда автоматически и видны всей команде."}</div>`;
+  }).join("") || `<div class="empty">${$("#hist-search").value || $("#hist-mine").value === "1" ? ($("#hist-mine").value === "1" && !$("#hist-search").value ? "Ничего не найдено: вы пока не создавали анализов и не вносили правки в чужие. Выберите «все», чтобы увидеть работу команды." : "Ничего не найдено.") : "История пуста. Анализы сохраняются сюда автоматически и видны всей команде."}</div>`;
   if (data.total > data.items.length) box.insertAdjacentHTML("beforeend", `<div class="muted" style="padding:.5rem">Показаны последние ${data.items.length} из ${data.total} — уточните поиск.</div>`);
 }
 $("#histlist").addEventListener("click", async (e) => {

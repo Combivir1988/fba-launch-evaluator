@@ -52,10 +52,10 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
 
   const metaCols = (core) => { const m = metaFromCore(core); return [m.niche, m.coreKeyword, m.verdict, m.c1 === null ? null : Math.round(m.c1), m.score, m.sources, m.aiDone, m.patentsDone]; };
 
-  /** Список без документов. mine — только автора userId; q — поиск по нише, ключу и имени автора. */
+  /** Список без документов. mine — созданные мной или изменённые мной; q — поиск по нише, ключу и имени автора. */
   async function list({ userId, mine = false, q = "", limit = 200, offset = 0 } = {}) {
     const where = ["a.deleted_at IS NULL"]; const params = [];
-    if (mine) { params.push(userId); where.push(`a.created_by = $${params.length}`); }
+    if (mine) { params.push(userId); where.push(`(a.created_by = $${params.length} OR a.updated_by = $${params.length})`); } // «мои» — и те, что я создал, и те, над которыми работал
     const needle = String(q || "").trim().slice(0, 100);
     if (needle) { params.push("%" + needle.replace(/[\\%_]/g, (c) => "\\" + c) + "%"); const i = params.length; where.push(`(a.niche ILIKE $${i} OR a.core_keyword ILIKE $${i} OR cu.name ILIKE $${i})`); }
     const w = where.join(" AND ");

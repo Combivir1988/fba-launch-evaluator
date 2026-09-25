@@ -87,7 +87,15 @@ test("фильтр «мои», поиск по нише, ключу и авто�
   const mk = async (niche, kw, user) => { const core = { ...splitDoc(fixtureAnalysis()).core, id: randomUUID(), niche, coreKeyword: kw }; await A.saveCore({ id: core.id, core }, user); };
   await mk("bike tube", "inner tube 26", anna); await mk("urinal screen", "urinal deodorizer", ivan); await mk("100%_cotton", "towel", ivan);
   assert.equal((await A.list({ userId: anna.id, mine: true })).total, 1);
+  // «мои» — не только созданные: правка чужого анализа тоже делает его «моим» (иначе у того, кто только дорабатывает, список пуст)
   assert.equal((await A.list({ userId: ivan.id, mine: true })).total, 2);
+  // анна правит анализ ивана — он попадает в её «мои», у ивана остаётся (он автор)
+  const ivans = (await A.list({ userId: ivan.id, mine: true })).items.find((x) => x.niche === "urinal screen");
+  await A.saveCore({ id: ivans.id, baseVersion: ivans.version, core: { ...splitDoc(fixtureAnalysis()).core, id: ivans.id, niche: "urinal screen", coreKeyword: "urinal deodorizer" } }, anna);
+  const annaMine = await A.list({ userId: anna.id, mine: true });
+  assert.equal(annaMine.total, 2, "правка чужого анализа делает его «моим»");
+  assert.ok(annaMine.items.some((x) => x.niche === "urinal screen" && x.createdBy.name === "Иван"));
+  assert.equal((await A.list({ userId: ivan.id, mine: true })).total, 2, "у автора анализ никуда не делся");
   assert.equal((await A.list({ userId: anna.id, q: "URINAL" })).total, 1);
   assert.equal((await A.list({ userId: anna.id, q: "inner" })).items[0].niche, "bike tube");
   assert.equal((await A.list({ userId: anna.id, q: "иван" })).total, 2);
