@@ -9,9 +9,24 @@ function inner(html, id, max = 12000) {
   const next = rest.slice(80).search(/<div[^>]+id="[A-Za-z0-9_]+_feature_div"/); const end = next >= 0 ? next + 80 : rest.length;
   return strip(rest.slice(0, end));
 }
+/** Все блоки с таким id: на странице их несколько, и первый бывает скрытой заготовкой без содержимого. */
+function innerAll(html, id, max = 12000) {
+  const out = []; let from = 0;
+  for (;;) {
+    const i = html.indexOf(`id="${id}"`, from); if (i < 0) break;
+    const start = html.lastIndexOf("<", i); const rest = html.slice(start, start + max);
+    const next = rest.slice(80).search(/<div[^>]+id="[A-Za-z0-9_]+_feature_div"/); const end = next >= 0 ? next + 80 : rest.length;
+    out.push(strip(rest.slice(0, end))); from = i + 1;
+    if (out.length >= 6) break;
+  }
+  return out;
+}
 const num = (s) => { const n = Number(String(s).replace(/,/g, "")); return Number.isFinite(n) ? n : null; };
 
-/** @returns {{ price, listPrice, discountPct, coupon, deal, sns, promotions, hasPromo } | null} */
+/** Версия разбора: если она выросла, кнопка «Обновить промо» предложит перечитать страницы (v2 — починен Subscribe & Save). */
+export const PROMO_VERSION = 2;
+
+/** @returns {{ v, price, listPrice, discountPct, coupon, deal, sns, promotions, hasPromo } | null} */
 export function parsePromo(html) {
   if (!html || typeof html !== "string" || html.length < 500) return null;
   const price = inner(html, "apex_desktop", 14000) || inner(html, "corePriceDisplay_desktop_feature_div", 14000) || inner(html, "corePrice_feature_div", 14000);
@@ -31,12 +46,23 @@ export function parsePromo(html) {
   const dm = dealText.match(/(Limited time deal|Lightning Deal|Deal of the Day|Prime Exclusive Deal|Black Friday Deal|Cyber Monday Deal|Prime Day Deal|Prime Big Deal Days Deal|Holiday Deal|Spring Deal|Top Deal|With Prime|[A-Z][A-Za-z]+ Deal)/);
   const deal = dm ? dm[1] : null;
 
-  const snsText = inner(html, "snsAccordionRowMiddle", 16000);
+  // Subscribe & Save: блоков с этим id несколько (первый — скрытая заготовка), а процент скидки лежит либо в самом блоке,
+  // либо в тексте доставки «…with 10% savings». Навигация магазина упоминает «Subscribe & Save» без процента и без этого блока.
+  const snsRange = (t) => {
+    const a = /Save (\d{1,2})\s?%/i.exec(t), b = /up to (\d{1,2})\s?%/i.exec(t), c = /(\d{1,2})\s?% savings/i.exec(t);
+    if (a || b) return { min: a ? Number(a[1]) : Number(b[1]), max: b ? Number(b[1]) : Number(a[1]) };
+    return c ? { min: Number(c[1]), max: Number(c[1]) } : null;
+  };
   let sns = null;
-  if (/Subscribe & Save/i.test(snsText)) { const a = snsText.match(/Save (\d{1,2})%/i), b = snsText.match(/up to (\d{1,2})%/i); if (a || b) sns = { min: a ? Number(a[1]) : Number(b[1]), max: b ? Number(b[1]) : Number(a[1]) }; }
+  const snsBlocks = innerAll(html, "snsAccordionRowMiddle", 16000).filter((t) => /Subscribe\s*&\s*Save/i.test(t));
+  if (snsBlocks.length) {
+    for (const t of snsBlocks) { sns = snsRange(t); if (sns) break; }
+    // процент часто живёт не в самом блоке, а в тексте доставки: «…with 10% savings»
+    if (!sns) { const m = /Subscribe\s*&\s*Save[\s\S]{0,240}?(\d{1,2})\s?% savings/i.exec(html); sns = { min: m ? Number(m[1]) : null, max: m ? Number(m[1]) : null }; }
+  }
 
   const hasPromo = Boolean(coupon || deal || promotions.length || (discountPct && discountPct > 0) || sns);
-  return { price: pagePrice, listPrice, discountPct, coupon, deal, sns, promotions, hasPromo };
+  return { v: PROMO_VERSION, price: pagePrice, listPrice, discountPct, coupon, deal, sns, promotions, hasPromo };
 }
 
 /** Цена «с учётом купона»: тег минус купон (% или $). */

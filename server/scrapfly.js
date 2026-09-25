@@ -1,7 +1,7 @@
 // Этап 2 (spec 010, D2): загрузка страниц Amazon через Scrapfly — ТОЛЬКО на сервере, ключ из окружения.
 // Ответ модели извлечения «product» сводится к текстовой записи листинга (без HTML, картинок и отзывов) для кэша в анализе.
 import { log } from "./log.js";
-import { parsePromo } from "./promo-parse.js";
+import { parsePromo, PROMO_VERSION } from "./promo-parse.js";
 
 export const SCRAPFLY_URL = "https://api.scrapfly.io/scrape";
 const COST_BUDGET = 80; // кредитов на страницу — страховка от неожиданной надбавки за размер HTML (норма 26–31)
@@ -88,5 +88,5 @@ export function mockListing(asin, title = "") {
     bullets: [`Material: ${material} — durable ${t.toLowerCase()}`, `Pack of ${1 + (n % 3)} pieces`, `Color: ${color}`, `Weight: ${(1 + (n % 5) * 0.5).toFixed(1)} lb`],
     specs: [{ k: "Brand Name", v: t.split(" ")[0] || "Mock" }, { k: "Material", v: material }, { k: "Number of Items", v: String(1 + (n % 3)) }, { k: "Color", v: color }, { k: "Item Weight", v: `${(1 + (n % 5) * 0.5).toFixed(1)} Pounds` }],
     aplus: "", price: 10 + (n % 50), rating: 4 + (n % 10) / 10, ratingCount: 50 + n, variants: n % 2 ? [color, "Green"] : [], imageCount: 5 + (n % 5),
-    promo: n % 3 === 0 ? { price: 10 + (n % 50), listPrice: Math.round((10 + (n % 50)) * 1.25 * 100) / 100, discountPct: 20, coupon: { text: "Save 10% with coupon", value: 10, unit: "%" }, deal: n % 6 === 0 ? "Limited time deal" : null, sns: n % 9 === 0 ? { min: 5, max: 15 } : null, promotions: [], hasPromo: true } : { price: 10 + (n % 50), listPrice: null, discountPct: null, coupon: null, deal: null, sns: null, promotions: [], hasPromo: false } };
+    promo: n % 3 === 0 ? { v: PROMO_VERSION, price: 10 + (n % 50), listPrice: Math.round((10 + (n % 50)) * 1.25 * 100) / 100, discountPct: 20, coupon: { text: "Save 10% with coupon", value: 10, unit: "%" }, deal: n % 6 === 0 ? "Limited time deal" : null, sns: n % 9 === 0 ? { min: 5, max: 15 } : null, promotions: [], hasPromo: true } : { v: PROMO_VERSION, price: 10 + (n % 50), listPrice: null, discountPct: null, coupon: null, deal: null, sns: null, promotions: [], hasPromo: false } };
 }

@@ -536,7 +536,8 @@ async function startConfigExtract(resumeJobId = null) {
   finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
 /** Промо без данных (spec 014): страницы загружены до появления разбора промо — у записи нет поля promo. */
-function promoMissingAsins() { const L = S.a.aggregates?.listings || {}; const rows = S.a.config?.table?.rows || {}; return Object.keys(rows).filter((a) => L[a] && !L[a].error && (L[a].promo === undefined || L[a].promo === null)); }
+const PROMO_VERSION = 2; // см. server/promo-parse.js
+function promoMissingAsins() { const L = S.a.aggregates?.listings || {}; const rows = S.a.config?.table?.rows || {}; return Object.keys(rows).filter((a) => L[a] && !L[a].error && (!L[a].promo || (L[a].promo.v ?? 1) < PROMO_VERSION)); }
 async function startConfigPromo(resumeJobId = null) {
   if (S.cfgBusy) return; if (!S.a.config?.table) return toast("Сначала извлеките характеристики (шаг 2)");
   const asins = promoMissingAsins(); if (!asins.length && !resumeJobId) return toast("Промо уже есть у всех загруженных листингов");

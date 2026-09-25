@@ -640,7 +640,8 @@
     return head + btns + stale + toggle + fieldsHtml + dom + priceBlock(A, R, o) + promoBlock(st.promo, o) + pies + cfgTable(A, C, o);
   }
   /** Листинги таблицы, чьи страницы сохранены без данных о промо (загружены до spec 014). */
-  const promoMissing = (A, C) => { const L = A.aggregates?.listings || {}; return Object.keys(C?.table?.rows || {}).filter((a) => L[a] && !L[a].error && (L[a].promo === undefined || L[a].promo === null)).length; };
+  const PROMO_VERSION = 2; // см. server/promo-parse.js: v2 починил Subscribe & Save
+  const promoMissing = (A, C) => { const L = A.aggregates?.listings || {}; return Object.keys(C?.table?.rows || {}).filter((a) => L[a] && !L[a].error && (!L[a].promo || (L[a].promo.v ?? 1) < PROMO_VERSION)).length; };
   /** Из чего складывается промо в нише: купонная война или мягкие акции. */
   function promoMix(P) {
     const hot = P.hotRevShare || 0, act = P.activeRevShare ?? hot, soft = (P.promotions?.revShare || 0) + (P.discount?.revShare || 0);
@@ -651,7 +652,7 @@
   /** Промо по нише (spec 014). */
   function promoBlock(P, o = {}) {
     if (!P) return "";
-    if (!P.known) return `<p class="muted" style="font-size:.8rem;margin-top:.6rem">Промо (купоны, дилы, скидки от List Price, Subscribe & Save) появятся после повторной загрузки страниц: текущий кэш сохранён без данных о промо${o.static ? "" : " — кнопка «Обновить промо» выше (≈ 30 кредитов Scrapfly за страницу)"}.</p>`;
+    if (!P.known) return `<p class="muted" style="font-size:.8rem;margin-top:.6rem">Промо (купоны, дилы, скидки от List Price, Subscribe & Save) появятся после повторной загрузки страниц: в кэше они либо отсутствуют, либо разобраны старой версией${o.static ? "" : " — кнопка «Обновить промо» выше (≈ 30 кредитов Scrapfly за страницу)"}.</p>`;
     const c = (x, label, extra = "") => `<div class="card"><h4>${label}</h4><div class="big">${fmtPct(x.revShare)}</div><div class="muted">выручки · ${fmtN(x.count)} из ${fmtN(P.known)} листингов${extra}</div></div>`;
     const sat = { high: ["fail", "массово"], mid: ["warn", "умеренно"], low: ["ok", "мало"] }[P.saturation] || ["na", "—"];
     return `<div style="margin-top:.8rem"><h3>Промо в нише <span class="chip ${sat[0]}" title="Доля выручки, которая продаётся хоть с какой-то активной скидкой: купон, дил, акция «купи N» или цена ниже List Price. Subscribe & Save не считается — это подписка, а не борьба ценой. ≥ 50 % — массово, ≥ 20 % — умеренно">${sat[1]} · ${fmtPct(P.activeRevShare ?? P.hotRevShare)} выручки со скидкой</span>${P.appliedToChecklist ? '<span class="chip" title="Подставлено в чеклист «Купоны/дилы», пока там не выбрано вручную">→ чеклист</span>' : ""}</h3>

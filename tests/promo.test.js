@@ -22,7 +22,7 @@ test("купон, дил, Subscribe & Save и акции — только из �
     <div id="dealBadge_feature_div"><span>Limited time deal</span></div><div id="y_feature_div"></div>
     <div id="snsAccordionRowMiddle">Subscribe & Save: Save 5% now and up to 15% on repeat deliveries</div><div id="z_feature_div"></div>`);
   const p = parsePromo(html);
-  assert.deepEqual(p, { price: 24.99, listPrice: 29.99, discountPct: 17, coupon: { text: "Save 10% with coupon", value: 10, unit: "%" }, deal: "Limited time deal", sns: { min: 5, max: 15 }, promotions: ["Buy 2, save 5%"], hasPromo: true });
+  assert.deepEqual(p, { v: 2, price: 24.99, listPrice: 29.99, discountPct: 17, coupon: { text: "Save 10% with coupon", value: 10, unit: "%" }, deal: "Limited time deal", sns: { min: 5, max: 15 }, promotions: ["Buy 2, save 5%"], hasPromo: true });
   const dollar = parsePromo(wrap(`<div id="apex_desktop">$40.00</div><div id="promoPriceBlockMessage_feature_div">Apply $5 coupon</div><div id="q_feature_div"></div>`)); assert.deepEqual(dollar.coupon, { text: "Apply $5 coupon", value: 5, unit: "$" }); assert.equal(dollar.listPrice, null);
   const none = parsePromo(wrap(`<div id="apex_desktop">$40.00</div><div id="promoPriceBlockMessage_feature_div"></div><div id="dealBadge_feature_div"></div><div id="q_feature_div"></div>`)); assert.equal(none.hasPromo, false); assert.equal(none.coupon, null); assert.equal(none.deal, null); assert.equal(none.listPrice, null, "List Price из футера не подхватывается");
   assert.equal(parsePromo(""), null); assert.equal(parsePromo(null), null);
@@ -62,4 +62,17 @@ test("compute: промо по нише в results.config.promo; чеклист 
   if (P.saturation === "high") assert.ok(Object.values(a.results.scorecard.axes).some((ax) => /купонов/.test(ax.note || "")), "scorecard увидел авто-значение чеклиста");
   a.inputs.checklist.couponsDealsSaturation = "low"; a.results = compute(a); assert.equal(a.results.config.promo.appliedToChecklist, undefined);
   const plain = entryFixture(); assert.equal(plain.results.config, null); assert.equal(plain.results.priceConfig, null);
+});
+
+test("Subscribe & Save: берётся не первый (пустой) блок, а тот, где есть подписка; процент — хоть из текста доставки", () => {
+  const empty = '<div id="snsAccordionRowMiddle" style="display:none;">Loading recommendations for you</div><div id="a_feature_div"></div>';
+  const real = '<div id="snsAccordionRowMiddle">Subscribe &amp; Save</div><div id="b_feature_div"></div>';
+  const delivery = 'Get it with your next Subscribe &amp; Save delivery, Oct 5, with 10% savings';
+  const p = parsePromo(wrap(`<div id="apex_desktop">$38.90</div>${empty}${real}<div>${delivery}</div>`));
+  assert.deepEqual(p.sns, { min: 10, max: 10 }, "пустая заготовка не мешает, процент найден в доставке");
+  assert.equal(p.hasPromo, true);
+  const navOnly = parsePromo(wrap('<div id="apex_desktop">$38.90</div><div id="nav-xshop">Subscribe &amp; Save</div><div id="c_feature_div"></div>'));
+  assert.equal(navOnly.sns, null, "меню магазина подпиской не считается");
+  const noPct = parsePromo(wrap('<div id="apex_desktop">$38.90</div><div id="snsAccordionRowMiddle">Subscribe &amp; Save</div><div id="d_feature_div"></div>'));
+  assert.deepEqual(noPct.sns, { min: null, max: null }, "подписка есть, процент неизвестен");
 });
