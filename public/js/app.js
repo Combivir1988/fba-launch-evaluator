@@ -744,15 +744,21 @@ const MODEL_NOTES = {
 };
 const FREE_HINT = "Бесплатные модели стоят $0, но у большинства общий пул провайдера: в час пик отвечают отказом. Приложение тогда повторяет запрос, при необходимости сокращает данные и берёт следующую бесплатную модель. Платные (Gemini 3.8 Flash ≈ $0.02, GPT-5.6 Sol / Claude Sonnet 5 ≈ $0.05, Opus 5 ≈ $0.10 за анализ) работают только после пополнения счёта openrouter.ai/settings/credits.";
 const modelNote = (m) => MODEL_NOTES[m] || (/^aistudio\//.test(m) ? "бесплатно, ключ Google AI Studio — быстро, но большие запросы в час пик отклоняет" : /:free$/.test(m) ? "бесплатно, OpenRouter — общий пул, бывают отказы" : "платная, нужен счёт на OpenRouter");
+/** Короткая подпись для обычного пользователя: важно только «бесплатно / платно», подробности — администратору. */
+const modelShort = (m) => (/^aistudio\//.test(m) || /:free$/.test(m) ? "бесплатно" : "платная");
 function renderSettings() {
   $("#set-provider").textContent = S.provider || "—";
-  const fill = (id, cur) => { const el = $(id); el.innerHTML = S.models.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(m)} — ${esc(modelNote(m))}</option>`).join("") || '<option value="">(список моделей недоступен — сервер не отвечает)</option>'; };
+  const fill = (id, cur) => { const el = $(id); el.innerHTML = S.models.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(m)} — ${esc(S.user?.role === "admin" ? modelNote(m) : modelShort(m))}</option>`).join("") || '<option value="">(список моделей недоступен — сервер не отвечает)</option>'; };
   fill("#set-model-ai", modelAi()); fill("#set-model-patents", modelPatents());
   $("#set-model-hint").textContent = `AI-вердикт: ${modelAi() || "—"} · патентный скан: ${modelPatents() || "—"}. ${FREE_HINT}`;
   $("#set-login-state").textContent = S.user ? `Вы вошли как ${S.user.name} (логин ${S.user.login}, ${S.user.role === "admin" ? "администратор" : "пользователь"}).` : "";
   $("#pw-user").value = S.user?.login || "";
   api("GET", "/api/auth/me").then((me) => { const has = me.user.hasPassword !== false; $("#pw-form").classList.toggle("hidden", !has); if (!has) $("#set-login-state").textContent += " Вы входите через Google — пароля у учётной записи нет; при необходимости его задаст администратор."; }).catch(() => {});
   $("#set-users").classList.toggle("hidden", S.user?.role !== "admin");
+  // Обычному пользователю в «Настройках» нужен только выбор модели: пояснения про провайдера, пул и кредиты — дело администратора.
+  const admin = S.user?.role === "admin";
+  $("#set-model-note")?.classList.toggle("hidden", !admin);
+  $("#set-model-hint")?.classList.toggle("hidden", !admin);
   if (S.user?.role === "admin") { renderUsers(); renderSessionPolicy(); }
 }
 $("#set-logout").addEventListener("click", logout);
