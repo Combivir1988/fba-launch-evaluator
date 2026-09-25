@@ -703,10 +703,18 @@ $("#hist-import").addEventListener("click", () => $("#hist-import-file").click()
 $("#hist-import-file").addEventListener("change", async (e) => { const f = e.target.files[0]; if (!f) return; try { await importDoc(JSON.parse(await f.text())); } catch (err) { toast("Импорт: " + err.message, 6000); } e.target.value = ""; });
 
 // ---------- settings tab ----------
-const FREE_HINT = "Бесплатные :free модели: $0, но ответ 3–6 минут и слабее структура. Платные (Gemini 3.8 Flash ≈ $0.02, GPT-5.6 Sol / Claude Sonnet 5 ≈ $0.05, Opus 5 ≈ $0.10 за анализ) — после пополнения openrouter.ai/settings/credits.";
+// Заметки по моделям — из собственной проверки на настоящем запросе вердикта (2026-09-24), а не из общих слов.
+const MODEL_NOTES = {
+  "nvidia/nemotron-3-ultra-550b-a55b:free": "бесплатно, свой эндпойнт Nvidia — отказы редки; весь запрос целиком, ответ ≈ 80 с",
+  "qwen/qwen3.8-27b:free": "бесплатно, самая умная из бесплатных, но общий пул часто занят",
+  "z-ai/glm-5.2:free": "бесплатно, сильная; общий пул часто занят, окно 32k",
+  "google/gemma-4-31b-it:free": "бесплатно, послабее; общий пул часто занят",
+};
+const FREE_HINT = "Бесплатные модели стоят $0, но у большинства общий пул провайдера: в час пик отвечают отказом. Приложение тогда повторяет запрос, при необходимости сокращает данные и берёт следующую бесплатную модель. Платные (Gemini 3.8 Flash ≈ $0.02, GPT-5.6 Sol / Claude Sonnet 5 ≈ $0.05, Opus 5 ≈ $0.10 за анализ) работают только после пополнения счёта openrouter.ai/settings/credits.";
+const modelNote = (m) => MODEL_NOTES[m] || (/^aistudio\//.test(m) ? "бесплатно, ключ Google AI Studio — быстро, но большие запросы в час пик отклоняет" : /:free$/.test(m) ? "бесплатно, OpenRouter — общий пул, бывают отказы" : "платная, нужен счёт на OpenRouter");
 function renderSettings() {
   $("#set-provider").textContent = S.provider || "—";
-  const fill = (id, cur) => { const el = $(id); el.innerHTML = S.models.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(m)}${/^aistudio\//.test(m) ? " — бесплатно, Google AI Studio (быстро)" : /:free$/.test(m) ? " — бесплатно, OpenRouter (часто перегружено)" : ""}</option>`).join("") || '<option value="">(список моделей недоступен — сервер не отвечает)</option>'; };
+  const fill = (id, cur) => { const el = $(id); el.innerHTML = S.models.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(m)} — ${esc(modelNote(m))}</option>`).join("") || '<option value="">(список моделей недоступен — сервер не отвечает)</option>'; };
   fill("#set-model-ai", modelAi()); fill("#set-model-patents", modelPatents());
   $("#set-model-hint").textContent = `AI-вердикт: ${modelAi() || "—"} · патентный скан: ${modelPatents() || "—"}. ${FREE_HINT}`;
   $("#set-login-state").textContent = S.user ? `Вы вошли как ${S.user.name} (логин ${S.user.login}, ${S.user.role === "admin" ? "администратор" : "пользователь"}).` : "";
