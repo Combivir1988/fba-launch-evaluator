@@ -73,7 +73,20 @@ test("patentScanStream: реальный поиск и AI подменяются
   const ev = []; for await (const e of patentScanStream({ coreKeyword: "urinal mat" }, cfg, { fetchImpl, aiJson })) ev.push(e);
   const scan = ev.find((e) => e.event === "done")?.data.scan; assert.ok(scan, JSON.stringify(ev.at(-1)));
   assert.equal(scan.items[0].expired, true, "Expired - Fee Related → истёк");
+  assert.equal(scan.items[0].relevance, 0.8, "доля остаётся долей");
   assert.equal(scan.items[0].assignee, "New Pig Corp");
   assert.equal(scan.status, "clear");
   assert.ok(validateVerdict({ overall: "clear", summary: "", designPatentNote: "", patents: [], nextSteps: [] }, ASSESS_SCHEMA).ok);
+});
+
+test("релевантность патента в процентах приводится к доле (иначе в таблице «9 500 %»)", async () => {
+  const searchJson = { results: { total_num_results: 1, cluster: [{ result: [{ id: "patent/US9309657B2/en", patent: { title: "Floor mat", snippet: "s", priority_date: "2012-09-14", publication_number: "US9309657B2", assignee: "New Pig" } }] }] } };
+  const html = readFileSync(join(FIX, "patent_US9309657B2.html"), "utf8");
+  const fetchImpl = async (url) => (url.includes("/xhr/query") ? new Response(JSON.stringify(searchJson), { status: 200 }) : new Response(html, { status: 200 }));
+  const aiJson = async ({ schema }) => (schema === QUERIES_SCHEMA ? { queries: [{ q: "urinal mat", purpose: "тип" }], concepts: ["adhesive layer"] }
+    : { overall: "unsure", summary: "с", designPatentNote: "д", nextSteps: [], patents: [{ number: "US9309657B2", relevance: 95, risk: "high", claimed: "c", overlap: "o", designAround: "d" }] });
+  const cfg = configFromEnv({ OPENROUTER_API_KEY: "k" });
+  const ev = []; for await (const e of patentScanStream({ coreKeyword: "urinal mat" }, cfg, { fetchImpl, aiJson })) ev.push(e);
+  const scan = ev.find((e) => e.event === "done")?.data.scan;
+  assert.equal(scan.items[0].relevance, 0.95, "95 — это проценты, а не 9500 %");
 });

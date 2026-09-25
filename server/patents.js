@@ -68,7 +68,7 @@ export const ASSESS_SCHEMA = { type: "object", additionalProperties: false, requ
   summary: { type: "string" },
   designPatentNote: { type: "string", description: "Что проверить вручную по design patents (внешний вид), 1–2 предложения" },
   patents: { type: "array", items: { type: "object", additionalProperties: false, required: ["number", "relevance", "risk", "claimed", "overlap", "designAround"], properties: {
-    number: { type: "string" }, relevance: { type: "number", description: "0–1" }, risk: { type: "string", enum: ["none", "low", "med", "high"] },
+    number: { type: "string" }, relevance: { type: "number", description: "доля от 0 до 1 (не проценты): 0.95 — почти полное совпадение" }, risk: { type: "string", enum: ["none", "low", "med", "high"] },
     claimed: { type: "string", description: "Что защищает независимый claim, 1–2 предложения по-русски" },
     overlap: { type: "string", description: "Пересечение с нашим ТЗ / фичей" }, designAround: { type: "string", description: "Как обойти (или «не требуется»)" } } } },
   nextSteps: { type: "array", items: { type: "string" } } } };
@@ -130,7 +130,9 @@ export async function* patentScanStream(body, cfg, { signal, fetchImpl = fetch, 
     if (cfg.mock) assess = { overall: "unsure", summary: "[MOCK] Демонстрационная оценка без AI.", designPatentNote: "Проверьте design patents по картинкам лидеров.", patents: packed.map((p, i) => ({ number: p.number, relevance: 0.5, risk: i === 0 ? "med" : "low", claimed: "mock", overlap: "mock", designAround: "mock" })), nextSteps: ["Показать патентному поверенному"] };
     else assess = await aiJson({ cfg, model, system: SYS_ASSESS, user: `${product}\n\nТехнические признаки ТЗ: ${(plan.concepts || []).join("; ")}\n\nКандидаты (JSON):\n${JSON.stringify(packed)}`, schema: ASSESS_SCHEMA, signal, fetchImpl, maxTokens: 16000 });
     const byNum = Object.fromEntries(cands.map((c) => [c.number, c]));
-    const items = (assess.patents || []).map((a) => { const c = byNum[a.number] || {}; return { ...a, title: c.title || null, assignee: c.assignee || null, priorityDate: c.priorityDate || null, expiryEstimate: c.expiryEstimate || null, expired: Boolean(c.expired), pending: Boolean(c.pending), legalStatus: c.legalStatus || null, url: c.url || `${GP}/patent/${a.number}/en`, hits: c.hits || 0 }; })
+    // Модель иногда отдаёт релевантность в процентах (95) вместо доли (0.95) — приводим к доле, иначе в таблице получается «9 500 %».
+    const relShare = (v) => { const n = Number(v); if (!Number.isFinite(n) || n < 0) return null; return Math.min(1, n > 1 ? n / 100 : n); };
+    const items = (assess.patents || []).map((a) => { const c = byNum[a.number] || {}; return { ...a, relevance: relShare(a.relevance), title: c.title || null, assignee: c.assignee || null, priorityDate: c.priorityDate || null, expiryEstimate: c.expiryEstimate || null, expired: Boolean(c.expired), pending: Boolean(c.pending), legalStatus: c.legalStatus || null, url: c.url || `${GP}/patent/${a.number}/en`, hits: c.hits || 0 }; })
       .sort((a, b) => ({ high: 3, med: 2, low: 1, none: 0 }[b.risk] - { high: 3, med: 2, low: 1, none: 0 }[a.risk]) || b.relevance - a.relevance);
     const scan = { createdAt: new Date().toISOString(), status: assess.overall, summary: assess.summary, designPatentNote: assess.designPatentNote, nextSteps: assess.nextSteps || [], items,
       queries: queries.map((q) => ({ ...q, url: `${GP}/?q=${encodeURIComponent(q.q)}&country=US&status=GRANT&type=PATENT` })), concepts: plan.concepts || [], candidatesTotal: found.size, droppedIrrelevant, designHits: designHits.slice(0, 10).map((d) => ({ number: d.number, title: d.title, assignee: d.assignee, url: d.url, grantDate: d.grantDate })),
