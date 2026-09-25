@@ -491,7 +491,7 @@ dash.addEventListener("click", (e) => { const a = e.target.closest("[data-goto]"
 function configAction(b) {
   const act = b.dataset.action;
   if (act === "config-schema") return startConfigSchema(); if (act === "config-edit") return openSchemaDialog(); if (act === "config-extract") return startConfigExtract();
-  if (act === "config-tz") return startConfigTz(); if (act === "tz-docx") return downloadTzDocx(); if (act === "config-promo") return startConfigPromo();
+  if (act === "config-tz") return startConfigTz(); if (act === "tz-docx") return downloadTzDocx(); if (act === "patents-docx") return downloadPatentsDocx(); if (act === "config-promo") return startConfigPromo();
   if (act === "price-apply") { const v = Number(b.dataset.price); if (!Number.isFinite(v)) return; S.a.inputs.price = Math.round(v * 100) / 100; markDirty(); renderAll(); return toast(`Цена ${S.a.inputs.price.toFixed(2)} $ подставлена в экономику — Gate 1/2, ROI, бюджет и деньги по месяцам пересчитаны`, 6000); }
   const T = S.a.config?.tz; if (!T) return;
   if (act === "tz-add") T.rows.push({ section: "конструкция", param: "", requirement: "", rationale: "", priority: "should", source: "вручную", unverified: false });
@@ -550,6 +550,18 @@ async function startConfigPromo(resumeJobId = null) {
     toast(`Промо обновлены: ${Object.keys(done.listings || {}).length} страниц, с промо ${done.withPromo ?? 0}${done.failed?.length ? `, не загрузилось ${done.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
   } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Промо: " + e.message, 8000); }
   finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
+}
+/** Подробный патентный ландшафт одним файлом (дашборд показывает то же самое кратко). */
+async function downloadPatentsDocx() {
+  const scan = S.a.patents; if (!scan) return toast("Сначала запустите патентный скан");
+  try {
+    const r = await fetch("/api/patents/docx", { method: "POST", credentials: "same-origin", headers: JSON_H,
+      body: JSON.stringify({ scan, meta: { niche: S.a.niche, coreKeyword: S.a.coreKeyword, date: new Date().toISOString().slice(0, 10) } }) });
+    if (r.status === 401) return goLogin(); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "HTTP " + r.status);
+    const blob = await r.blob(); const name = (r.headers.get("content-disposition") || "").match(/filename="([^"]+)"/)?.[1] || "patents.docx";
+    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+    toast("Патентный ландшафт скачан: " + name, 6000);
+  } catch (e) { console.error(e); toast("Не удалось скачать ландшафт: " + e.message, 7000); }
 }
 async function startConfigTz(resumeJobId = null) {
   if (S.tzBusy) return; const C = S.a.config; if (!C?.table) return toast("Сначала извлеките характеристики (шаг 2)");

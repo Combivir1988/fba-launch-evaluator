@@ -44,6 +44,8 @@ label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: 
 .row > * { flex: 1 1 140px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
 .hidden { display: none !important; }
+ul.tight { margin: .3rem 0 0; padding-left: 1.1rem; } ul.tight li { margin: .15rem 0; font-size: .9rem; }
+
 /* Вход через Google: виден, только если сервер сказал, что он включён (атрибут в <html>). Так блок не «доезжает» после первой отрисовки. */
 #google-box { display: none; }
 html[data-google="1"] #google-box { display: block; }

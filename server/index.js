@@ -16,6 +16,7 @@ import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
 import { schemaStream, extractStream, tzStream, promoStream } from "./config-jobs.js";
 import { buildTzDocx, tzFileName } from "./tz-docx.js";
+import { buildPatentsDocx, patentsFileName } from "./patents-docx.js";
 import { startJob, getJob, subscribe, cancelJob, runningCount } from "./jobs.js";
 import { log } from "./log.js";
 
@@ -224,6 +225,12 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   app.post("/api/config/extract", authed, limiter, scrapflyReady, jsonBig, configJob("config_extract", extractStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : !b.schema?.fields?.length ? "schema обязательна" : null)));
   app.post("/api/config/promo", authed, limiter, scrapflyReady, jsonBig, configJob("config_promo", promoStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : null))); // spec 014: перезагрузка страниц ради промо, без AI
   app.post("/api/config/tz", authed, limiter, jsonMid, configJob("config_tz", tzStream, (b) => (!b.payload || typeof b.payload !== "object" ? "payload обязателен" : null)));
+  app.post("/api/patents/docx", authed, jsonMid, async (req, res) => {
+    const { scan, meta } = req.body || {};
+    if (!scan || !Array.isArray(scan.items)) return res.status(400).json({ error: "bad_request", message: "scan.items обязателен" });
+    const buf = await buildPatentsDocx(scan, { ...(meta || {}), preparedBy: meta?.preparedBy || req.user.name });
+    res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Content-Disposition": `attachment; filename="${patentsFileName(meta || {})}"`, "Cache-Control": "no-store" }).send(buf);
+  });
   app.post("/api/tz/docx", authed, jsonMid, async (req, res) => {
     const { tz, meta } = req.body || {};
     if (!tz || !Array.isArray(tz.rows)) return res.status(400).json({ error: "bad_request", message: "tz.rows обязателен" });

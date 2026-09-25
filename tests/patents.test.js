@@ -3,11 +3,27 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parsePatentHtml, estimateExpiry, searchGooglePatents, patentScanStream, QUERIES_SCHEMA, ASSESS_SCHEMA } from "../server/patents.js";
+import { buildPatentsDocx, patentsFileName } from "../server/patents-docx.js";
+import zlib from "node:zlib";
 import { configFromEnv } from "../server/claude.js";
 import { validateVerdict } from "../shared/validate-verdict.js";
 import { newAnalysis } from "../shared/analysis.js";
 import { compute } from "../shared/compute.js";
 import { FIX } from "./helpers.js";
+
+/** Текст document.xml из .docx (тот же разбор, что в config-jobs.test.js). */
+function docxXml(buf) {
+  let off = 0;
+  while (off + 30 <= buf.length && buf.readUInt32LE(off) === 0x04034b50) {
+    const method = buf.readUInt16LE(off + 8), csize = buf.readUInt32LE(off + 18), nlen = buf.readUInt16LE(off + 26), xlen = buf.readUInt16LE(off + 28);
+    const name = buf.toString("utf8", off + 30, off + 30 + nlen); const start = off + 30 + nlen + xlen;
+    const flags = buf.readUInt16LE(off + 6); assert.equal(flags & 8, 0, "data descriptor не поддержан тестом");
+    if (name === "word/document.xml") { const data = buf.subarray(start, start + csize); return (method === 8 ? zlib.inflateRawSync(data) : data).toString("utf8"); }
+    off = start + csize;
+  }
+  throw new Error("word/document.xml не найден");
+}
+
 
 test("parsePatentHtml: реальная карточка US9309657B2 (кейс Urinal Mat из скилла)", () => {
   const d = parsePatentHtml(readFileSync(join(FIX, "patent_US9309657B2.html"), "utf8"));
@@ -89,4 +105,19 @@ test("релевантность патента в процентах приво
   const ev = []; for await (const e of patentScanStream({ coreKeyword: "urinal mat" }, cfg, { fetchImpl, aiJson })) ev.push(e);
   const scan = ev.find((e) => e.event === "done")?.data.scan;
   assert.equal(scan.items[0].relevance, 0.95, "95 — это проценты, а не 9500 %");
+});
+
+test("патентный ландшафт: белые пятна, держатели и плотность попадают в скан и в DOCX", async () => {
+  const scan = { createdAt: "2026-09-25T10:00:00Z", status: "unsure", summary: "с", feature: "фильтр-корзина", model: "m", source: "Google Patents",
+    items: [{ number: "US11076721B2", risk: "high", relevance: 0.9, claimed: "внутренняя корзина с ситом", overlap: "полное", designAround: "убрать признак «перфорированное сито» — фильтровать отдельным мешком", assignee: "Eternal East", priorityDate: "2018-01-01", expired: false, pending: false }],
+    holders: [{ name: "Joyoung", focus: "смешивание и нагрев", patents: ["US8342079B2"] }],
+    hotAreas: [{ area: "фильтрация", density: "high", note: "плотно закрыта" }, { area: "таймер", density: "low", note: "общая техника" }],
+    whiteSpaces: [{ area: "ультразвуковая очистка", why: "в США claims нет", howToUse: "сделать отличие и запатентовать самим" }],
+    designHits: [{ number: "USD878847S", title: "Nut milk machine", assignee: "Eternal East" }], designPatentNote: "сверить силуэт",
+    nextSteps: ["заказать FTO"], queries: [{ q: "nut milk maker filter basket", purpose: "тип товара" }], disclaimer: "не юридическое заключение" };
+  const buf = await buildPatentsDocx(scan, { niche: "nut milk maker", coreKeyword: "nut milk", date: "2026-09-25", preparedBy: "Тестер" });
+  assert.equal(buf.toString("latin1", 0, 2), "PK");
+  const xml = docxXml(buf);
+  for (const t of ["Патентный ландшафт", "Белые пятна", "ультразвуковая очистка", "Joyoung", "минное поле", "Eternal East", "USD878847S", "nut milk maker filter basket"]) assert.ok(xml.includes(t), "в файле нет: " + t);
+  assert.match(patentsFileName({ niche: "nut milk maker", date: "2026-09-25" }), /Patents-nut-milk-maker-2026-09-25\.docx/);
 });
