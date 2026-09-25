@@ -1,7 +1,7 @@
 // spec 013: цена по конфигурации — аналоги по совпадению полей, ступени 100/80/60 %, взвешенные квантили, вклад полей, ориентир себестоимости, выбор пользователя.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { priceByConfig, wquantile } from "../shared/price-config.js";
+import { priceByConfig, wquantile, parseRange } from "../shared/price-config.js";
 import { configStats } from "../shared/config-stats.js";
 import { mergeExtraction } from "../shared/config-extract.js";
 import { entryFixture } from "./helpers/entry-fixture.js";
@@ -50,4 +50,20 @@ test("compute: results.priceConfig есть при таблице этапа 2 �
   const f = a.results.priceConfig.fields.find((x) => x.type === "choice" && x.values.length > 1); a.config.priceChoice = { [f.id]: f.values[1].value }; a.results = compute(a);
   assert.equal(String(a.results.priceConfig.fields.find((x) => x.id === f.id).value), String(f.values[1].value));
   assert.equal(entryFixture().results.priceConfig, null);
+});
+
+test("числовое поле с интервалами («6–15», «от 50») разбирается как диапазон", () => {
+  assert.deepEqual(parseRange("6–15"), [6, 15]); assert.deepEqual(parseRange("от 50"), [50, Infinity]);
+  assert.deepEqual(parseRange("до 10"), [-Infinity, 10]); assert.equal(parseRange("Ocean"), null); assert.equal(parseRange("12"), null);
+});
+
+test("нет аналогов под сочетание: вместо тупика — цена по всей области с пометкой", () => {
+  const { config, stats, xray, listings } = build();
+  const pc = priceByConfig({ config, stats, xray, listings, choice: { conn: "нет такого", zones: 999 }, inputs: {}, th: { minAnalogs: 5, marginMin: 0.3 } });
+  assert.equal(pc.fallback, "scope", "переключились на всю область");
+  assert.ok(pc.market !== null, "цена есть — иначе вместе с ней исчезала бы и кнопка «подставить в экономику»");
+  assert.match(pc.warn || "", /аналогов не нашлось/);
+  assert.equal(pc.analogs, 12, "в основе — все листинги области");
+  const ok = priceByConfig({ config, stats, xray, listings, choice: { conn: "BT", zones: 9 }, inputs: {}, th: { minAnalogs: 5, marginMin: 0.3 } });
+  assert.equal(ok.fallback, null, "когда аналоги есть, ничего не меняется");
 });

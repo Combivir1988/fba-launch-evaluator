@@ -598,7 +598,8 @@ dash.addEventListener("change", (e) => { const el = e.target.closest("select[dat
 dash.addEventListener("change", (e) => {
   const el = e.target.closest("select[data-price-field]"); const C = S.a.config; if (!el || !C?.schema) return;
   const f = C.schema.fields.find((x) => x.id === el.dataset.priceField); if (!f) return;
-  C.priceChoice = { ...(C.priceChoice || {}) }; C.priceChoice[f.id] = el.value === "" ? null : f.type === "number" ? Number(el.value) : el.value;
+  const asNum = f.type === "number" && !/[–—-]/.test(el.value.trim().slice(1)); // «6–15» — интервал, его оставляем строкой
+  C.priceChoice = { ...(C.priceChoice || {}) }; C.priceChoice[f.id] = el.value === "" ? null : asNum ? Number(el.value) : el.value;
   markDirty(); renderConfig(["config"]);
 });
 dash.addEventListener("focusout", (e) => { const el = e.target.closest("[data-tz], [data-tz-summary], [data-tz-q]"); if (el && el.tagName !== "SELECT" && S.a.config?.tz) R().update(dash, S.a, renderOpts(), ["tz"]); });
