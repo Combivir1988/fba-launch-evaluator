@@ -182,4 +182,23 @@ test("добор из текста: модель пропустила «24 Pack�
   assert.equal(rows.A5.values.pack, undefined, "незагруженную страницу пропускаем");
   assert.equal(filled, 4);
   assert.equal(fillFromText({ schema, rows, listings }).filled, 0, "повторный запуск ничего не меняет");
+
+  // правила стали строже — старые догадки не остаются навсегда
+  const rows2 = { A1: { status: "ok", values: { scent: { value: "Citrus", source: "title", auto: true } } } };
+  const list2 = { A1: { title: "Ocean and Lemon mix", bullets: [], specs: [] } };
+  const r2 = fillFromText({ schema, rows: rows2, listings: list2 });
+  assert.equal(rows2.A1.values.scent.value, null, "добранная раньше клетка пересчитывается: теперь в тексте два запаха — значит пусто");
+  assert.equal(r2.filled, -1, "счётчик показывает, что клетку сняли");
+
+  // противоречие «в характеристиках 1, в тайтле 50» — верим тайтлу
+  const rows3 = { A1: { status: "ok", values: {} } };
+  const list3 = { A1: { title: "Urinal Screens 50 Pack", bullets: [], specs: [{ k: "Number of Items", v: "1" }] } };
+  fillFromText({ schema, rows: rows3, listings: list3 });
+  assert.equal(rows3.A1.values.pack.value, 50, "количество в упаковке берём из тайтла");
+
+  // бренд не подсказывает значение
+  const rows4 = { A1: { status: "ok", values: {} } };
+  const list4 = { A1: { brand: "Citrus Products", title: "Citrus Products Urinal Screen, Midnight Coast", bullets: [], specs: [] } };
+  fillFromText({ schema, rows: rows4, listings: list4 });
+  assert.equal(rows4.A1.values.scent?.value ?? null, null, "название бренда не считается значением поля");
 });

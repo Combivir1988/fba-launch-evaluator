@@ -51,49 +51,78 @@ export function sanitizeSchema(schema) {
  * Слияние результата AI с таблицей.
  * @param {object} o { schema, prevTable, items: [{asin, values:[{field,value,source}]}], listings, asins, model, cost, now }
  */
-/** Весь текст листинга по местам, где стоит искать значение: тайтл → буллеты → характеристики. */
-const textParts = (l) => [["title", String(l?.title || "")], ["bullets", (l?.bullets || []).join(" \n ")], ["specs", (l?.specs || []).map((x) => `${x.k}: ${x.v}`).join(" \n ")]];
+/** Текст листинга по местам поиска: характеристики (самое надёжное) → тайтл → буллеты. */
+const textParts = (l) => [["specs", (l?.specs || []).map((x) => `${x.k}: ${x.v}`).join(" \n ")], ["title", String(l?.title || "")], ["bullets", (l?.bullets || []).join(" \n ")]];
+const esc = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Название бренда из текста убираем: «Fresh Products» давал запах «Fresh», «Blue Cakes» — запах «Blue». */
+const withoutBrand = (text, brand) => (brand && String(brand).length > 2 ? String(text).replace(new RegExp(esc(brand), "gi"), " ") : String(text));
 
-/** Число с единицей в тексте: «24 Pack», «Pack of 24», «24-count», «24 шт», «12.5 lb». */
-function numberFromText(field, text) {
+/** Все числа, стоящие рядом с единицей поля: «24 Pack», «Pack of 24», «12.5 lb». → массив чисел */
+function numbersFromText(field, text) {
   const unit = String(field.unit || "").trim();
-  const words = [unit, "pack", "pcs", "pieces", "count", "pc", "ct", "шт"].filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const qty = /(?:count|quantity|pack|кол|штук|колич)/i.test(`${field.id} ${field.name} ${unit}`);
+  const words = [unit, ...(qty ? ["pack", "pcs", "pieces", "count", "pc", "ct", "шт"] : [])].filter(Boolean).map(esc);
+  if (!words.length) return [];
   const tail = `(?:${words.join("|")})`;
-  const pats = [new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*[-\u2013]?\\s*${tail}\\b`, "i"), new RegExp(`${tail}\\s*of\\s*(\\d+(?:[.,]\\d+)?)`, "i")];
-  for (const re of pats) { const m = re.exec(text); if (m) { const n = parseNumber(m[1]); if (n !== null) return n; } }
-  return null;
+  const out = [];
+  for (const re of [new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*[-\u2013]?\\s*${tail}\\b`, "gi"), new RegExp(`${tail}\\s*of\\s*(\\d+(?:[.,]\\d+)?)`, "gi")]) {
+    for (const m of String(text).matchAll(re)) { const n = parseNumber(m[1]); if (n !== null) out.push(n); }
+  }
+  return out;
 }
 
-/** Значение из списка поля, встретившееся в тексте. Берём только если совпало ровно одно — иначе догадка была бы опасной. */
-function choiceFromText(field, text) {
-  const hits = (field.options || []).filter((o) => { const t = String(o).trim(); if (t.length < 2) return false; return new RegExp(`(^|[^\\p{L}\\p{N}])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}\\p{N}]|$)`, "iu").test(text); });
-  return hits.length === 1 ? hits[0] : null;
+/** Значения списка поля, встретившиеся в тексте (по границам слов). */
+function choicesFromText(field, text) {
+  return (field.options || []).filter((o) => { const t = String(o).trim(); if (t.length < 3) return false;
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${esc(t)}([^\\p{L}\\p{N}]|$)`, "iu").test(text); });
 }
+
+/** Поля, у которых единица измерения совпадает с другим полем схемы (длина/ширина/толщина в дюймах): числа из текста им не раздаём — перепутаем. */
+const ambiguousUnits = (fields) => {
+  const seen = new Map();
+  for (const f of fields) { if (f.type !== "number") continue; const u = String(f.unit || "").toLowerCase().trim(); if (!u) continue; seen.set(u, (seen.get(u) || 0) + 1); }
+  return new Set([...seen.entries()].filter(([, n]) => n > 1).map(([u]) => u));
+};
 
 /**
- * Добор пустых клеток из текста листингов — без AI и без кредитов (2026-09-27).
- * Модель иногда пропускает значение, которое прямо в тайтле («24 Pack»): такие клетки заполняем детерминированно.
- * Трогаем ТОЛЬКО пустые клетки; ручные правки и значения модели не переписываются. Источник помечается как у AI, плюс auto: true.
+ * Добор пустых клеток из текста листингов — без AI и без кредитов (2026-09-27, ужесточено после замера точности).
+ * Заполняем ТОЛЬКО когда доказательство однозначно: в тексте ровно одно значение (для чисел — одно число рядом с единицей поля,
+ * для списка — ровно одно значение списка), название бренда из текста вырезано, поля с общей единицей (длина/ширина) пропускаются.
+ * Трогаются только пустые клетки; ручные значения и ответы модели не переписываются. Источник помечается как у AI плюс auto: true.
  * @returns {{ rows, filled: number }}
  */
 export function fillFromText({ schema, rows, listings = {} }) {
-  const fields = (schema?.fields || []).filter((f) => f.type === "number" || f.type === "choice");
+  const all = schema?.fields || [];
+  const ambiguous = ambiguousUnits(all);
+  const fields = all.filter((f) => (f.type === "number" && !ambiguous.has(String(f.unit || "").toLowerCase().trim())) || f.type === "choice");
   let filled = 0;
   for (const [asin, row] of Object.entries(rows || {})) {
     const l = listings[asin]; if (!l || l.error || row.status === "failed") continue;
     for (const f of fields) {
       const cell = row.values?.[f.id];
-      if (cell && cell.value !== null && cell.value !== undefined) continue;
       if (cell?.source === "manual") continue;
-      for (const [where, text] of textParts(l)) {
-        if (!text) continue;
-        const raw = f.type === "number" ? numberFromText(f, text) : choiceFromText(f, text);
-        if (raw === null) continue;
-        const n = normalizeValue(f, raw); if (n.value === null) continue;
-        row.values = row.values || {};
-        row.values[f.id] = { value: n.value, source: where, auto: true, ...(n.unlisted ? { unlisted: true } : {}) };
-        filled++; break;
+      // Клетку, добранную из текста раньше, пересчитываем заново: правила могли стать строже, и старая догадка должна уйти.
+      if (cell && cell.value !== null && cell.value !== undefined && !cell.auto) continue;
+      if (cell?.auto) { row.values[f.id] = { value: null, source: null }; filled--; }
+      // Смотрим ВЕСЬ текст сразу: в характеристиках часто стоит «Number of Items: 1», а в тайтле «50 Pack» —
+      // такое противоречие заполнять нельзя, берём значение только когда весь листинг говорит одно и то же.
+      const hits = [];
+      for (const [where, rawText] of textParts(l)) {
+        if (!rawText) continue;
+        const text = withoutBrand(rawText, l.brand);
+        for (const v of f.type === "number" ? numbersFromText(f, text) : choicesFromText(f, text)) hits.push({ v, where });
       }
+      // Количество в упаковке продавец пишет в тайтле («50 Pack»), а в характеристиках часто стоит «Number of Items: 1» —
+      // при расхождении верим тайтлу, как это делает и модель.
+      const fromTitle = hits.filter((h) => h.where === "title");
+      const pool = f.type === "number" && fromTitle.length && new Set(fromTitle.map((h) => h.v)).size === 1 ? fromTitle : hits;
+      const uniq = [...new Set(pool.map((h) => (typeof h.v === "number" ? h.v : String(h.v).toLowerCase())))];
+      if (uniq.length !== 1) continue; // ноль — нечего брать, больше одного — противоречие, гадать нельзя
+      const hit = pool[0];
+      const n = normalizeValue(f, hit.v); if (n.value === null) continue;
+      row.values = row.values || {};
+      row.values[f.id] = { value: n.value, source: hit.where, auto: true, ...(n.unlisted ? { unlisted: true } : {}) };
+      filled++;
     }
   }
   return { rows, filled };
