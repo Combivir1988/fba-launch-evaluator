@@ -40,7 +40,7 @@ test("статика: index.html с сеансом, без сеанса — ср
   assert.equal(anon2.headers.get("location"), "/login.html?next=%2F%3Ftab%3Dhistory", "адрес запомнен для возврата после входа");
   const dead = await fetch(`${base}/`, { headers: { cookie: "fba_sid=no-such-token" }, redirect: "manual" }); assert.equal(dead.status, 302);
   const ok = await fetch(`${base}/`, { headers: h, redirect: "manual" });
-  assert.equal(ok.status, 200); assert.match(await ok.text(), /class="booting"/);
+  assert.equal(ok.status, 200); assert.match(await ok.text(), /class="booting[^"]*"/);
   const login = await fetch(`${base}/login.html`); const loginHtml = await login.text();
   assert.equal(login.status, 200); assert.equal(login.headers.get("cache-control"), "no-store");
   assert.match(loginHtml, /theme-boot\.js/, "тема ставится до первой отрисовки — иначе страница мигает");

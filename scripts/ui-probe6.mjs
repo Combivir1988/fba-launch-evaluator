@@ -26,7 +26,7 @@ await page.waitForFunction(() => document.querySelector("#sec-patents")?.textCon
 await page.waitForTimeout(800);
 console.log("after scan chip:", await chip());
 // 2) История → Открыть тот же анализ
-await page.click('.topbar nav button[data-tab="history"]');
+await page.click('.rail nav button[data-tab="history"]');
 await page.waitForSelector("[data-open]");
 await page.click("[data-open]");
 await page.waitForTimeout(500);

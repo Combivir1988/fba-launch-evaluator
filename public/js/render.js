@@ -122,7 +122,10 @@
   function secOverview(A, R) {
     const c = R.criterion1.items, poe = A.aggregates?.poe, comp = R.competition, tr = R.traffic, sc = R.scorecard;
     const lp = poe?.launchPotential || {};
-    const t = (k, v, s, cls = "") => `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s || ""}</div></div>`;
+    // Проценты показываем ещё и шкалой: глазу видно «много/мало» без чтения цифры.
+    const pctOf = (v) => { const m = /^(\d+(?:[.,]\d+)?)\s?%$/.exec(String(v).trim()); return m ? Math.max(0, Math.min(100, Number(m[1].replace(",", ".")))) : null; };
+    const t = (k, v, s, cls = "") => { const pc = pctOf(v);
+      return `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s || ""}</div>${pc === null ? "" : `<div class="meter ${cls}"><i style="width:${pc}%"></i></div>`}</div>`; };
     return `<h2>Обзор</h2><div class="tiles">
       ${t("Выручка ниши", fmtK(c["1a"].value) + "/мес", (SRC_LABEL[c["1a"].source] || "нет данных") + (bandOf(R) ? ` · в диапазоне ${isNum(c["1a"].bandValue) ? fmtK(c["1a"].bandValue) + " (" + fmtPct(c["1a"].bandShare) + ")" : fmtPct(c["1a"].bandShare) + " кликов"}` : ""), c["1a"].status)}
       ${t("Средняя цена" + bandChip(R, "band"), fmtMoney(c["1b"].value, 2), c["1b"].source === "xray" ? "медиана проверенных" : SRC_LABEL[c["1b"].source] || "", c["1b"].status)}
@@ -512,6 +515,37 @@
       <p class="muted">${esc(ch.note)}. Правило: входить при ≥ 6 из 8 зелёных, критерии 6 и 8 обязательны. В счёт «N из 8» идут только зелёные статусы, подтверждённые данными (колонка «Основание»: не допущение и не решение).</p>
       ${!ch.gate4Discussed ? '<div class="notice">Gate 4 не обсуждён: патентный поиск не отмечен (панель «Риски», поле «Патенты / FTO»).</div>' : ""}
       <div class="tablewrap"><table><thead><tr><th>#</th><th>Критерий</th><th>Статус</th><th>Основание</th><th>Комментарий</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  /* Иконки секций: рисуются один раз после отрисовки, поэтому секции об этом ничего не знают (2026-09-28). */
+  const ICON = {
+    overview: 'M4 19V5m0 14h16M8 15l3.5-4 3 2.5L20 7',
+    criterion1: 'M5 12l4 4L19 6M4 20h16',
+    economics: 'M12 3v18M8 7h6.5a2.5 2.5 0 010 5H9.5a2.5 2.5 0 000 5H17',
+    cashflow: 'M3 17l5-5 4 3 8-8M3 21h18',
+    budget: 'M4 7h16v12H4zM9 7V5h6v2M12 11v5M9.5 13.5h5',
+    competition: 'M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c.8-3.2 3.1-5 6-5s5.2 1.8 6 5M17 13a2.5 2.5 0 100-5',
+    traffic: 'M11 17a6 6 0 100-12 6 6 0 000 12zM20 20l-4.2-4.2',
+    entry: 'M12 3l2 5 5 .7-3.6 3.5.9 5.1L12 15l-4.3 2.3.9-5.1L5 8.7 10 8z',
+    scorecard: 'M12 3a9 9 0 109 9h-9z',
+    checklist: 'M4 7h4M4 12h4M4 17h4M11 7h9M11 12h9M11 17h9',
+    patents: 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',
+    config: 'M4 7h16M4 12h10M4 17h7M18 15l3 3-3 3',
+    tz: 'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3',
+    ai: 'M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4zM5 17l.9 2.2L8 20l-2.1.8L5 23l-.9-2.2L2 20l2.1-.8z',
+    verdict: 'M12 3l8 4v6c0 4.4-3.3 7.7-8 9-4.7-1.3-8-4.6-8-9V7z',
+    regulatory: 'M12 3l8 4v6c0 4.4-3.3 7.7-8 9-4.7-1.3-8-4.6-8-9V7zM9 12l2 2 4-4',
+    hero: 'M4 6h16v12H4zM8 10h8M8 14h5',
+  };
+  const iconSvg = (d) => `<svg class="secico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  /** Ставит иконку в <h2> каждой секции: одно место вместо правок во всех построителях. */
+  function decorateSection(sec, id) { const h = sec.querySelector('h2'); if (!h || h.querySelector('.secico')) return; const d = ICON[id]; if (d) h.insertAdjacentHTML('afterbegin', iconSvg(d)); }
+  function decorate(container) {
+    for (const sec of container.querySelectorAll("[data-section]")) {
+      const h = sec.querySelector("h2"); if (!h || h.querySelector(".secico")) continue;
+      const d = ICON[sec.dataset.section]; if (!d) continue;
+      h.insertAdjacentHTML("afterbegin", iconSvg(d));
+    }
   }
 
   const RISK = { high: ["fail", "высокий"], med: ["warn", "средний"], low: ["ok", "низкий"], none: ["na", "нет"] };
@@ -1072,7 +1106,7 @@
   function initTips() {
     const doc = document; if (doc.__fbaTips || !doc.body) return; doc.__fbaTips = true;
     const box = doc.createElement("div"); box.className = "tipbox"; box.setAttribute("role", "tooltip"); box.id = "fba-tipbox"; box.hidden = true; doc.body.appendChild(box);
-    let cur = null, timer = 0, shownAt = 0;
+    let cur = null, timer = 0, shownAt = 0, byKeyboard = false;
     const hide = () => { clearTimeout(timer); if (cur) cur.removeAttribute("aria-describedby"); cur = null; box.hidden = true; };
     const place = (el) => {
       const r = el.getBoundingClientRect(), vw = doc.documentElement.clientWidth || window.innerWidth || 1024, vh = window.innerHeight || 768, m = 8;
@@ -1080,16 +1114,16 @@
       const b = box.getBoundingClientRect(); let left = Math.min(Math.max(m, r.left), Math.max(m, vw - b.width - m)); let top = r.bottom + 6; if (top + b.height > vh - m && r.top - b.height - 6 >= m) top = r.top - b.height - 6;
       box.style.left = Math.round(left) + "px"; box.style.top = Math.round(Math.max(m, top)) + "px";
     };
-    const show = (el) => { clearTimeout(timer); const text = el.getAttribute("data-tip"); if (!text) return hide(); if (cur && cur !== el) cur.removeAttribute("aria-describedby"); cur = el; shownAt = Date.now(); box.textContent = text; box.hidden = false; el.setAttribute("aria-describedby", box.id); place(el); };
+    const show = (el, viaKeyboard) => { clearTimeout(timer); const text = el.getAttribute("data-tip"); if (!text) return hide(); if (cur && cur !== el) cur.removeAttribute("aria-describedby"); cur = el; shownAt = Date.now(); byKeyboard = !!viaKeyboard; box.textContent = text; box.hidden = false; el.setAttribute("aria-describedby", box.id); place(el); };
     const target = (e) => (e.target && e.target.closest ? e.target.closest("[data-tip]") : null);
     doc.addEventListener("mouseover", (e) => { const el = target(e); if (!el) return hide(); if (el === cur) return; clearTimeout(timer); timer = setTimeout(() => { if (doc.contains(el)) show(el); }, 120); });
     doc.addEventListener("mouseleave", hide);
-    doc.addEventListener("focusin", (e) => { const el = target(e); if (el && el === e.target) show(el); });
+    doc.addEventListener("focusin", (e) => { const el = target(e); if (el && el === e.target) show(el, true); });
     doc.addEventListener("focusout", hide);
     doc.addEventListener("click", (e) => { const el = target(e); if (el && !e.target.closest("input, select, textarea, button, a")) show(el); else hide(); });
     doc.addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
-    // Переход клавишей Tab сам прокручивает страницу к элементу: сразу после показа подсказку не прячем, а переставляем на новое место.
-    window.addEventListener("scroll", () => { if (cur && Date.now() - shownAt < 400 && doc.contains(cur)) place(cur); else hide(); }, true); window.addEventListener("resize", hide);
+    // Переход клавишей Tab сам прокручивает страницу к элементу: только в этом случае сразу после показа подсказку не прячем, а переставляем на новое место.
+    window.addEventListener("scroll", () => { if (cur && byKeyboard && Date.now() - shownAt < 400 && doc.contains(cur)) place(cur); else hide(); }, true); window.addEventListener("resize", hide);
     doc.__fbaTipsHide = () => { if (cur && !doc.contains(cur)) hide(); };
   }
 
@@ -1145,7 +1179,7 @@
     if ((opts.hidden || []).includes(id)) { el.classList.add("hidden"); el.innerHTML = ""; return; } // секция скрыта автором ссылки: данных для неё в снимке нет
     const html = def[1](A, R, opts);
     if (!html) { el.classList.add("hidden"); return; }
-    el.classList.remove("hidden"); el.innerHTML = html;
+    el.classList.remove("hidden"); el.innerHTML = html; decorateSection(el, id);
     try { annotate(el, id); if (document.__fbaTipsHide) document.__fbaTipsHide(); } catch (e) { console.error("tips", id, e); }
     if (def[2]) try { def[2](container, R, A); } catch (e) { console.error("chart", id, e); }
   }

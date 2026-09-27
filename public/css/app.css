@@ -2,7 +2,7 @@
 :root {
   color-scheme: light;
   --bg: #f6f6f4; --surface: #ffffff; --surface-2: #f0efec; --border: #dcdad4;
-  --text: #0b0b0b; --text-2: #52514e; --muted: #7a7873; --accent: #2a78d6; --accent-ink: #ffffff;
+  --text: #0b0b0b; --text-2: #52514e; --muted: #7a7873; --accent: #4f46e5; --accent-ink: #ffffff; --rail: #101a2b; --rail-2: #1b2942; --rail-ink: #aeb9cb; --rail-ink-2: #6b7a91;
   --ok: #1a7f37; --ok-bg: #e6f4ea; --warn: #9a6700; --warn-bg: #fff4d6; --fail: #c62828; --fail-bg: #fde8e8; --na: #7a7873; --na-bg: #eeeeeb; --pending: #5b5bd6; --pending-bg: #ececfb;
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
   --neg: #e34948; --pos: #2a78d6; --grid: #e6e5e0;
@@ -44,6 +44,14 @@ label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: 
 .row > * { flex: 1 1 140px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
 .hidden { display: none !important; }
+/* Иконка в заголовке секции и шкала под процентом в плитке (2026-09-28). */
+h2 .secico { width: 17px; height: 17px; color: var(--accent); vertical-align: -3px; margin-right: 7px; }
+.tile .meter { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 8px; }
+.tile .meter i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.tile.ok .meter i { background: var(--ok); } .tile.warn .meter i { background: var(--warn); }
+.tile.fail .meter i { background: var(--fail); } .tile.na .meter i { background: var(--na); }
+.tile { border-radius: 10px; }
+
 ul.tight { margin: .3rem 0 0; padding-left: 1.1rem; } ul.tight li { margin: .15rem 0; font-size: .9rem; }
 
 /* Вход через Google: виден, только если сервер сказал, что он включён (атрибут в <html>). Так блок не «доезжает» после первой отрисовки. */
@@ -56,6 +64,33 @@ html[data-google="1"] #google-box { display: block; }
 body.booting > *:not(#boot) { visibility: hidden; }
 #boot { display: none; }
 body.booting #boot { display: flex; position: fixed; inset: 0; align-items: center; justify-content: center; color: var(--muted); font-size: .9rem; }
+
+/* ——— Каркас-консоль: слева меню с иконками, справа рабочая область (2026-09-28) ——— */
+body.app-shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+.rail { background: var(--rail); color: var(--rail-ink); display: flex; flex-direction: column; padding: 14px 10px; gap: 2px; position: sticky; top: 0; height: 100vh; }
+.rail-logo { display: flex; align-items: center; gap: 9px; color: #fff; font-weight: 650; letter-spacing: -.01em; padding: 6px 8px 14px; }
+.rail-logo svg { width: 20px; height: 20px; color: var(--accent); }
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--rail-ink); font: 500 13.5px var(--font); cursor: pointer; text-align: left; }
+.rail nav button svg { width: 17px; height: 17px; flex: 0 0 17px; opacity: .85; }
+.rail nav button:hover { background: var(--rail-2); color: #fff; }
+.rail nav button.active { background: var(--accent); color: var(--accent-ink); }
+.rail nav button.active svg { opacity: 1; }
+.railcount { margin-left: auto; font: 600 11px/1.6 var(--mono); font-style: normal; background: var(--rail-2); color: var(--rail-ink); border-radius: 5px; padding: 0 6px; }
+.rail nav button.active .railcount { background: rgba(255,255,255,.22); color: var(--accent-ink); }
+.rail-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 10px 6px 2px; border-top: 1px solid var(--rail-2); }
+.rail-foot .user-chip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--rail-ink); font-size: 12.5px; }
+.rail-foot #user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-foot button { background: transparent; border: 0; color: var(--rail-ink-2); cursor: pointer; padding: 5px; border-radius: 7px; display: grid; place-items: center; }
+.rail-foot button svg { width: 16px; height: 16px; }
+.rail-foot button:hover { background: var(--rail-2); color: #fff; }
+.appmain { min-width: 0; display: flex; flex-direction: column; }
+@media (max-width: 860px) {
+  body.app-shell { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; align-items: center; padding: 8px; overflow-x: auto; }
+  .rail nav { flex-direction: row; } .rail nav button span { display: none; } .rail-logo { padding: 0 8px 0 4px; } .rail-logo span { display: none; }
+  .rail-foot { margin: 0 0 0 auto; border: 0; padding: 0; }
+}
 
 /* Shell */
 .topbar { position: sticky; top: 0; z-index: 20; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: .8rem; padding: .55rem 16px; }

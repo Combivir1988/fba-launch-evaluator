@@ -30,7 +30,7 @@ try {
   ok((await A.textContent("#user-name")).includes("админ"), "имя и роль в шапке: " + (await A.textContent("#user-name")));
   ok(await A.evaluate(() => !document.cookie.includes("fba_sid")), "cookie сеанса недоступна скриптам страницы (HttpOnly)");
 
-  await A.click('.topbar nav button[data-tab="settings"]');
+  await A.click('.rail nav button[data-tab="settings"]');
   await A.waitForSelector("#set-users:not(.hidden)");
   await A.fill("#un-name", "Анна Коваль"); await A.fill("#un-login", "Anna");
   const tempPw = await A.inputValue("#un-pass");
@@ -47,14 +47,14 @@ try {
   await B.fill("#change-next", "anna-own-password-1"); await B.fill("#change-next2", "anna-own-password-1"); await B.click("#change-btn");
   await B.waitForURL((u) => !u.pathname.endsWith("/login.html"), { timeout: 15000 });
   await B.waitForSelector("#user-chip:not(.hidden)");
-  await B.click('.topbar nav button[data-tab="settings"]');
+  await B.click('.rail nav button[data-tab="settings"]');
   ok(await B.$eval("#set-users", (el) => el.classList.contains("hidden")), "обычный пользователь не видит раздел «Пользователи»");
   const direct = await ctxB.request.get(base + "/api/users");
   ok(direct.status() === 403, "прямой запрос /api/users обычным пользователем → 403");
   ok((await B.textContent("#set-login-state")).includes("anna"), "в настройках видно, под кем вошли");
 
   // --- расчёты работают под учётной записью ---
-  await B.click('.topbar nav button[data-tab="analysis"]');
+  await B.click('.rail nav button[data-tab="analysis"]');
   await B.fill("#f-core", "urinal screen deodorizer");
   await B.setInputFiles("#file-input", ["tests/fixtures/POE_urinal_screen_deodorizer_2026-09-15.json"]);
   await B.waitForFunction(() => document.querySelectorAll(".filecard").length >= 1);
@@ -64,11 +64,11 @@ try {
 
   // ================= Часть 2 (US2): общая история =================
   const saved = (page) => page.waitForFunction(() => document.querySelector("#save-state")?.textContent.includes("сохранено в общую историю"), null, { timeout: 20000 });
-  const setField = async (page, sel, val) => { await page.click('.topbar nav button[data-tab="analysis"]'); await page.evaluate((q) => { const el = document.querySelector(q); el.closest("details")?.setAttribute("open", ""); }, sel); await page.fill(sel, val); await page.dispatchEvent(sel, "change"); };
+  const setField = async (page, sel, val) => { await page.click('.rail nav button[data-tab="analysis"]'); await page.evaluate((q) => { const el = document.querySelector(q); el.closest("details")?.setAttribute("open", ""); }, sel); await page.fill(sel, val); await page.dispatchEvent(sel, "change"); };
   await saved(B);
   ok((await B.textContent("#doc-meta")).includes("автор: Анна Коваль"), "у автора под кнопками: " + (await B.textContent("#doc-meta")));
 
-  await A.click('.topbar nav button[data-tab="history"]');
+  await A.click('.rail nav button[data-tab="history"]');
   await A.waitForFunction(() => document.querySelector("#histlist .histrow"));
   const rowA = await A.textContent("#histlist .histrow");
   ok(rowA.includes("автор: Анна Коваль") && rowA.includes("urinal screen deodorizer"), "администратор видит анализ Анны в общей истории с автором");
@@ -106,7 +106,7 @@ try {
   await B.waitForFunction(() => document.querySelector("#f-cogs")?.value === "4.2", null, { timeout: 15000 });
   ok(true, "после F5 открыта копия с сохранёнными правками");
   // удалить чужой анализ обычный пользователь не может
-  await B.click('.topbar nav button[data-tab="history"]');
+  await B.click('.rail nav button[data-tab="history"]');
   await B.waitForFunction(() => document.querySelectorAll("#histlist .histrow").length === 2);
   ok(await B.$$eval("#histlist .histrow", (rows) => rows.map((r) => Boolean(r.querySelector("[data-del]")))).then((a) => a.filter(Boolean).length === 2), "Анна — автор обоих анализов, кнопка «Удалить» есть у обоих");
 
@@ -127,7 +127,7 @@ try {
   const note = (await C.textContent("#sec-hero .snapnote")).trim();
   ok(note.includes("Анна Коваль") && note.includes("только чтение"), "гость видит дашборд с пометкой: " + note);
   ok(await C.$eval("#dashboard", (d) => d.querySelectorAll("button, input, select, textarea, [data-action]").length === 0), "в дашборде гостя нет полей ввода, ползунков и кнопок запуска");
-  ok(await C.evaluate(() => !document.querySelector('.topbar nav button, [data-tab="history"], #btn-ai, #set-users')), "у гостя нет вкладок истории, настроек и запуска AI");
+  ok(await C.evaluate(() => !document.querySelector('.rail nav button, [data-tab="history"], #btn-ai, #set-users')), "у гостя нет вкладок истории, настроек и запуска AI");
   const painted = await C.$$eval("#dashboard canvas", (cs) => cs.map((c) => { try { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; } catch { return -1; } }));
   ok(painted.filter((n) => n > 500).length >= 6, "графики у гостя отрисованы: " + painted.filter((n) => n > 500).length + " из " + painted.length + " (Gate 2 пуст без CPC — в анализе только POE)");
   ok((await C.textContent("#sec-economics")).length > 50 && (await C.textContent("#sec-economics")).includes("4,37"), "полный режим: экономика видна (COGS $4,37)");
@@ -175,13 +175,13 @@ try {
   const gone = (await C.textContent("#share-unavailable")).replace(/\s+/g, " ").trim();
   await C.goto(base + "/s/" + "Z".repeat(43), { waitUntil: "load" }); await C.waitForSelector("#share-unavailable:not(.hidden)", { timeout: 15000 });
   ok(gone === (await C.textContent("#share-unavailable")).replace(/\s+/g, " ").trim() && gone.includes("недействительна"), "отозванная и несуществующая ссылки выглядят одинаково: «" + gone.slice(0, 60) + "…»");
-  await B.click("#share-close"); await B.click('.topbar nav button[data-tab="history"]');
+  await B.click("#share-close"); await B.click('.rail nav button[data-tab="history"]');
   await B.waitForFunction(() => [...document.querySelectorAll("#histlist .histrow")].some((r) => r.querySelector(".chip.ok")?.textContent === "ссылка"));
   ok(true, "в истории у анализа значок «ссылка»");
   await ctxC.close();
 
   // --- отключение ---
-  await A.click('.topbar nav button[data-tab="settings"]');
+  await A.click('.rail nav button[data-tab="settings"]');
   await A.waitForSelector('#users-list button[data-uact="toggle"]');
   A.once("dialog", (d) => d.accept());
   await A.locator("#users-list tr", { hasText: "anna" }).locator('button[data-uact="toggle"]').click();

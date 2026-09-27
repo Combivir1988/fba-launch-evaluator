@@ -21,7 +21,7 @@ try {
   ok(await page.$eval("#login-msg", (e) => e.classList.contains("hidden")), "неизвестный код ошибки игнорируется");
 
   await loginContext(ctx, base); await page.goto(base + "/", { waitUntil: "networkidle" });
-  await page.click('.topbar nav button[data-tab="settings"]'); await page.waitForSelector("#set-users:not(.hidden)");
+  await page.click('.rail nav button[data-tab="settings"]'); await page.waitForSelector("#set-users:not(.hidden)");
   ok((await page.inputValue("#un-mode")) === "google" && await page.$eval("#un-pass", (e) => e.closest(".field").classList.contains("hidden")), "форма по умолчанию — приглашение через Google, поля логина и пароля скрыты");
   await page.fill("#un-email", "Anna.Koval@Gmail.com"); await page.click('#user-new button[type="submit"]');
   await page.waitForFunction(() => [...document.querySelectorAll("#users-list tr")].some((tr) => tr.textContent.includes("anna.koval@gmail.com")));
