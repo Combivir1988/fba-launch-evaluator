@@ -9,7 +9,7 @@ import { detectAndParse } from "./files.js";
 import { history, localHistory } from "./history.js";
 import { runAi, runPatentScan, runConfigJob, pendingJob } from "./ai.js";
 import { configScope, topForSchema, freshListings } from "/shared/config-scope.js";
-import { sanitizeSchema, setCell, renameOption, unlistedValues } from "/shared/config-extract.js";
+import { sanitizeSchema, setCell, renameOption, unlistedValues, fillFromText, coverage } from "/shared/config-extract.js";
 import { buildTzPayload } from "/shared/tz-payload.js";
 import { api, goLogin, isLeaving } from "/js/api.js";
 import { startIdleWatch } from "./idle.js";
@@ -490,7 +490,7 @@ function gotoConfig(id = "sec-config") { showTab("analysis"); setStage(2); const
 dash.addEventListener("click", (e) => { const a = e.target.closest("[data-goto]"); if (a) { e.preventDefault(); gotoConfig(a.dataset.goto); } });
 function configAction(b) {
   const act = b.dataset.action;
-  if (act === "config-schema") return startConfigSchema(); if (act === "config-edit") return openSchemaDialog(); if (act === "config-extract") return startConfigExtract();
+  if (act === "config-schema") return startConfigSchema(); if (act === "config-edit") return openSchemaDialog(); if (act === "config-extract") return startConfigExtract(); if (act === "config-fill") return fillCellsFromText();
   if (act === "config-tz") return startConfigTz(); if (act === "tz-docx") return downloadTzDocx(); if (act === "patents-docx") return downloadPatentsDocx(); if (act === "config-promo") return startConfigPromo();
   if (act === "price-apply") { const v = Number(b.dataset.price); if (!Number.isFinite(v)) return; S.a.inputs.price = Math.round(v * 100) / 100; markDirty(); renderAll(); return toast(`Цена ${S.a.inputs.price.toFixed(2)} $ подставлена в экономику — Gate 1/2, ROI, бюджет и деньги по месяцам пересчитаны`, 6000); }
   const T = S.a.config?.tz; if (!T) return;
@@ -535,6 +535,16 @@ async function startConfigExtract(resumeJobId = null) {
   } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Извлечение: " + e.message, 8000); }
   finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
+/** Дозаполнить пустые клетки прямо из текста листингов: без AI, без кредитов, мгновенно. */
+function fillCellsFromText() {
+  const C = S.a.config; if (!C?.table) return toast("Сначала извлеките характеристики (шаг 2)");
+  const { filled } = fillFromText({ schema: C.schema, rows: C.table.rows, listings: S.a.aggregates.listings || {} });
+  if (!filled) return toast("Пустых клеток, которые видно прямо в тексте листинга, не нашлось");
+  C.table.coverage = coverage(C.table, C.schema);
+  markDirty(); renderAll();
+  toast(`Дозаполнено ${filled} клеток из тайтлов, буллетов и характеристик — без AI и без кредитов (пометка «·»)`, 7000);
+}
+
 /** Промо без данных (spec 014): страницы загружены до появления разбора промо — у записи нет поля promo. */
 const PROMO_VERSION = 2; // см. server/promo-parse.js
 function promoMissingAsins() { const L = S.a.aggregates?.listings || {}; const rows = S.a.config?.table?.rows || {}; return Object.keys(rows).filter((a) => L[a] && !L[a].error && (!L[a].promo || (L[a].promo.v ?? 1) < PROMO_VERSION)); }

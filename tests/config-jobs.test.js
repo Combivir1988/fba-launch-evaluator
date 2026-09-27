@@ -55,10 +55,10 @@ test("extractStream (live, подмены): пачки по batchSize, табл�
   assert.deepEqual(batches.map((b) => b.length), [3, 3], "6 загруженных страниц → 2 пачки по 3");
   assert.equal(d.table.rows[asin(1)].values.material.value, "шёлк", "ручная клетка сохранена"); assert.equal(d.table.rows[asin(1)].values.material.source, "manual");
   assert.deepEqual(d.table.rows[asin(3)].values.material, { value: "латекс", source: "bullets" }); assert.deepEqual(d.table.rows[asin(3)].values.count, { value: 5, source: "specs" });
-  assert.deepEqual(d.table.rows[asin(2)].values.count, { value: null, source: null });
+  assert.deepEqual(d.table.rows[asin(2)].values.count, { value: 5, source: "title", auto: true }, "модель поле пропустила, но число есть в тайтле — добрали сами, без AI");
   assert.equal(d.table.rows[asin(7)].status, "failed"); assert.deepEqual(d.table.failed, [asin(7)]);
   assert.equal(d.table.cost, 10 + 26 * 6); assert.equal(Object.keys(d.listings).length, 7, "новые страницы (включая ошибочную) уходят в кэш");
-  assert.ok(Math.abs(d.table.coverage.count - 5 / 7) < 1e-9);
+  assert.ok(Math.abs(d.table.coverage.count - 6 / 7) < 1e-9, "покрытие выросло: пропущенную моделью клетку добрали из тайтла");
   const ai = ev.filter((e) => e.event === "stage" && e.data.stage === "ai"); assert.equal(ai.at(-1).data.done, 2);
 });
 

@@ -51,6 +51,54 @@ export function sanitizeSchema(schema) {
  * Слияние результата AI с таблицей.
  * @param {object} o { schema, prevTable, items: [{asin, values:[{field,value,source}]}], listings, asins, model, cost, now }
  */
+/** Весь текст листинга по местам, где стоит искать значение: тайтл → буллеты → характеристики. */
+const textParts = (l) => [["title", String(l?.title || "")], ["bullets", (l?.bullets || []).join(" \n ")], ["specs", (l?.specs || []).map((x) => `${x.k}: ${x.v}`).join(" \n ")]];
+
+/** Число с единицей в тексте: «24 Pack», «Pack of 24», «24-count», «24 шт», «12.5 lb». */
+function numberFromText(field, text) {
+  const unit = String(field.unit || "").trim();
+  const words = [unit, "pack", "pcs", "pieces", "count", "pc", "ct", "шт"].filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const tail = `(?:${words.join("|")})`;
+  const pats = [new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*[-\u2013]?\\s*${tail}\\b`, "i"), new RegExp(`${tail}\\s*of\\s*(\\d+(?:[.,]\\d+)?)`, "i")];
+  for (const re of pats) { const m = re.exec(text); if (m) { const n = parseNumber(m[1]); if (n !== null) return n; } }
+  return null;
+}
+
+/** Значение из списка поля, встретившееся в тексте. Берём только если совпало ровно одно — иначе догадка была бы опасной. */
+function choiceFromText(field, text) {
+  const hits = (field.options || []).filter((o) => { const t = String(o).trim(); if (t.length < 2) return false; return new RegExp(`(^|[^\\p{L}\\p{N}])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}\\p{N}]|$)`, "iu").test(text); });
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/**
+ * Добор пустых клеток из текста листингов — без AI и без кредитов (2026-09-27).
+ * Модель иногда пропускает значение, которое прямо в тайтле («24 Pack»): такие клетки заполняем детерминированно.
+ * Трогаем ТОЛЬКО пустые клетки; ручные правки и значения модели не переписываются. Источник помечается как у AI, плюс auto: true.
+ * @returns {{ rows, filled: number }}
+ */
+export function fillFromText({ schema, rows, listings = {} }) {
+  const fields = (schema?.fields || []).filter((f) => f.type === "number" || f.type === "choice");
+  let filled = 0;
+  for (const [asin, row] of Object.entries(rows || {})) {
+    const l = listings[asin]; if (!l || l.error || row.status === "failed") continue;
+    for (const f of fields) {
+      const cell = row.values?.[f.id];
+      if (cell && cell.value !== null && cell.value !== undefined) continue;
+      if (cell?.source === "manual") continue;
+      for (const [where, text] of textParts(l)) {
+        if (!text) continue;
+        const raw = f.type === "number" ? numberFromText(f, text) : choiceFromText(f, text);
+        if (raw === null) continue;
+        const n = normalizeValue(f, raw); if (n.value === null) continue;
+        row.values = row.values || {};
+        row.values[f.id] = { value: n.value, source: where, auto: true, ...(n.unlisted ? { unlisted: true } : {}) };
+        filled++; break;
+      }
+    }
+  }
+  return { rows, filled };
+}
+
 export function mergeExtraction({ schema, prevTable = null, items = [], listings = {}, asins = [], model = "", cost = 0, now = new Date().toISOString() }) {
   const fields = schema?.fields || []; const fieldIds = new Set(fields.map((f) => f.id));
   const rows = {};
@@ -70,6 +118,7 @@ export function mergeExtraction({ schema, prevTable = null, items = [], listings
       row.values[f.id] = n.unlisted ? { value: n.value, source, unlisted: true } : { value: n.value, source };
     }
   }
+  fillFromText({ schema, rows, listings }); // то, что модель пропустила, но что прямо написано в тексте
   return { rows, extractedAt: now, model, cost: (prevTable?.cost || 0) + (cost || 0), coverage: coverage({ rows }, schema), failed: Object.entries(rows).filter(([, r]) => r.status === "failed").map(([a]) => a).sort() };
 }
 

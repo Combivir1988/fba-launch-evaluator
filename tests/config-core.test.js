@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { configScope, topForSchema, isFresh, freshListings } from "../shared/config-scope.js";
-import { normalizeValue, parseNumber, sanitizeSchema, mergeExtraction, setCell, renameOption } from "../shared/config-extract.js";
+import { normalizeValue, parseNumber, sanitizeSchema, mergeExtraction, setCell, renameOption, fillFromText } from "../shared/config-extract.js";
 import { configStats, NO_DATA } from "../shared/config-stats.js";
 import { buildTzPayload, collectTzNumbers, markUnverified } from "../shared/tz-payload.js";
 import { mergeThresholds } from "../shared/thresholds.js";
@@ -155,4 +155,31 @@ test("снимок ссылки: без ТЗ и кэша страниц, диа�
   assert.ok(s.analysis.config.table && s.analysis.results.config.whole.fields.length === 3);
   assert.ok(a.config.tz, "исходный анализ не тронут");
   const ne = buildSnapshot(a, { mode: "no_economics" }); assert.ok(ne.analysis.results.config.whole.fields[0].values[0].avgPrice !== undefined, "рыночные цены — не закупочная экономика");
+});
+
+test("добор из текста: модель пропустила «24 Pack» в тайтле — берём сами, без AI", () => {
+  const schema = { fields: [{ id: "pack", name: "Штук", type: "number", unit: "pcs", options: [] }, { id: "scent", name: "Запах", type: "choice", options: ["Ocean", "Lemon", "Citrus"] }, { id: "note", name: "Текст", type: "text", options: [] }] };
+  const listings = {
+    A1: { title: "Urinal Screen Deodorizer, 24 Pack Ocean Breeze Cakes", bullets: [], specs: [] },
+    A2: { title: "Bulk set", bullets: ["Pack of 48 screens", "Lemon fresh"], specs: [] },
+    A3: { title: "Variety set", bullets: ["Ocean, Lemon and Citrus in one box"], specs: [] },
+    A4: { title: "Manual override", bullets: ["12 Pack"], specs: [] },
+    A5: { title: "Broken page", error: { code: "asp" } },
+  };
+  const rows = {
+    A1: { status: "ok", values: { pack: { value: null, source: null }, scent: { value: null, source: null } } },
+    A2: { status: "ok", values: {} },
+    A3: { status: "ok", values: { scent: { value: null, source: null } } },
+    A4: { status: "ok", values: { pack: { value: 1, source: "manual" } } },
+    A5: { status: "failed", values: {} },
+  };
+  const { filled } = fillFromText({ schema, rows, listings });
+  assert.equal(rows.A1.values.pack.value, 24); assert.equal(rows.A1.values.pack.source, "title"); assert.equal(rows.A1.values.pack.auto, true);
+  assert.equal(rows.A1.values.scent.value, "Ocean");
+  assert.equal(rows.A2.values.pack.value, 48, "«Pack of 48» тоже понимаем"); assert.equal(rows.A2.values.scent.source, "bullets");
+  assert.equal(rows.A3.values.scent.value, null, "три запаха в одном тексте — не угадываем");
+  assert.equal(rows.A4.values.pack.value, 1, "ручное значение не трогаем");
+  assert.equal(rows.A5.values.pack, undefined, "незагруженную страницу пропускаем");
+  assert.equal(filled, 4);
+  assert.equal(fillFromText({ schema, rows, listings }).filled, 0, "повторный запуск ничего не меняет");
 });
