@@ -15,7 +15,7 @@ try {
   ok(/next=%2F%3Ftab%3Dhistory/.test(p0.url()), "адрес запомнен — после входа вернёмся куда шли");
   const chain = []; for (let r = r0.request(); r; r = r.redirectedFrom()) chain.push(r.url().replace(base, ""));
   ok(chain.includes("/?tab=history"), "переход сделал сервер (302), а не страница: " + chain.reverse().join(" → "));
-  ok(await p0.evaluate(() => !document.querySelector("aside.rail")), "HTML приложения браузеру не отдавался");
+  ok(await p0.evaluate(() => !document.querySelector("header.topbar")), "HTML приложения браузеру не отдавался");
   await anon.close();
 
   // 2. Живой сеанс: пока идёт проверка, вместо дашборда — «Проверяем сеанс…»
@@ -26,9 +26,9 @@ try {
   await page.waitForSelector("#boot", { state: "attached", timeout: 10000 });
   await page.waitForFunction(() => document.body.classList.contains("booting"), null, { timeout: 10000 });
   ok(await visible(page, "#boot"), "во время проверки видно «Проверяем сеанс…»");
-  ok(!(await visible(page, "aside.rail")) && !(await visible(page, "#dashboard")), "шапка и дашборд в это время скрыты");
+  ok(!(await visible(page, "header.topbar")) && !(await visible(page, "#dashboard")), "шапка и дашборд в это время скрыты");
   await nav; await page.waitForFunction(() => !document.body.classList.contains("booting"), null, { timeout: 20000 });
-  ok((await visible(page, "aside.rail")) && !(await visible(page, "#boot")), "после проверки приложение показано, заставка убрана");
+  ok((await visible(page, "header.topbar")) && !(await visible(page, "#boot")), "после проверки приложение показано, заставка убрана");
   ok(/Вы вошли|admin|Админ/i.test(await page.textContent("#user-chip")) || (await page.textContent("#user-name")).length > 0, "имя пользователя в шапке: " + (await page.textContent("#user-name")));
   await ctx.unroute("**/api/auth/me");
 
@@ -38,7 +38,7 @@ try {
   await ctx2.route("**/api/auth/me", async (route) => { await new Promise((r) => setTimeout(r, 900)); await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: "unauthorized", message: "Сеанс завершён из-за бездействия", reason: "idle" }) }); });
   p2.goto(base + "/", { waitUntil: "commit" }).catch(() => {});
   await p2.waitForFunction(() => document.body?.classList.contains("booting"), null, { timeout: 15000 });
-  ok(!(await visible(p2, "aside.rail")), "умерший сеанс: оболочка скрыта, пока идёт проверка");
+  ok(!(await visible(p2, "header.topbar")), "умерший сеанс: оболочка скрыта, пока идёт проверка");
   await p2.waitForURL(/login\.html/, { timeout: 15000 });
   await p2.waitForFunction(() => /бездейств/i.test(document.querySelector("#login-msg")?.textContent || ""), null, { timeout: 10000 });
   ok(/бездейств/i.test(await p2.textContent("#login-msg")), "страница входа объясняет причину: " + (await p2.textContent("#login-msg")).trim());

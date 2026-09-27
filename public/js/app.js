@@ -66,14 +66,14 @@ $("#side-open").addEventListener("click", () => setSide(false));
 if (localStorage.getItem("fba_side") === "collapsed") setSide(true, true); // при загрузке — без анимации
 
 // ---------- tabs ----------
-$$("[data-tab]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+$$(".topbar nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 // Открытый раздел живёт в адресе (#history) и запоминается в браузере: после F5 открывается тот же раздел, ссылку на раздел можно переслать.
 const TABS = ["analysis", "history", "settings", "thresholds", "help"];
 const wantedTab = () => { const h = location.hash.slice(1); if (TABS.includes(h)) return h; try { const t = localStorage.getItem("fba_tab"); if (TABS.includes(t)) return t; } catch {} return "analysis"; };
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.includes(h)) showTab(h); });
 function showTab(name) {
   if (!TABS.includes(name)) name = "analysis";
-  $$("[data-tab]").forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle("active", on); if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+  $$(".topbar nav button").forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle("active", on); if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   for (const t of TABS) $(`#tab-${t}`).classList.toggle("hidden", t !== name);
   try { localStorage.setItem("fba_tab", name); } catch {}
   if (location.hash.slice(1) !== name) window.history.replaceState(null, "", name === "analysis" && !location.hash ? location.pathname + location.search : "#" + name); // history в этом файле — модуль истории анализов

@@ -25,7 +25,7 @@ try {
   });
   await loginContext(ctx, base);
   await page.goto(base + "/", { waitUntil: "networkidle" });
-  await page.click('.rail nav button[data-tab="history"]');
+  await page.click('.topbar nav button[data-tab="history"]');
   await page.waitForSelector("#migrate-bar:not(.hidden)");
   ok((await page.textContent("#migrate-bar")).includes("3"), "предложение переноса показывает число локальных анализов");
   ok((await ctx.request.get(base + "/api/analyses").then((r) => r.json())).total === 0, "до переноса общая история пуста");
@@ -40,12 +40,12 @@ try {
   await page.waitForFunction(() => document.querySelector("#f-core")?.value === "urinal screen", null, { timeout: 10000 });
   ok(true, "последний открытый локально анализ открыт из общей истории");
   // 2) повторный перенос из настроек — ноль новых
-  await page.click('.rail nav button[data-tab="settings"]'); await page.click("#set-migrate");
+  await page.click('.topbar nav button[data-tab="settings"]'); await page.click("#set-migrate");
   await page.waitForFunction(() => /\+0 новых, 3 уже были/.test(document.querySelector("#set-migrate-msg")?.textContent || ""), null, { timeout: 30000 });
   ok((await ctx.request.get(base + "/api/analyses").then((r) => r.json())).total === 3, "повторный перенос добавил 0 (SC-010): " + (await page.textContent("#set-migrate-msg")));
   const localLeft = await page.evaluate(() => new Promise((res) => { const r = indexedDB.open("fba-launch-evaluator"); r.onsuccess = () => { const g = r.result.transaction("analyses").objectStore("analyses").count(); g.onsuccess = () => res(g.result); }; }));
   ok(localLeft === 3, "локальная копия в браузере не удалена (страховка)");
-  await page.reload({ waitUntil: "networkidle" }); await page.click('.rail nav button[data-tab="history"]');
+  await page.reload({ waitUntil: "networkidle" }); await page.click('.topbar nav button[data-tab="history"]');
   ok(await page.$eval("#migrate-bar", (el) => el.classList.contains("hidden")), "после переноса предложение больше не показывается");
   console.log("console:", logs.join("\n") || "(чисто)"); if (logs.length) process.exitCode = 1;
 } catch (e) { console.error("PROBE FAILED:", e.message); console.log("console:", logs.join("\n")); process.exitCode = 1; }
