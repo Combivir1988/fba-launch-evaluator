@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { percentile, salesPerClickPct, newEntrantCohort, reviewBarrier, clickWeightedPrice, poeDataNotes } from "../shared/entry.js";
+import { percentile, salesPerClickPct, newEntrantCohort, reviewBarrier, clickWeightedPrice, poeDataNotes, sourceOverlap } from "../shared/entry.js";
 import { mergeThresholds } from "../shared/thresholds.js";
 import { median, monthsSince } from "../shared/num.js";
 import { compute } from "../shared/compute.js";
@@ -65,7 +65,7 @@ test("нехватка данных: причина названа, оценок
   assert.equal(poeOnly.salesPerClickPct.ok, false); assert.match(poeOnly.salesPerClickPct.reason, /нужен Xray/); assert.equal(poeOnly.reach.status, "na"); assert.equal(poeOnly.reach.requiredShare, null);
   assert.equal(poeOnly.cohort.ok, true, "когорта по POE считается и без Xray"); assert.equal(poeOnly.cohort.reviewsSource, "poe"); assert.equal(poeOnly.cohort.salesMedian, null); assert.equal(poeOnly.cohort.inheritedChecked, false); assert.ok(poeOnly.cohort.ageFromPoe > 0);
   const mixed = fixtureAnalysis().results.entry; // Xray и POE из разных ниш — пересечения нет
-  assert.equal(mixed.salesPerClickPct.ok, false); assert.match(mixed.salesPerClickPct.reason, /нужно не меньше 5/);
+  assert.equal(mixed.salesPerClickPct.ok, false); assert.match(mixed.salesPerClickPct.reason, /ни один товар POE не найден в Xray/, "пустой пересчёт называется своим именем, а не «мало товаров»");
   const noSales = entryFixture({ mutateXray: (x) => { x.flags.hasAsinSales = false; } }).results.entry; assert.match(noSales.salesPerClickPct.reason, /нет колонки продаж/);
   const few = entryFixture({ mutateXray: (x) => { x.asins = x.asins.slice(0, 3); } }).results.entry; assert.equal(few.salesPerClickPct.ok, false); assert.equal(few.salesPerClickPct.n <= 3, true);
   const empty = compute(migrate({ schemaVersion: 1, id: "e", niche: "пусто" })).entry; assert.equal(empty.available, false); assert.equal(empty.cohort.ok, false); assert.equal(empty.reviews.ok, false);
@@ -115,4 +115,19 @@ test("ловушки данных POE: три постоянные пометк�
   const b = entryFixture({ mutateXray: (x) => { x.asins.find((r) => r.asin === asin).creationDate = "2024-06-01"; } });
   const gap = b.results.dataNotes.find((n) => n.id === "dateGap"); assert.ok(gap); assert.equal(gap.items[0].asin, asin); assert.ok(gap.items[0].days > 90); assert.equal(gap.items[0].xray, "2024-06-01");
   assert.deepEqual(poeDataNotes(a.aggregates.xray, null, TH.entry), []);
+});
+
+test("совпадение товаров Xray и POE: ноль = разные ниши", () => {
+  const poe = { asinMetrics: Array.from({ length: 10 }, (_, i) => ({ asin: "B0POE0000" + i })) };
+  const xr = (list) => ({ asins: list.map((a) => ({ asin: a })) });
+  assert.equal(sourceOverlap(null, poe), null, "без Xray сравнивать нечего");
+  assert.equal(sourceOverlap(xr(["B0X0000000"]), null), null, "без POE сравнивать нечего");
+  const none = sourceOverlap(xr(["B0X0000001", "B0X0000002"]), poe);
+  assert.deepEqual([none.hit, none.level, none.poeTotal, none.xrayTotal], [0, "none", 10, 2]);
+  const low = sourceOverlap(xr(["b0poe00000", "B0X0000001"]), poe); // регистр ASIN не важен
+  assert.deepEqual([low.hit, low.level], [1, "low"]);
+  const ok = sourceOverlap(xr(poe.asinMetrics.slice(0, 5).map((m) => m.asin)), poe);
+  assert.deepEqual([ok.hit, ok.share, ok.level], [5, 0.5, "ok"]);
+  assert.equal(entryFixture().results.sourceOverlap.level, "ok", "фикстура с общими ASIN");
+  assert.equal(fixtureAnalysis().results.sourceOverlap.level, "none", "Xray и POE из разных ниш");
 });

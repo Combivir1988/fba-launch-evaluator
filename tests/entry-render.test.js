@@ -36,7 +36,12 @@ test("секция «Вход в нишу»: продажи на 1 % клико�
 });
 
 test("нехватка данных в секции названа словами; без отчётов секции нет; только POE — отзывы «с текстом»", () => {
-  const mixed = draw(fixtureAnalysis()); assert.match(text(mixed, "entry"), /Продажи на 1 % кликов не посчитаны: в обоих отчётах одновременно есть только 0/);
+  const mixed = draw(fixtureAnalysis()); const mt = text(mixed, "entry");
+  assert.match(mt, /Продажи на 1 % кликов не посчитаны: ни один товар POE не найден в Xray/);
+  assert.match(mt, /файлы от разных ниш/, "плитка «Продажи новичков» называет настоящую причину");
+  assert.match(text(mixed, "hero"), /Xray и POE, похоже, от разных ниш/, "предупреждение видно в шапке, а не только в пустом столбце");
+  assert.ok(mixed.querySelector("#sec-hero .notice.fail"), "разные ниши — красное предупреждение");
+  assert.ok(!draw(entryFixture()).querySelector("#sec-hero .notice.fail"), "при совпадающих файлах предупреждения нет");
   const poeOnly = draw(entryFixture({ withXray: false })); const t = text(poeOnly, "entry");
   assert.match(t, /нужен Xray/); assert.match(t, /отзывов с текстом \(POE\)/); assert.match(t, /возраст взят из POE/); assert.match(t, /Проверка на унаследованные отзывы не выполнена/);
   assert.match(text(poeOnly, "competitors"), /Отзывы с текстом/); assert.match(text(poeOnly, "competitors"), /Запуск \(вариации\)/); assert.match(text(poeOnly, "overview"), /POE: только с текстом/);
@@ -73,7 +78,7 @@ test("FR-012: AI получает вход в нишу, деньги по мес
   assert.equal(p.entry.reviews.reviewRateIsAssumption, true); assert.ok(p.cashflow.peakInvestment > 0); assert.equal(p.cashflow.rows, undefined, "строки сценария в AI не уходят"); assert.match(p.budget.basis, /пик вложений/); assert.ok(p.budget.needTwoBatchesReference > 0);
   assert.ok(p.clickWeightedPrice.value > 0); assert.ok(Array.isArray(p.borderline)); assert.ok(p.regulatory.triggers.some((t) => t.agency === "EPA" && t.inNicheName)); assert.equal(p.dataNotes.length, 3);
   assert.ok(JSON.stringify(p).length < 60_000, "пейлоад остаётся компактным");
-  const poor = buildAiPayload(fixtureAnalysis()); assert.match(poor.entry.salesPer1pctClicks.unavailable, /нужно не меньше 5/); assert.match(poor.entry.reach.unavailable, /нужно не меньше 5/);
+  const poor = buildAiPayload(fixtureAnalysis()); assert.match(poor.entry.salesPer1pctClicks.unavailable, /файлы от разных ниш/); assert.match(poor.entry.reach.unavailable, /файлы от разных ниш/);
   assert.match(SYSTEM_PROMPT, /8\. Вход в нишу/); assert.match(SYSTEM_PROMPT, /peakInvestment/); assert.match(SYSTEM_PROMPT, /regulatory\.triggers/);
 });
 

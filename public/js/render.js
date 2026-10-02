@@ -98,6 +98,14 @@
     const m = A.aggregates?.poe?.merged; if (!m) return "";
     return `<div class="notice info bandnote"><b>POE объединён из ${m.count} ниш:</b> ${m.niches.map((n) => `${esc(n.title)} — ${fmtPct(n.weight)}`).join(" · ")}. Товаров без дублей ${fmtN(m.asinsTotal)} (общих ${fmtN(m.overlapAsins)}), запросов ${fmtN(m.termsTotal)} (общих ${fmtN(m.overlapTerms)}). Доли кликов, конверсия клика и новички посчитаны по общему рынку; что сложено, а что взято приближённо — в секции «Вход в нишу» → «Особенности данных POE».</div>`;
   }
+  /** Файлы от разных ниш: без этого предупреждения видно только пустые столбцы, а не причину (2026-10-02). */
+  function overlapNote(R) {
+    const ov = R.sourceOverlap; if (!ov || ov.level === "ok") return "";
+    const none = ov.level === "none";
+    return `<div class="notice ${none ? "fail" : ""} bandnote"><b>${none ? "Xray и POE, похоже, от разных ниш:" : "Xray и POE почти не пересекаются:"}</b> общих товаров ${fmtN(ov.hit)} из ${fmtN(ov.poeTotal)} в POE (в Xray ${fmtN(ov.xrayTotal)}).
+      Продажи в штуках, возраст листинга и проверка унаследованных отзывов берутся из Xray по ASIN — ${none ? "сейчас они пустые" : "сейчас они посчитаны по горстке товаров"}; доли кликов, конкуренты и спрос считаются по разным рынкам.
+      Загрузите Xray по той же нише, что и POE (или наоборот).</div>`;
+  }
   /** Ссылка на этап 2 в шапке: секция далеко внизу дашборда, без неё её не находят. */
   function stage2Note(A, R, o) {
     if (o.static || !A.aggregates?.xray?.asins?.length) return "";
@@ -112,7 +120,7 @@
       <div><h1>${esc(A.niche || "Без названия")}</h1>
         <div class="meta">Ключ: <b>${esc(A.coreKeyword || "—")}</b> · ${esc(A.marketplace || "US")} · расчёт ${fmtDate(R.computedAt)} · методология ${esc(R.methodologyVersion || "")}</div>
         <div class="chips" style="margin-top:.4rem">${srcs || '<span class="chip na">файлы не загружены</span>'}</div>
-        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${mergedNote(A)}${bandNote(R, o)}${stage2Note(A, R, o)}</div>
+        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${mergedNote(A)}${overlapNote(R)}${bandNote(R, o)}${stage2Note(A, R, o)}</div>
       <div class="verdict ${esc(v)}"><div class="k muted">${ai ? "Вердикт AI" + (ai.adjustedByRules ? " (скорректирован правилами)" : "") : "Потолок по правилам"}</div>
         <div class="big">${esc(VLABEL[v])}</div>
         <div class="muted">Критерий 1: <b>${R.criterion1.okCount} из 8</b> · решающий: ${esc(ai?.decisiveGate || R.verdict.decisiveGate || "—")}</div>
@@ -418,6 +426,13 @@
   // ---------- вход в нишу: трафик, новички, отзывы (spec 005) ----------
   const REACH_LABEL = { ok: "достижимо", warn: "на пределе", fail: "выше достигнутого", na: "нет данных" };
   const months = (v) => (!isNum(v) ? "—" : v === 0 ? "сразу" : v < 1 ? "меньше месяца" : fmtN(v, 1) + " мес");
+  /** Почему продажи новичков пустые: «нет файла» и «файл не про эту нишу» — разные беды, а раньше обе назывались одинаково. */
+  function noSalesWhy(R) {
+    const ov = R.sourceOverlap;
+    if (ov && ov.level === "none") return `ни один товар POE не найден в Xray (0 из ${fmtN(ov.poeTotal)}) — файлы от разных ниш`;
+    if (ov && ov.level === "low") return `в Xray нашлось только ${fmtN(ov.hit)} из ${fmtN(ov.poeTotal)} товаров POE`;
+    return "нужен Xray с продажами";
+  }
   function secEntry(A, R) {
     const E = R.entry; if (!E || !E.available) return "";
     const per = E.salesPerClickPct, co = E.cohort, rc = E.reach, rv = E.reviews;
@@ -434,7 +449,7 @@
     const cohort = co.population ? `<h3 style="margin-top:1rem">Новые участники <span class="chip ${co.ok ? "ok" : "na"}">${fmtN(co.size)} из ${fmtN(co.population)} товаров</span></h3>
       <p class="muted" style="font-size:.85rem">Кто вошёл в нишу за последние два года и уже заметен покупателям: возраст от ${co.minAgeMonths} до ${co.maxAgeMonths} месяцев и доля ${co.basis === "revenue" ? "выручки" : "кликов"} не ниже равномерной (${fmtPct(co.uniformShare, 1)}). Отсеяно: ${exParts.join("; ") || "никого"}.${co.ageFilterSkipped ? " Все листинги отчёта моложе ${co.minAgeMonths} месяцев — нижняя граница возраста не применялась." : ""}${co.ageFromPoe ? ` У ${fmtN(co.ageFromPoe)} товар(ов) возраст взят из POE — это может быть дата всей вариации.` : ""}${co.inheritedChecked ? "" : " Проверка на унаследованные отзывы не выполнена — нужны продажи из Xray."}</p>
       ${co.ok ? `<div class="tiles">
-        ${tile("Продажи новичков", isNum(co.salesMedian) ? fmtN(co.salesMedian) + " шт/мес" : "—", isNum(co.salesMedian) ? `медиана; разброс ${fmtN(co.salesP25)}–${fmtN(co.salesP75)} · стартовый уровень для сценария` : "нужен Xray с продажами")}
+        ${tile("Продажи новичков", isNum(co.salesMedian) ? fmtN(co.salesMedian) + " шт/мес" : "—", isNum(co.salesMedian) ? `медиана; разброс ${fmtN(co.salesP25)}–${fmtN(co.salesP75)} · стартовый уровень для сценария` : noSalesWhy(R))}
         ${tile("Отзывы новичков", fmtN(co.reviewsMedian), "медиана, " + revLabel)}
         ${tile("Доля кликов новичков", fmtPct(co.shareMedian, 1), `медиана · у лучшего ${fmtPct(co.bestShare, 1)}`)}
       </div>

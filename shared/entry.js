@@ -21,6 +21,18 @@ export function percentile(arr, p) {
 /** Доля кликов товара: за 90 дней (ближе к «сейчас»), запасной вариант — за 360. */
 function clickShare(a) { return isNum(a.clickShareT90) && a.clickShareT90 > 0 ? { share: a.clickShareT90, period: "T90" } : isNum(a.clickShareT360) && a.clickShareT360 > 0 ? { share: a.clickShareT360, period: "T360" } : null; }
 
+// Доля товаров POE, найденных в Xray. Ноль означает, что файлы описывают РАЗНЫЕ ниши: продажи, возраст листинга и проверку
+// унаследованных отзывов мы берём из Xray по ASIN, и при нулевом совпадении они просто пустеют — без этой проверки причина не видна (2026-10-02).
+const OVERLAP_LOW = 0.2; // меньше пятой части товаров POE нашлось в Xray — продажи и возраст покрывают слишком малую часть когорты
+export function sourceOverlap(xray, poe) {
+  const xs = xray?.asins || [], ps = poe?.asinMetrics || [];
+  if (!xs.length || !ps.length) return null; // сравнивать нечего: об отсутствии файла говорят сами показатели
+  const set = new Set(xs.map((a) => up(a.asin)));
+  const hit = ps.filter((p) => set.has(up(p.asin))).length;
+  const share = hit / ps.length;
+  return { poeTotal: ps.length, xrayTotal: xs.length, hit, share, level: hit === 0 ? "none" : share < OVERLAP_LOW ? "low" : "ok" };
+}
+
 /** Продажи в месяц на 1 % кликов ниши — по товарам, которые есть и в Xray (продажи), и в POE (доля кликов). */
 export function salesPerClickPct(xray, poe, th) {
   const out = { ok: false, reason: null, n: 0, median: null, p25: null, p75: null, fallbackT360: 0, rows: [] };
@@ -34,6 +46,7 @@ export function salesPerClickPct(xray, poe, th) {
     out.rows.push({ asin: up(p.asin), brand: p.brand, sales: x.asinSales, share: cs.share, per1pct: x.asinSales / (cs.share * 100) });
   }
   out.n = out.rows.length;
+  if (out.n === 0) { out.reason = `ни один товар POE не найден в Xray — похоже, файлы от разных ниш (общих ASIN: 0 из ${poe.asinMetrics.length})`; return out; }
   if (out.n < th.minOverlap) { out.reason = `в обоих отчётах одновременно есть только ${out.n} товар(ов) с продажами и долей кликов — нужно не меньше ${th.minOverlap}`; return out; }
   const v = out.rows.map((r) => r.per1pct);
   out.median = median(v); out.p25 = percentile(v, 25); out.p75 = percentile(v, 75); out.ok = true;

@@ -11,7 +11,7 @@ import { challenger } from "./challenger.js";
 import { scorecard } from "./scorecard.js";
 import { gate0, verdictCeiling } from "./verdict-rules.js";
 import { relDelta } from "./num.js";
-import { entryFeasibility, clickWeightedPrice, poeDataNotes } from "./entry.js";
+import { entryFeasibility, clickWeightedPrice, poeDataNotes, sourceOverlap } from "./entry.js";
 import { cashflow } from "./cashflow.js";
 import { borderline } from "./borderline.js";
 import { regulatoryTriggers } from "./regulatory.js";
@@ -83,6 +83,7 @@ export function compute(analysis) {
     clickPrice: clickWeightedPrice(whole.poe, { priceMedian: (band.active ? band.whole?.priceMedian : null) ?? p.criterion1.items["1b"].value, myPrice: price, band }, th.entry),
     regulatory: regulatoryTriggers({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, xray: whole.xray, poe: whole.poe, cerebro: whole.cerebro }),
     dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
+    sourceOverlap: sourceOverlap(whole.xray, whole.poe), // файлы от разных ниш → часть показателей молча пустеет
     amazon,
   };
   results.config = configStats(analysis.config, whole.xray, { band, th: th.config }); // этап 2 (spec 010): null, пока таблица характеристик не извлечена
