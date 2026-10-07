@@ -19,7 +19,7 @@ function makeWindow() {
   return w;
 }
 const draw = (a, opts = {}) => { const w = makeWindow(); const el = w.document.getElementById("d"); w.FBARender.render(el, a, opts); return el; };
-const prices = (el) => [...el.querySelectorAll("#sec-competitors tbody tr td:nth-child(4)")].map((td) => Number(td.textContent.replace(/[^0-9,.-]/g, "").replace(",", ".")));
+const prices = (el) => [...el.querySelectorAll("#sec-competitors table:not(.amztable) tbody tr td:nth-child(4)")].map((td) => Number(td.textContent.replace(/[^0-9,.-]/g, "").replace(",", ".")));
 
 test("шапка с диапазоном, пометки «в диапазоне / вся ниша», две цифры у 1a, таблица конкурентов только из диапазона", () => {
   const a = fixtureAnalysis({ inputs: { priceMin: 20, priceMax: 60 } }); const el = draw(a, { static: false }); const pb = a.results.priceBand;

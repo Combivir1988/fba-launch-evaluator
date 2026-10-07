@@ -1,7 +1,7 @@
 // Конкурентная структура: доли брендов (Xray revenue / POE click share), барьер отзывов,
 // число игроков, contamination-кандидаты, Amazon как продавец.
 import { sum, mean, median, safeDiv } from "./num.js";
-import { isAmazonSeller } from "./amazon.js";
+import { isAmazonSeller, amazonBy } from "./amazon.js";
 
 /** Группировка Xray по бренду (без исключённых брендов). */
 export function brandShares(asins, excludedBrands = []) {
@@ -86,11 +86,15 @@ export function competition(p) {
   const barrierExcluded = incumbent ? [...excluded, ...own.brands] : excluded;
   const out = { source: null, brands: [], topBrand: null, topBrandShare: null, top5Share: null, top10Share: null, top20Share: null,
     reviewBarrier: { leaderReviews: null, avg: null, median: null, tier: null }, playersOver100: null, brandsOver10pct: null,
-    amazonSells: false, amazonSellsSource: "auto", amazonAsins: [], amazonRevenueShare: null, contaminationCandidates: [], poeBrands: [] };
+    amazonSells: false, amazonSellsSource: "auto", amazonAsins: [], amazonListings: [], amazonRevenueShare: null, contaminationCandidates: [], poeBrands: [] };
   // Amazon как продавец: явный ответ пользователя побеждает автоопределение по колонке Seller в Xray
   // По листингам ПЕРЕДАННОГО вида (вся ниша или ценовой диапазон), а не по флагу всей выгрузки (spec 012)
   const amz = (xray?.asins || []).filter(isAmazonSeller); out.amazonAsins = amz.map((a) => a.asin);
-  { const tot = sum((xray?.asins || []).map((a) => a.asinRevenue ?? 0)); out.amazonRevenueShare = tot > 0 ? sum(amz.map((a) => a.asinRevenue ?? 0)) / tot : null; }
+  { const tot = sum((xray?.asins || []).map((a) => a.asinRevenue ?? 0)); out.amazonRevenueShare = tot > 0 ? sum(amz.map((a) => a.asinRevenue ?? 0)) / tot : null;
+    // Карточки этих листингов: без них «Amazon продаёт сам · 2 ASIN» нечем проверить — нужно видеть, что именно он продаёт (2026-10-07)
+    out.amazonListings = amz.map((a) => ({ asin: a.asin, brand: a.brand, title: a.title, price: a.price ?? null, revenue: a.asinRevenue ?? null, sales: a.asinSales ?? null, reviews: a.reviews ?? null,
+      share: tot > 0 && typeof a.asinRevenue === "number" ? a.asinRevenue / tot : null, url: a.url || null, by: amazonBy(a) }))
+      .sort((x, y) => (y.revenue ?? 0) - (x.revenue ?? 0)); }
   const az = inputs.checklist?.amazonSells;
   if (az === "yes" || az === true) { out.amazonSells = true; out.amazonSellsSource = "user"; }
   else if (az === "no") { out.amazonSells = false; out.amazonSellsSource = "user"; }

@@ -7,6 +7,8 @@ import { amazonPresence, isAmazonSeller } from "../shared/amazon.js";
 import { thresholdOverrides } from "../shared/thresholds.js";
 import { fixtureAnalysis } from "./helpers/fixture-analysis.js";
 import { resultsHash } from "./helpers/results-hash.js";
+import { readFileSync } from "node:fs";
+import { JSDOM } from "jsdom";
 
 const asin = (i) => "B0" + String(i).padStart(8, "0");
 function xrayWithAmazon() {
@@ -53,4 +55,37 @@ test("amazonPresence: без Xray — не найден; пороги-строк
 test("отпечатки прежних расчётов не меняются (вердикт в отпечаток не входит; в фикстуре Amazon есть — и это блокирует)", () => {
   const a = fixtureAnalysis(); assert.equal(typeof a.results.amazon.present, "boolean"); assert.equal(resultsHash(a.results), "1d212554e8f27864");
   if (a.results.amazon.present) { assert.equal(a.results.verdict.ceiling, "no_go"); assert.equal(a.results.verdict.decisiveGate, "Amazon в нише"); assert.ok(a.results.competition.amazonAsins.length > 0); }
+});
+
+function draw(a) {
+  const dom = new JSDOM(`<!doctype html><html><body><div id="d"></div></body></html>`, { pretendToBeVisual: true, runScripts: "outside-only" });
+  const w = dom.window; w.matchMedia = () => ({ matches: false }); w.HTMLCanvasElement.prototype.getContext = () => ({});
+  class Chart { constructor() {} destroy() {} } Chart.defaults = { color: "", borderColor: "", font: {}, plugins: { legend: { labels: {} } } }; w.Chart = Chart;
+  w.eval(readFileSync(new URL("../public/js/render.js", import.meta.url), "utf8"));
+  const el = w.document.getElementById("d"); w.FBARender.render(el, a, {}); return el;
+}
+
+test("карточки листингов Amazon: что именно он продаёт, со ссылками и долей выручки", () => {
+  const R = withXray().results;
+  const L = R.competition.amazonListings;
+  assert.equal(L.length, 2);
+  assert.deepEqual(L.map((l) => l.asin), [asin(8), asin(10)], "по убыванию выручки");
+  assert.deepEqual(L.map((l) => l.by), ["seller", "fulfillment"], "видно, продавец это или отгрузка");
+  assert.equal(L[0].brand, "Br3"); assert.equal(L[0].price, 90); assert.ok(L[0].share > 0 && L[0].share < 0.1);
+  assert.deepEqual(R.amazon.listings, L, "в amazon.listings те же карточки, что в competition");
+});
+
+test("блок в «Конкурентной карте»: ссылки на листинги Amazon, признак и режим порога", () => {
+  const el = draw(withXray()); const sec = el.querySelector("#sec-competitors"); const t = sec.textContent.replace(/\s+/g, " ");
+  assert.match(t, /Amazon продаёт сам по всей нише/); assert.match(t, /решающий гейт: вердикт No-Go/);
+  const links = [...sec.querySelectorAll("a[href*='/dp/']")].map((a) => a.getAttribute("href"));
+  for (const id of [asin(8), asin(10)]) assert.ok(links.some((h) => h.endsWith("/dp/" + id)), "ссылка на " + id);
+  assert.match(t, /продавец/); assert.match(t, /отгрузка/);
+  const consider = draw(withXray({ thresholds: thresholdOverrides({ amazon: { mode: "consider" } }) }));
+  assert.match(consider.querySelector("#sec-competitors").textContent.replace(/\s+/g, " "), /учитывается в общей картине/);
+  const manual = newAnalysis({ niche: "x", coreKeyword: "x" }); // Amazon в отчёте нет, но менеджер отметил его в чеклисте
+  const clean2 = xrayWithAmazon(); clean2.asins = clean2.asins.map((a) => ({ ...a, seller: "Seller", fulfillment: "FBA" }));
+  manual.aggregates.xray = clean2; Object.assign(manual.inputs, { price: 30, cogs: 5, cpc: 1, checklist: { amazonSells: "yes" } }); manual.results = compute(manual);
+  assert.match(draw(manual).querySelector("#sec-competitors").textContent.replace(/\s+/g, " "), /Отмечено вручную в чеклисте/, "без листингов блок честно говорит, откуда факт");
+  const clean = fixtureAnalysis(); assert.ok(!clean.results.amazon.present || draw(clean).querySelector("#sec-competitors").textContent.includes("Amazon"));
 });

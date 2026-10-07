@@ -291,6 +291,17 @@
       options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => "SV: " + fmtN(c.parsed.x) + " запросов/мес" } } }, scales: { x: { grid, ticks: { callback: (v) => fmtN(v) } }, y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 11 } } } } } });
   }
 
+  /** Какие именно листинги продаёт сам Amazon: чип называл только число, а решение No-Go проверить было нечем (2026-10-07). */
+  function amazonBlock(R) {
+    const az = R.amazon; if (!az?.present) return "";
+    const cls = az.blocks ? "fail" : "warn";
+    const head = `<b>Amazon продаёт сам ${esc(az.scopeLabel)}</b>${az.blocks ? " — это решающий гейт: вердикт No-Go" : " — учитывается в общей картине (1e, scorecard, чеклист)"}. Режим и область меняются во вкладке «Пороги» → «Amazon как продавец».`;
+    if (!az.listings.length) return `<div class="notice ${cls}" style="margin-top:.6rem">${head} ${az.source === "user" ? "Отмечено вручную в чеклисте — конкретных листингов в Xray нет, проверьте выдачу сами." : "Листинги в отчёте не найдены."}</div>`;
+    const rows = az.listings.map((l) => `<tr><td><a href="${esc(l.url || "https://www.amazon.com/dp/" + l.asin)}" target="_blank" rel="noopener">${esc(l.asin)}</a>${l.title ? `<br><small class="muted">${esc(String(l.title).slice(0, 80))}</small>` : ""}</td><td>${esc(l.brand || "—")}</td><td class="num">${fmtMoney(l.price, 2)}</td><td class="num">${fmtK(l.revenue)}</td><td class="num">${fmtPct(l.share, 1)}</td><td class="num">${fmtN(l.reviews)}</td><td>${l.by === "seller" ? "продавец" : "отгрузка"}</td></tr>`).join("");
+    return `<div class="notice ${cls}" style="margin-top:.6rem">${head} Ниже — ${fmtN(az.listings.length)} листинг(ов) из отчёта${isNum(az.revenueShare) ? `, вместе ${fmtPct(az.revenueShare)} выручки` : ""}; откройте и посмотрите, с чем именно придётся конкурировать.</div>
+      <div class="tablewrap" style="max-height:320px;overflow:auto;margin-top:.4rem"><table class="amztable"><thead><tr><th>ASIN</th><th>Бренд</th><th class="num">Цена</th><th class="num">Выручка</th><th class="num">Доля ниши</th><th class="num">Отзывы</th><th>Признак</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
   function secCompetitors(A, R) {
     const comp = R.competition;
     if (!comp.source && bandOf(R)) return `<h2>Конкурентная карта${bandChip(R, "band")}</h2><div class="empty">В ценовом диапазоне ${esc(R.priceBand.label)} — ${fmtN(R.priceBand.inCount)} из ${fmtN(R.priceBand.totalCount)} листингов: этого мало, чтобы считать доли брендов и барьер отзывов. Расширьте диапазон в панели (раздел 5) или сбросьте его.</div>`;
@@ -318,6 +329,7 @@
         ${cmpTile("Отзывы (ср. / мед.)", `${fmtN(rb.avg)} / ${fmtN(rb.median)}`, `${fmtN(wh.reviewsAvg)} / ${fmtN(wh.reviewsMedian)}`)}
       </div>` : "";
     const az = R.amazon; const azChip = az?.present ? `<span class="chip ${az.blocks ? "fail" : "warn"}" title="${esc(az.blocks ? "Порог «Amazon как продавец»: однозначно No-Go. Область: " + az.scopeLabel : "Порог «Amazon как продавец»: учитывается в общей картине (1e, scorecard). Область: " + az.scopeLabel)}${az.note ? ". " + esc(az.note) : ""}">Amazon продаёт сам${az.scope === "band" ? " в диапазоне" : " в нише"}${az.count ? ` · ${az.count} ASIN` : ""}${isNum(az.revenueShare) ? ` · ${fmtPct(az.revenueShare)} выручки` : ""}${az.blocks ? " · No-Go" : ""}</span>` : "";
+    const azBlock = amazonBlock(R);
     const inc = comp.incumbent ? '<span class="chip ok has-tip" data-tip="Галочка «Оценивать как новый вход» снята: ваш бренд убран из метрик концентрации и из планки отзывов — барьер создают чужие. В размере рынка ваша выручка осталась.">вы уже в нише</span>' : "";
     const ownBlock = !comp.own ? "" : `<div class="tiles" style="margin-top:.6rem">
         <div class="tile ok"><div class="k">Мои листинги в нише</div><div class="v">${fmtN(comp.own.listings)}</div><div class="s">${esc(comp.own.brands.join(", ") || "—")}</div></div>
@@ -325,7 +337,7 @@
         <div class="tile ok"><div class="k">Мои отзывы</div><div class="v">${fmtN(comp.own.reviewsMax)}</div><div class="s">медиана ${fmtN(comp.own.reviewsMedian)} · это мой актив, а не барьер</div></div>
         <div class="tile ok"><div class="k">Моя цена</div><div class="v">${fmtMoney(comp.own.priceMedian, 2)}</div><div class="s">медиана моих листингов</div></div>
       </div>`;
-    return `<h2>Конкурентная карта${bandChip(R, "band")} <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${azChip}${inc}</h2>${ownBlock}
+    return `<h2>Конкурентная карта${bandChip(R, "band")} <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${azChip}${inc}</h2>${azBlock}${ownBlock}
       <div class="tiles">
         <div class="tile ${comp.dominant ? "fail" : "ok"}"><div class="k">Лидер${comp.incumbent ? " (без меня)" : ""}</div><div class="v">${esc(comp.topBrand || "—")}</div><div class="s">${fmtPct(comp.topBrandShare, 1)} ${comp.source === "xray" ? "выручки" : "кликов"}</div></div>
         <div class="tile ${rb.tier === "moat" ? "fail" : rb.tier === "medium" ? "warn" : "ok"}"><div class="k">Отзывов у лидера</div><div class="v">${fmtN(rb.leaderReviews)}</div><div class="s">${rb.tier === "moat" ? "> 2000 — практически непробиваем" : rb.tier === "medium" ? "500–2000 — нужен дифференциатор + Vine" : rb.tier === "breakable" ? "< 500 — пробиваемый ров" : "—"}</div></div>
