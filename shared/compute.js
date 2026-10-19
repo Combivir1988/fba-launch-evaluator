@@ -20,6 +20,7 @@ import { configScope } from "./config-scope.js";
 import { amazonPresence } from "./amazon.js";
 import { promoStats } from "./promo-stats.js";
 import { priceByConfig } from "./price-config.js";
+import { heroListing } from "./hero-image.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -83,6 +84,7 @@ export function compute(analysis) {
     clickPrice: clickWeightedPrice(whole.poe, { priceMedian: (band.active ? band.whole?.priceMedian : null) ?? p.criterion1.items["1b"].value, myPrice: price, band }, th.entry),
     regulatory: regulatoryTriggers({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, xray: whole.xray, poe: whole.poe, cerebro: whole.cerebro }),
     dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
+    hero: heroListing({ xray: p.xray || whole.xray, poe: whole.poe, excludedBrands: inputs.excludedBrands }) || heroListing({ xray: whole.xray, poe: whole.poe, excludedBrands: inputs.excludedBrands }), // фото ниши для шапки и истории
     sourceOverlap: sourceOverlap(whole.xray, whole.poe), // файлы от разных ниш → часть показателей молча пустеет
     amazon,
   };

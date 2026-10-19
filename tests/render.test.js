@@ -108,3 +108,22 @@ test("снимок без закупочной экономики: секции 
   for (const needle of ["12.00", "20000", "20 000", e.gate1.net0.toFixed(2), String(Math.round(e.gate1.margin0 * 100)) + " %"]) assert.equal(html.includes(needle), false, `в HTML осталось «${needle}»`);
   assert.equal(el.querySelectorAll("button, input, select, [data-action]").length, 0);
 });
+
+test("фото ниши в шапке: картинка со ссылкой на сам листинг, без фото — просто заголовок", () => {
+  const { w } = makeWindow(); const a = fullAnalysis();
+  const el = w.document.getElementById("d"); w.FBARender.render(el, a, {});
+  const img = el.querySelector("#sec-hero .herophoto img");
+  assert.ok(img, "картинка есть");
+  assert.equal(img.getAttribute("src"), a.results.hero.imageUrl);
+  assert.equal(img.getAttribute("referrerpolicy"), "no-referrer", "адрес нашего приложения не уезжает на Amazon");
+  assert.match(el.querySelector("#sec-hero .herophoto").getAttribute("href"), new RegExp("/dp/" + a.results.hero.asin + "$"));
+
+  const noPhoto = fullAnalysis();
+  noPhoto.aggregates.xray.asins = noPhoto.aggregates.xray.asins.map((x) => ({ ...x, imageUrl: null }));
+  noPhoto.aggregates.poe.asinMetrics = noPhoto.aggregates.poe.asinMetrics.map((x) => ({ ...x, imageUrl: null }));
+  noPhoto.results = compute(noPhoto);
+  assert.equal(noPhoto.results.hero, null);
+  const w2 = makeWindow().w; const el2 = w2.document.getElementById("d"); w2.FBARender.render(el2, noPhoto, {});
+  assert.equal(el2.querySelector("#sec-hero .herophoto"), null, "пустой рамки нет");
+  assert.match(el2.querySelector("#sec-hero h1").textContent, /car sound deadening mat/);
+});

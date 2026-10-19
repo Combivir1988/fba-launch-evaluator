@@ -50,7 +50,7 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
     return old;
   }
 
-  const metaCols = (core) => { const m = metaFromCore(core); return [m.niche, m.coreKeyword, m.verdict, m.c1 === null ? null : Math.round(m.c1), m.score, m.sources, m.aiDone, m.patentsDone]; };
+  const metaCols = (core) => { const m = metaFromCore(core); return [m.niche, m.coreKeyword, m.verdict, m.c1 === null ? null : Math.round(m.c1), m.score, m.sources, m.aiDone, m.patentsDone, m.thumbUrl]; };
 
   /** Список без документов. mine — только автора userId; q — поиск по нише, ключу и имени автора. */
   async function list({ userId, mine = false, q = "", limit = 200, offset = 0 } = {}) {
@@ -62,12 +62,12 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
     const total = (await db.query(`SELECT count(*)::int AS n FROM analyses a ${JOIN_USERS} WHERE ${w}`, params)).rows[0].n;
     const lim = Math.min(Math.max(Number(limit) || 200, 1), 500), off = Math.max(Number(offset) || 0, 0);
     const rows = (await db.query(
-      `SELECT ${SELECT_META}, a.niche, a.core_keyword, a.verdict, a.c1_score, a.score, a.sources, a.ai_done, a.patents_done,
+      `SELECT ${SELECT_META}, a.niche, a.core_keyword, a.verdict, a.c1_score, a.score, a.sources, a.ai_done, a.patents_done, a.thumb_url,
               (SELECT count(*)::int FROM shares s WHERE s.analysis_id = a.id AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > now())) AS shares,
               (SELECT count(*)::int FROM analysis_versions v WHERE v.analysis_id = a.id) AS versions
          FROM analyses a ${JOIN_USERS} WHERE ${w} ORDER BY a.updated_at DESC LIMIT ${lim} OFFSET ${off}`, params)).rows;
     return { total, items: rows.map((r) => ({ ...rowMeta(r), niche: r.niche, coreKeyword: r.core_keyword, verdict: r.verdict, c1: r.c1_score, score: r.score === null ? null : Number(r.score),
-      sources: r.sources || [], aiDone: r.ai_done, patentsDone: r.patents_done, shares: r.shares, versions: r.versions, runningJobs: [] })) };
+      sources: r.sources || [], aiDone: r.ai_done, patentsDone: r.patents_done, thumbUrl: r.thumb_url || null, shares: r.shares, versions: r.versions, runningJobs: [] })) };
   }
 
   async function get(id) {
@@ -91,16 +91,16 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
     if (baseVersion === null || baseVersion === undefined) {
       try {
         const r = (await db.query(
-          `INSERT INTO analyses (id, core, niche, core_keyword, verdict, c1_score, score, sources, ai_done, patents_done, created_by, updated_by)
-           VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11) RETURNING version, updated_at`, [id, text, ...cols, user.id])).rows[0];
+          `INSERT INTO analyses (id, core, niche, core_keyword, verdict, c1_score, score, sources, ai_done, patents_done, thumb_url, created_by, updated_by)
+           VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12) RETURNING version, updated_at`, [id, text, ...cols, user.id])).rows[0];
         return { version: r.version, updatedAt: r.updated_at, created: true };
       } catch (e) { if (e.code === "23505") throw new UserError("exists", "Анализ с таким идентификатором уже есть в истории", 409); throw e; }
     }
     const r = await db.tx(async (t) => {
       const old = await archive(t, id, { force, baseVersion }, user); if (!old || old.conflict) return null;
       return (await t.query(
-        `UPDATE analyses SET core = $2::jsonb, niche = $3, core_keyword = $4, verdict = $5, c1_score = $6, score = $7, sources = $8, ai_done = $9, patents_done = $10,
-                updated_by = $11, updated_at = now(), version = version + 1 WHERE id = $1 RETURNING version, updated_at`, [id, text, ...cols, user.id])).rows[0];
+        `UPDATE analyses SET core = $2::jsonb, niche = $3, core_keyword = $4, verdict = $5, c1_score = $6, score = $7, sources = $8, ai_done = $9, patents_done = $10, thumb_url = $11,
+                updated_by = $12, updated_at = now(), version = version + 1 WHERE id = $1 RETURNING version, updated_at`, [id, text, ...cols, user.id])).rows[0];
     });
     if (!r) throw await conflict(id);
     return { version: r.version, updatedAt: r.updated_at, created: false };
@@ -127,8 +127,8 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
     const buf = aggregates && Object.keys(aggregates).length ? gz(aggregates) : null;
     if (buf && buf.length > MAX_AGG_GZ) throw new UserError("too_large", "Отчёты слишком большие для хранения", 413);
     const r = (await db.query(
-      `INSERT INTO analyses (id, core, aggregates_gz, niche, core_keyword, verdict, c1_score, score, sources, ai_done, patents_done, created_by, updated_by)
-       VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12) RETURNING version`, [id, text, buf, ...metaCols(next), user.id])).rows[0];
+      `INSERT INTO analyses (id, core, aggregates_gz, niche, core_keyword, verdict, c1_score, score, sources, ai_done, patents_done, thumb_url, created_by, updated_by)
+       VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13) RETURNING version`, [id, text, buf, ...metaCols(next), user.id])).rows[0];
     return { id, version: r.version };
   }
 
@@ -148,8 +148,8 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
     if (buf && buf.length > MAX_AGG_GZ) throw new UserError("too_large", "Отчёты слишком большие для хранения", 413);
     const date = (v) => { const d = new Date(v); return Number.isNaN(d.getTime()) || d.getTime() > Date.now() ? new Date() : d; };
     const r = (await db.query(
-      `INSERT INTO analyses (id, core, aggregates_gz, niche, core_keyword, verdict, c1_score, score, sources, ai_done, patents_done, created_by, updated_by, created_at, updated_at)
-       VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13,$14) ON CONFLICT (id) DO NOTHING RETURNING id`,
+      `INSERT INTO analyses (id, core, aggregates_gz, niche, core_keyword, verdict, c1_score, score, sources, ai_done, patents_done, thumb_url, created_by, updated_by, created_at, updated_at)
+       VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13,$14,$15) ON CONFLICT (id) DO NOTHING RETURNING id`,
       [id, text, buf, ...metaCols(core), user.id, date(core.createdAt), date(core.updatedAt)])).rows[0];
     return { id, imported: Boolean(r) };
   }
@@ -182,8 +182,8 @@ export function createAnalyses(db, { now = () => Date.now() } = {}) {
     const core = { ...v.core, id, updatedAt: new Date(now()).toISOString() }; const text = checkCore(id, core); const cols = metaCols(core);
     const ok = await db.tx(async (t) => {
       const old = await archive(t, id, { withAgg: Boolean(v.aggregates_gz), reason: "restore", force: true }, user); if (!old) return false;
-      await t.query(`UPDATE analyses SET core = $2::jsonb, niche = $3, core_keyword = $4, verdict = $5, c1_score = $6, score = $7, sources = $8, ai_done = $9, patents_done = $10, updated_by = $11, updated_at = now(), version = version + 1,
-          aggregates_gz = COALESCE($12, aggregates_gz) WHERE id = $1`, [id, text, ...cols, user.id, v.aggregates_gz]);
+      await t.query(`UPDATE analyses SET core = $2::jsonb, niche = $3, core_keyword = $4, verdict = $5, c1_score = $6, score = $7, sources = $8, ai_done = $9, patents_done = $10, thumb_url = $11, updated_by = $12, updated_at = now(), version = version + 1,
+          aggregates_gz = COALESCE($13, aggregates_gz) WHERE id = $1`, [id, text, ...cols, user.id, v.aggregates_gz]);
       return true;
     });
     if (!ok) throw NOT_FOUND();

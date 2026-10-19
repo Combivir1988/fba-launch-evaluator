@@ -22,7 +22,8 @@ test("splitDoc/joinDoc: round-trip на реальных фикстурах, л�
   assert.ok(kb < 100, `core ${kb.toFixed(0)} KB`);
   assert.deepEqual(meta.sources.sort(), ["cerebro", "poe", "xray"]);
   assert.equal(meta.niche, a.niche); assert.equal(meta.aiDone, false); assert.equal(typeof meta.c1, "number"); assert.ok(meta.verdict);
-  assert.deepEqual(metaFromCore({}), { niche: "", coreKeyword: "", verdict: null, c1: null, score: null, sources: [], aiDone: false, patentsDone: false, configDone: false });
+  assert.deepEqual(metaFromCore({}), { niche: "", coreKeyword: "", verdict: null, c1: null, score: null, sources: [], aiDone: false, patentsDone: false, configDone: false, thumbUrl: null });
+  assert.ok(meta.thumbUrl && meta.thumbUrl.startsWith("http"), "фото ниши в сводке для списка: " + meta.thumbUrl);
 });
 
 test("coreSignature не зависит от меток времени, но зависит от содержимого", () => {

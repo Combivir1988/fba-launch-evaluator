@@ -12,7 +12,7 @@ const DAY = 86400000; const code = (c) => (e) => e.code === c;
 before(async () => { db = await testDb(); });
 after(async () => { await db.close(); });
 beforeEach(async () => {
-  await db.reset(); clock = Date.parse("2026-09-19T10:00:00Z");
+  await db.reset(); clock = Date.now(); // не прибивать к дате: счётчик активных ссылок в списке сверяет срок с SQL now(), а не с нашими часами
   A = createAnalyses(db); SH = createShares(db, A, { now: () => clock, publicUrl: "https://app.example" });
   anna = await db.makeUser({ login: "anna", name: "Анна" }); ivan = await db.makeUser({ login: "ivan", name: "Иван" }); olga = await db.makeUser({ login: "olga", name: "Ольга" }); boss = await db.makeUser({ login: "boss", name: "Босс", role: "admin" });
   doc = fixtureAnalysis(); const { core, aggregates } = splitDoc(doc);

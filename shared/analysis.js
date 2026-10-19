@@ -56,6 +56,7 @@ export function metaFromCore(core = {}) {
     c1: num(core.results?.criterion1?.okCount), score: num(core.results?.scorecard?.total),
     sources: Object.entries(core.sources || {}).filter(([, v]) => v).map(([k]) => k),
     aiDone: Boolean(core.ai), patentsDone: Boolean(core.patents), configDone: Boolean(core.config?.table),
+    thumbUrl: String(core.results?.hero?.imageUrl || "").slice(0, 500) || null,
   };
 }
 

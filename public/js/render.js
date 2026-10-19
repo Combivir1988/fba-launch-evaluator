@@ -112,15 +112,21 @@
     const C = A.config || {}; const st = C.tz ? `ТЗ: ${C.tz.rows.length} требований` : C.table ? `извлечено ${Object.keys(C.table.rows).length} листингов, ТЗ не составлено` : C.schema ? `схема: ${C.schema.fields.length} полей, извлечение не запущено` : "не начат";
     return `<div class="noprint" style="margin-top:.4rem"><a href="#sec-config" class="chip ${C.table ? "ok" : "na"}" data-goto="sec-config" title="Открыть вкладку «Этап 2 · конфигурация продукта и ТЗ»">Этап 2 · конфигурация продукта и ТЗ: ${esc(st)} →</a></div>`;
   }
+  /** Фото ниши рядом с названием: «dog calming diffuser» ни о чём не говорит, пока не увидишь товар (2026-10-19). */
+  function heroPhoto(R) {
+    const h = R.hero; if (!h?.imageUrl) return "";
+    const tip = `${h.title || h.asin}${h.brand ? " · " + h.brand : ""} — самый релевантный листинг выгрузки${h.source === "poe" ? " POE" : " Xray"}`;
+    return `<a class="herophoto" href="https://www.amazon.com/dp/${esc(h.asin)}" target="_blank" rel="noopener" title="${esc(tip)}"><img src="${esc(h.imageUrl)}" alt="${esc(h.title || h.asin)}" loading="lazy" referrerpolicy="no-referrer"></a>`;
+  }
   function secHero(A, R, o) {
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;
     const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(k === "poe" && m.parts?.length > 1 ? m.parts.map((p) => p.nicheTitle || p.fileName).join(" + ") : m.fileName || "")}">${SRC_LABEL[k]}${k === "poe" && m.parts?.length > 1 ? ` · ${m.parts.length} ниш(и)` : ""} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
     const snap = o.snapshot ? `<div class="notice info snapnote">Подготовил(а): <b>${esc(o.snapshot.preparedBy || "—")}</b> · снимок от ${fmtDate(o.snapshot.snapshotAt)} · только чтение${o.snapshot.mode === "no_economics" ? " · закупочная экономика скрыта автором" : ""}</div>` : "";
     return `${snap}<div class="hero">
-      <div><h1>${esc(A.niche || "Без названия")}</h1>
+      <div class="heromain">${heroPhoto(R)}<div class="herotext"><h1>${esc(A.niche || "Без названия")}</h1>
         <div class="meta">Ключ: <b>${esc(A.coreKeyword || "—")}</b> · ${esc(A.marketplace || "US")} · расчёт ${fmtDate(R.computedAt)} · методология ${esc(R.methodologyVersion || "")}</div>
         <div class="chips" style="margin-top:.4rem">${srcs || '<span class="chip na">файлы не загружены</span>'}</div>
-        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${mergedNote(A)}${overlapNote(R)}${bandNote(R, o)}${stage2Note(A, R, o)}</div>
+        <p class="muted" style="margin-top:.4rem">${esc(R.gate0.note)}</p>${mergedNote(A)}${overlapNote(R)}${bandNote(R, o)}${stage2Note(A, R, o)}</div></div>
       <div class="verdict ${esc(v)}"><div class="k muted">${ai ? "Вердикт AI" + (ai.adjustedByRules ? " (скорректирован правилами)" : "") : "Потолок по правилам"}</div>
         <div class="big">${esc(VLABEL[v])}</div>
         <div class="muted">Критерий 1: <b>${R.criterion1.okCount} из 8</b> · решающий: ${esc(ai?.decisiveGate || R.verdict.decisiveGate || "—")}</div>
@@ -1174,6 +1180,8 @@
     if (!html) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden"); el.innerHTML = html;
     try { annotate(el, id); if (document.__fbaTipsHide) document.__fbaTipsHide(); } catch (e) { console.error("tips", id, e); }
+    // Фото листинга может не открыться (Amazon убрал картинку, нет сети) — тогда убираем рамку. Через addEventListener: inline-обработчики запрещены нашей CSP.
+    for (const img of el.querySelectorAll(".herophoto img")) img.addEventListener("error", () => img.closest(".herophoto")?.remove(), { once: true });
     if (def[2]) try { def[2](container, R, A); } catch (e) { console.error("chart", id, e); }
   }
   function update(container, A, opts = {}, ids = ECON_DEPENDENT) {

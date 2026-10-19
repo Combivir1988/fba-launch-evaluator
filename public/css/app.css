@@ -137,6 +137,10 @@ body.booting #boot { display: flex; position: fixed; inset: 0; align-items: cent
 .section > h2 .chip { font-size: .75rem; }
 .hero { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
 .hero .meta { color: var(--text-2); font-size: .9rem; }
+.heromain { display: flex; gap: .9rem; align-items: flex-start; }
+.herotext { min-width: 0; }
+.herophoto { flex: 0 0 auto; display: block; }
+.herophoto img { width: 84px; height: 84px; object-fit: contain; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); }
 .verdict { border-radius: var(--radius); padding: .8rem 1rem; border: 1px solid var(--border); }
 .verdict.go { background: var(--ok-bg); border-color: var(--ok); } .verdict.go_conditional { background: var(--warn-bg); border-color: var(--warn); } .verdict.rework { background: var(--pending-bg); border-color: var(--pending); } .verdict.no_go { background: var(--fail-bg); border-color: var(--fail); }
 .verdict .big { font-size: 1.5rem; font-weight: 800; }
@@ -187,8 +191,10 @@ tr.leader td { font-weight: 600; }
 .overlay { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; z-index: 50; padding: 16px; }
 .login { width: min(420px, 100%); padding: 1.2rem; }
 .hist { display: grid; gap: .5rem; }
-.histrow { display: grid; grid-template-columns: 1fr auto; gap: .5rem; align-items: center; padding: .6rem .8rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.histrow { display: grid; grid-template-columns: 52px 1fr auto; gap: .5rem; align-items: center; padding: .6rem .8rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .histrow .t { font-weight: 600; } .histrow .m { font-size: .8rem; color: var(--muted); }
+.histthumb { width: 52px; height: 52px; object-fit: contain; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); }
+.histthumb.empty { border-style: dashed; }
 .histrow .b { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
 .thr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .6rem; }
 .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: .55rem .9rem; border-radius: 8px; z-index: 60; box-shadow: var(--shadow); max-width: 92vw; }
