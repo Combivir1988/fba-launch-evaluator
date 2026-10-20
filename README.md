@@ -23,6 +23,7 @@
 ```bash
 npm install
 cp .env.example .env      # OPENROUTER_API_KEY (или ANTHROPIC_API_KEY), ADMIN_LOGIN, ADMIN_PASSWORD
+                          # .env читается сам (--env-file-if-exists); переменная из окружения всегда главнее файла
 npm test                  # ~100 тестов: расчёты на реальных фикстурах + аккаунты на Postgres в процессе (PGlite)
 npm start                 # http://localhost:3000
 ```
