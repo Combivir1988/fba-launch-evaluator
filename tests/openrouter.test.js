@@ -135,3 +135,9 @@ test("пустой ответ на исчерпанном лимите объя�
   await assert.rejects(() => openrouterJson({ cfg: cfg(), model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl, maxTokens: 2500 }),
     (e) => /\u0438\u0437\u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432\u0430\u043b\u0430 \u0432\u0435\u0441\u044c \u043b\u0438\u043c\u0438\u0442/.test(e.message) && /2500/.test(e.message));
 });
+
+test("«хватает не на весь ответ» — беда временная (резерв держит соседний запрос), поэтому задача вправе повторить", async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({ error: { message: "This request requires more credits, or fewer max_tokens. You requested up to 2853 tokens, but can only afford 1200." } }), { status: 402 });
+  await assert.rejects(() => openrouterJson({ cfg: cfg(), model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl, maxTokens: 2853 }),
+    (e) => e.code === "billing" && e.retryable === true);
+});

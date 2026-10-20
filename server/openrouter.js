@@ -196,7 +196,9 @@ function classify(status, txt, label = "OpenRouter") {
   msg = String(msg).slice(0, 300);
   const google = label !== "OpenRouter";
   if (status === 401 || (google && status === 403)) return { code: "auth", message: `${label}: неверный API-ключ`, retryable: false };
-  if (status === 402) return { code: "billing", message: "OpenRouter: недостаточно кредитов — пополните баланс на openrouter.ai/settings/credits", retryable: false };
+  if (status === 402) return /can only afford/i.test(msg)
+    ? { code: "billing", message: "OpenRouter: остатка кредитов хватает не на весь ответ (параллельные запросы делят остаток) — пополните баланс на openrouter.ai/settings/credits", retryable: true }
+    : { code: "billing", message: "OpenRouter: недостаточно кредитов — пополните баланс на openrouter.ai/settings/credits", retryable: false };
   if (status === 429) return { code: "rate_limited", message: google ? "Google AI Studio: исчерпан бесплатный лимит запросов (в минуту или за день) — повторите через минуту или выберите другую модель" : "OpenRouter: лимит запросов — повторите позже", retryable: true };
   if (status === 408 || status === 504) return { code: "upstream", message: `${label}: таймаут модели`, retryable: true };
   if (status === 503 && google) return { code: "upstream", message: "Google AI Studio: модель перегружена (высокий спрос на бесплатном уровне) — повторите через минуту или выберите другую модель", retryable: true };
