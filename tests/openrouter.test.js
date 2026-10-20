@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractJson, openrouterStream, parseModelList } from "../server/openrouter.js";
+import { extractJson, openrouterStream, openrouterJson, parseModelList } from "../server/openrouter.js";
 import { configFromEnv, VERDICT_SCHEMA } from "../server/claude.js";
 import { mockVerdict } from "../server/mock-verdict.js";
 
@@ -89,4 +89,49 @@ test("окно модели меньше запроса: просим ровно
   assert.equal(ev.at(-1).event, "done", JSON.stringify(ev.at(-1)).slice(0, 200));
   assert.equal(asked[0], 32000); assert.equal(asked[1], 32768 - 13000 - 512, "просим остаток окна");
   assert.ok(ev.some((e) => e.event === "thinking" && /Окно модели/.test(e.data.text)), "объяснили человеку");
+});
+
+// ——— JSON-вызовы (этап 2, патенты): размышления не должны съедать лимит ответа ———
+const SCHEMA = { type: "object", additionalProperties: false, required: ["ok"], properties: { ok: { type: "string" } } };
+const jsonReply = (content, extra = {}) => new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: extra.finish || "stop" }], usage: extra.usage || {} }), { status: 200, headers: { "content-type": "application/json" } });
+
+test("JSON-запрос просит модель не размышлять: иначе Claude тратит весь max_tokens на reasoning и отвечает пустотой", async () => {
+  const bodies = [];
+  const fetchImpl = async (url, init) => { bodies.push(JSON.parse(init.body)); return jsonReply(JSON.stringify({ ok: "да" })); };
+  const out = await openrouterJson({ cfg: cfg(), model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl });
+  assert.deepEqual(out, { ok: "да" });
+  assert.deepEqual(bodies[0].reasoning, { enabled: false });
+
+  bodies.length = 0; // с OPENROUTER_REASONING=1 размышления просим явно, с глубиной из настроек
+  await openrouterJson({ cfg: { ...cfg(), openrouterReasoning: true, effort: "low" }, model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl });
+  assert.deepEqual(bodies[0].reasoning, { effort: "low" });
+
+  bodies.length = 0; // Google AI Studio такого параметра не знает — ему не шлём
+  await openrouterJson({ cfg: { ...cfg(), googleKey: "g" }, model: "aistudio/gemini-x", system: "s", user: "u", schema: SCHEMA, fetchImpl });
+  assert.equal("reasoning" in bodies[0], false);
+});
+
+test("«хватает только на N токенов»: повторяем запрос ровно на разрешённый лимит, а не падаем с billing", async () => {
+  const sent = []; let first = true;
+  const fetchImpl = async (url, init) => {
+    sent.push(JSON.parse(init.body));
+    if (first) { first = false; return new Response(JSON.stringify({ error: { message: "This request requires more credits, or fewer max_tokens. You requested up to 8000 tokens, but can only afford 2917." } }), { status: 402 }); }
+    return jsonReply(JSON.stringify({ ok: "да" }));
+  };
+  const out = await openrouterJson({ cfg: cfg(), model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl, maxTokens: 8000 });
+  assert.deepEqual(out, { ok: "да" });
+  assert.deepEqual(sent.map((b) => b.max_tokens), [8000, 2853], "второй заход — на то, что разрешили");
+});
+
+test("если 402 без подсказки про лимит — это честный отказ по деньгам, без повторов", async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls++; return new Response(JSON.stringify({ error: { message: "Insufficient credits" } }), { status: 402 }); };
+  await assert.rejects(() => openrouterJson({ cfg: cfg(), model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl }), (e) => e.code === "billing");
+  assert.equal(calls, 1);
+});
+
+test("пустой ответ на исчерпанном лимите объясняется словами, а не «модель не вернула JSON»", async () => {
+  const fetchImpl = async () => jsonReply("", { finish: "length", usage: { completion_tokens_details: { reasoning_tokens: 2500 } } });
+  await assert.rejects(() => openrouterJson({ cfg: cfg(), model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl, maxTokens: 2500 }),
+    (e) => /\u0438\u0437\u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432\u0430\u043b\u0430 \u0432\u0435\u0441\u044c \u043b\u0438\u043c\u0438\u0442/.test(e.message) && /2500/.test(e.message));
 });

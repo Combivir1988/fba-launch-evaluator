@@ -242,21 +242,40 @@ async function openrouterJsonOnce({ cfg, model, system, user, schema, signal, fe
     { name: "json_object", response_format: { type: "json_object" }, sys: hint("") },
     { name: "text", response_format: undefined, sys: hint(", без markdown") },
   ];
-  let last = null;
-  for (const mode of ep.google ? modes.filter((m) => m.name !== "json_schema") : modes) {
-    const req = { model: ep.model, messages: [{ role: "system", content: mode.sys }, { role: "user", content: user }], temperature, max_tokens: maxTokens };
+  let last = null, capTokens = 0; // capTokens: OpenRouter сам говорит, сколько токенов ответа мы можем себе позволить на остатке кредитов
+  const send = (mode, mt) => {
+    const req = { model: ep.model, messages: [{ role: "system", content: mode.sys }, { role: "user", content: user }], temperature, max_tokens: mt };
     if (mode.response_format) req.response_format = mode.response_format;
-    const res = await fetchImpl(ep.url, { method: "POST", headers, body: JSON.stringify(req), signal });
+    // Размышления съедают тот же max_tokens: Claude 5 думает по умолчанию и возвращал content: null, израсходовав весь лимит
+    // на reasoning (замер 2026-10-20: 2500 из 2500 токенов — размышления, ответа нет). Здесь думать не о чем — мы просим JSON по схеме.
+    if (!ep.google) req.reasoning = cfg.openrouterReasoning ? { effort: ["low", "medium", "high"].includes(cfg.effort) ? cfg.effort : "medium" } : { enabled: false };
+    return fetchImpl(ep.url, { method: "POST", headers, body: JSON.stringify(req), signal });
+  };
+  for (const mode of ep.google ? modes.filter((m) => m.name !== "json_schema") : modes) {
+    let res = await send(mode, capTokens || maxTokens);
+    let txt = null;
     if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      const err = classify(res.status, txt, ep.label);
-      if ((res.status === 400 || res.status === 404) && /response_format|json_schema|structured|schema|provider/i.test(txt) && mode.name !== "text") { last = err; continue; }
+      txt = await res.text().catch(() => "");
+      // «requires more credits, or fewer max_tokens … can only afford N» — просим ровно столько, сколько разрешено, и пробуем ещё раз.
+      const afford = res.status === 402 ? /can only afford (\d+)/i.exec(txt) : null;
+      if (afford && !capTokens) {
+        capTokens = Math.max(512, Number(afford[1]) - 64);
+        log("warn", "ai json: лимит ответа урезан под остаток кредитов", { model: ep.model, maxTokens, capTokens });
+        res = await send(mode, capTokens); txt = res.ok ? null : await res.text().catch(() => "");
+      }
+    }
+    if (!res.ok) {
+      const err = classify(res.status, txt || "", ep.label);
+      if ((res.status === 400 || res.status === 404) && /response_format|json_schema|structured|schema|provider/i.test(txt || "") && mode.name !== "text") { last = err; continue; }
       throw Object.assign(new Error(err.message), { code: err.code, retryable: err.retryable });
     }
     const j = await res.json().catch(() => null);
     const text = j?.choices?.[0]?.message?.content ?? "";
     const obj = extractJson(typeof text === "string" ? text : JSON.stringify(text));
-    if (!obj) { last = { code: "parse", message: `Модель не вернула JSON (${mode.name})` }; continue; }
+    const finish = j?.choices?.[0]?.finish_reason, spentOnThinking = j?.usage?.completion_tokens_details?.reasoning_tokens || 0;
+    if (!obj) { last = { code: "parse", message: !text && finish === "length"
+      ? `Модель ${model} израсходовала весь лимит ответа (${capTokens || maxTokens} токенов)${spentOnThinking ? ` на размышления (${spentOnThinking})` : ""} и ничего не ответила — выберите другую модель или пополните баланс`
+      : `Модель не вернула JSON (${mode.name})${finish === "length" ? `: ответ оборван на лимите ${capTokens || maxTokens} токенов` : ""}` }; continue; }
     const v = validateVerdict(obj, schema);
     if (!v.ok) { last = { code: "parse", message: "Ответ не по схеме: " + v.errors.slice(0, 4).join("; ") }; if (mode.name === "text") break; continue; }
     return obj;
