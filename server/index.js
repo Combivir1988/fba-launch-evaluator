@@ -300,6 +300,15 @@ if (isMain) {
   const cfg = configFromEnv();
   if (!cfg.mock && cfg.provider === "anthropic" && !cfg.apiKey) log("warn", "ANTHROPIC_API_KEY не задан — AI-анализ недоступен (MOCK_AI=1 для демо или AI_PROVIDER=openrouter)");
   if (!cfg.mock && cfg.provider === "openrouter" && !cfg.openrouterKey) log("warn", "OPENROUTER_API_KEY не задан — AI-анализ недоступен");
+  // Живой ли ключ: мёртвый ключ OpenRouter лечится за минуту, но ищется часами — все задачи просто падают с «неверный API-ключ»
+  // (прод 2026-10-20: на Railway лежал удалённый ключ, локально — рабочий; схема строилась на Google AI Studio и никто не замечал).
+  if (!cfg.mock && cfg.openrouterKey) {
+    fetch("https://openrouter.ai/api/v1/key", { headers: { Authorization: "Bearer " + cfg.openrouterKey } })
+      .then(async (r) => { const d = r.ok ? await r.json().catch(() => null) : null;
+        if (r.ok) log("info", "ключ OpenRouter принят", { label: d?.data?.label || null, freeTier: d?.data?.is_free_tier ?? null });
+        else log("error", "ключ OpenRouter НЕ принят — все задачи через OpenRouter будут падать", { status: r.status, detail: (await r.text().catch(() => "")).slice(0, 120) }); })
+      .catch((e) => log("warn", "ключ OpenRouter проверить не удалось", { detail: e?.message }));
+  }
   let db;
   try {
     db = await connect(cfg);
