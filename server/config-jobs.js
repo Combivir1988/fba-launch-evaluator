@@ -85,7 +85,7 @@ export async function* extractStream(body, cfg, deps = {}) {
     const got = yield* fetchMissing(asins, body.listings, cfg, deps); fresh = got.fresh;
     const ok = asins.filter((a) => got.listings[a] && !got.listings[a].error);
     const batches = []; for (let i = 0; i < ok.length; i += batchSize) batches.push(ok.slice(i, i + batchSize));
-    const items = []; let doneB = 0; const errors = [];
+    const items = []; let doneB = 0; const errors = []; const stoodIn = new Set(); // модели, которые отвечали вместо выбранной
     yield { event: "stage", data: { stage: "ai", done: 0, total: batches.length, text: `AI заполняет таблицу: 0/${batches.length} пачек`, cost: got.cost } };
     let bi = 0;
     // Ответ не влез в лимит токенов (так бывает, когда остаток кредитов режет max_tokens) — делим пачку пополам,
@@ -95,7 +95,7 @@ export async function* extractStream(body, cfg, deps = {}) {
       const listings = batch.map((a) => got.listings[a]);
       if (cfg.mock) return mockExtract({ schema, listings }).items;
       try {
-        const r = await retryAi(() => aiJson({ cfg, model, system: SYS_EXTRACT, user: extractUser({ niche: body.niche, schema, listings }), schema: EXTRACT_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 8000 }), { tries: 3, pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
+        const r = await retryAi(() => aiJson({ cfg, model, system: SYS_EXTRACT, user: extractUser({ niche: body.niche, schema, listings }), schema: EXTRACT_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 8000, onFallback: ({ to }) => stoodIn.add(to) }), { tries: 3, pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
         return r.items || [];
       } catch (e) {
         if (!tooLong(e) || batch.length < 2 || deps.signal?.aborted) throw e;
@@ -113,7 +113,8 @@ export async function* extractStream(body, cfg, deps = {}) {
     for (const o of outs) items.push(...o);
     const table = mergeExtraction({ schema, prevTable: body.prevTable || null, items, listings: got.listings, asins, model: cfg.mock ? "mock" : model, cost: got.cost });
     if (errors.length) table.aiErrors = errors.map((e) => ({ asins: e.asins, message: String(e.message || "").slice(0, 200) }));
-    log("info", "config extract done", { asins: asins.length, loaded: ok.length, batches: batches.length, errors: errors.length, cost: got.cost, ms: Date.now() - t0 });
+    if (stoodIn.size) table.stoodIn = [...stoodIn];
+    log("info", "config extract done", { asins: asins.length, loaded: ok.length, batches: batches.length, errors: errors.length, stoodIn: [...stoodIn], cost: got.cost, ms: Date.now() - t0 });
     yield { event: "done", data: { table, schema, listings: got.fresh, cost: got.cost, model: table.model, durationMs: Date.now() - t0 } };
   } catch (e) { log("warn", "config extract error", toErr(e)); const partial = e?.partial || fresh; if (partial && Object.keys(partial).length) yield { event: "stage", data: { stage: "partial", listings: partial } }; yield { event: "error", data: toErr(e) }; }
 }

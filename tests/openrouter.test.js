@@ -141,3 +141,17 @@ test("«хватает не на весь ответ» — беда времен
   await assert.rejects(() => openrouterJson({ cfg: cfg(), model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl, maxTokens: 2853 }),
     (e) => e.code === "billing" && e.retryable === true);
 });
+
+test("кончились кредиты у выбранной модели — доделывает бесплатная, и об этом сообщают наверх", async () => {
+  const asked = []; const fell = [];
+  const fetchImpl = async (url, init) => {
+    const b = JSON.parse(init.body); asked.push(b.model);
+    if (!b.model.endsWith(":free")) return new Response(JSON.stringify({ error: { message: "Insufficient credits" } }), { status: 402 });
+    return jsonReply(JSON.stringify({ ok: "да" }));
+  };
+  const c = { ...cfg({ openrouterModels: ["test/model", "free/model:free"] }), openrouterKey: "k" };
+  const out = await openrouterJson({ cfg: c, model: "test/model", system: "s", user: "u", schema: SCHEMA, fetchImpl, onFallback: (x) => fell.push(x) });
+  assert.deepEqual(out, { ok: "да" });
+  assert.deepEqual(asked, ["test/model", "free/model:free"]);
+  assert.deepEqual(fell, [{ from: "test/model", to: "free/model:free" }], "таблица должна знать, кто на самом деле ответил");
+});

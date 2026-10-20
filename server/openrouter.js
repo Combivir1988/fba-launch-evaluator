@@ -221,10 +221,15 @@ export async function openrouterJson(args) {
   ].slice(0, 4);
   let last = null;
   for (const cur of candidates) {
-    try { return await openrouterJsonOnce({ ...args, model: cur }); }
+    try {
+      const out = await openrouterJsonOnce({ ...args, model: cur });
+      if (cur !== chosen) args.onFallback?.({ from: chosen, to: cur }); // кто ответил на самом деле — чтобы таблица не врала про модель
+      return out;
+    }
     catch (e) {
       last = cur === chosen ? e : last || e; // наверх идёт отказ выбранной модели
-      if (["auth", "billing", "refusal", "bad_request", "aborted"].includes(e?.code) || e?.retryable === false || signalAborted(args.signal)) throw e;
+      // billing здесь НЕ фатален: запасные модели бесплатные, деньги им не нужны (прод 2026-10-20: из-за этого терялись пачки целиком)
+      if (["auth", "refusal", "bad_request", "aborted"].includes(e?.code) || (e?.retryable === false && e?.code !== "billing") || signalAborted(args.signal)) throw e;
       if (cur !== candidates.at(-1)) log("warn", "ai json: переход на запасную модель", { from: cur, code: e?.code });
     }
   }
