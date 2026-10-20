@@ -17,13 +17,15 @@ const toErr = (e) => ({ code: e?.code || "upstream", message: e?.message || Stri
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Вызов AI с повторами: перегрузка бесплатной модели (429/503) — обычное дело, а страницы уже оплачены. Ошибка ключа не повторяется;
  *  ответ не по схеме (parse) — один повтор сразу: модель недетерминирована, вторая попытка обычно проходит. */
+/** Ответ не поместился в лимит токенов: повторять бессмысленно, помогает только меньшая пачка. */
+const TOO_LONG = /оборван|израсходовала/;
 async function retryAi(fn, { tries = 3, pauseMs = 15000, signal } = {}) {
   let last, parseRetries = 0;
   for (let i = 0; i < tries; i++) {
     try { return await fn(); }
     catch (e) {
       last = e; if (e?.code === "auth" || signal?.aborted) throw e;
-      if (e?.code === "parse") { if (parseRetries++ >= 1) throw e; log("warn", "ai answer not by schema, retrying", { message: String(e.message).slice(0, 200) }); continue; }
+      if (e?.code === "parse") { if (parseRetries++ >= 1 || TOO_LONG.test(String(e.message))) throw e; /* оборванный ответ повтором не лечится — его лечит деление пачки */ log("warn", "ai answer not by schema, retrying", { message: String(e.message).slice(0, 200) }); continue; }
       if (e?.retryable === false || i === tries - 1) throw e; await sleep(pauseMs * (i + 1));
     }
   }
@@ -86,11 +88,22 @@ export async function* extractStream(body, cfg, deps = {}) {
     const items = []; let doneB = 0; const errors = [];
     yield { event: "stage", data: { stage: "ai", done: 0, total: batches.length, text: `AI заполняет таблицу: 0/${batches.length} пачек`, cost: got.cost } };
     let bi = 0;
+    // Ответ не влез в лимит токенов (так бывает, когда остаток кредитов режет max_tokens) — делим пачку пополам,
+    // вплоть до одного листинга. Иначе вся пачка пропадала целиком, хотя страницы за неё уже оплачены (2026-10-20).
+    const tooLong = (e) => e?.code === "parse" && TOO_LONG.test(String(e?.message || ""));
     const runBatch = async (batch) => {
       const listings = batch.map((a) => got.listings[a]);
       if (cfg.mock) return mockExtract({ schema, listings }).items;
-      const r = await retryAi(() => aiJson({ cfg, model, system: SYS_EXTRACT, user: extractUser({ niche: body.niche, schema, listings }), schema: EXTRACT_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 8000 }), { tries: 3, pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
-      return r.items || [];
+      try {
+        const r = await retryAi(() => aiJson({ cfg, model, system: SYS_EXTRACT, user: extractUser({ niche: body.niche, schema, listings }), schema: EXTRACT_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 8000 }), { tries: 3, pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
+        return r.items || [];
+      } catch (e) {
+        if (!tooLong(e) || batch.length < 2 || deps.signal?.aborted) throw e;
+        const mid = Math.ceil(batch.length / 2);
+        log("warn", "config extract: ответ не влез — делим пачку", { was: batch.length, now: [mid, batch.length - mid] });
+        const head = await runBatch(batch.slice(0, mid));
+        return head.concat(await runBatch(batch.slice(mid)));
+      }
     };
     const worker = async (out) => { while (bi < batches.length && !deps.signal?.aborted) { const b = batches[bi++]; try { out.push(...(await runBatch(b))); } catch (e) { errors.push({ asins: b, message: e?.message }); if (e?.code === "auth") throw e; } doneB++; } };
     // события между пачками: воркеры пишут в items, генератор опрашивает прогресс

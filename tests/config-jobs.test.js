@@ -182,3 +182,21 @@ test("маршруты: health.scrapfly, 400 без asins/schema/payload, зад
   const buf = Buffer.from(await d.arrayBuffer()); assert.equal(buf.toString("latin1", 0, 2), "PK"); assert.ok(docxXml(buf).includes("Коробка"));
   assert.equal((await fetch(`${base}/api/tz/docx`, { method: "POST", headers: h, body: JSON.stringify({ tz: {} }) })).status, 400);
 });
+
+test("пачка не влезла в лимит ответа — делим её пополам, а не теряем оплаченные страницы", async () => {
+  const j = fixture("B0BZHHSV52");
+  const fetchImpl = async () => res(200, j);
+  const asins = [asin(1), asin(2), asin(3), asin(4)];
+  const sizes = [];
+  const aiJson = async ({ user }) => {
+    const n = (user.match(/^ASIN B0/gm) || []).length; sizes.push(n);
+    if (n > 1) { const e = new Error(`Модель не вернула JSON (text): ответ оборван на лимите 2853 токенов`); e.code = "parse"; throw e; }
+    const a = /^ASIN (B0[A-Z0-9]+)/m.exec(user)[1];
+    return { items: [{ asin: a, values: [{ field: "material", value: "латекс", source: "title" }] }] };
+  };
+  const ev = await collect(extractStream({ niche: "n", schema, asins, listings: {}, batchSize: 4 }, live, { fetchImpl, aiJson, aiParallel: 1, aiPauseMs: 0 }));
+  const d = last(ev, "done");
+  assert.ok(d, "задача дошла до конца: " + JSON.stringify(last(ev, "error") || {}));
+  assert.deepEqual(Object.keys(d.table.rows).sort(), asins.slice().sort(), "извлечены все четыре листинга");
+  assert.deepEqual(sizes, [4, 2, 1, 1, 2, 1, 1], "4 → 2+2 → по одному");
+});
