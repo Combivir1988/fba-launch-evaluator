@@ -60,15 +60,25 @@ export function criterion1(p) {
     }
     items["1d"] = finalize(it, mo["1d"], (v) => v < t.reviewsOk, (v) => v > t.reviewsFail);
   }
+  // spec 016: что именно значит присутствие Amazon — своя марка, доминирующий вендор или обычный конкурент
+  const az = p.amazon || null;
+  const azHard = az ? az.level === "own" || az.level === "dominant" || az.level === "unknown" : Boolean(comp?.amazonSells);
+  const azWatch = az ? az.level === "watch" : false;
+  const azPct = (x) => Math.round((x || 0) * 100) + " %";
+  const azNote = !az || !az.present ? "" : az.level === "own" ? ` — собственная марка Amazon (${az.ownBrands.map((b) => b.brand).join(", ")}), НЕ OK при любой доле`
+    : az.level === "dominant" ? ` — вендор ${az.vendors[0]?.brand} держит ${azPct(az.maxVendorShare)}, выше порога доминации ${azPct(az.blockAt)}`
+    : az.level === "watch" ? ` — вендор ${az.vendors[0]?.brand} держит ${azPct(az.maxVendorShare)}: смотрите внимательно (порог «внимательно» ${azPct(az.watchAt)})`
+    : az.level === "normal" ? ` — это чужие бренды-вендоры, крупнейший ${azPct(az.maxVendorShare)}: обычные конкуренты` : "";
   // 1e — Доминация бренда / Amazon
   {
     const it = item({ unit: "%", threshold: `Top Brand < ${Math.round(t.topBrandShare * 100)} % и нет Amazon как продавца`, pct: true });
     if (comp?.topBrandShare !== null && comp?.topBrandShare !== undefined) {
       it.value = comp.topBrandShare; it.source = comp.source; it.brand = comp.topBrand;
       it.note = `${comp.topBrand}: ${(comp.topBrandShare * 100).toFixed(1)} % ${comp.source === "xray" ? "выручки" : "кликов (прокси)"}${comp.incumbent ? " · ваш бренд не считается барьером (вы уже в нише)" : ""}`;
-      if (comp.amazonSells) it.note += `; Amazon продаёт сам (${comp.amazonSellsSource === "user" ? "указано вручную" : "по Xray, колонка Seller"}) — НЕ OK независимо от доли`;
+      if (comp.amazonSells) it.note += `; Amazon продаёт сам (${comp.amazonSellsSource === "user" ? "указано вручную" : "по Xray, колонки Seller / Fulfillment"})${azNote}`;
     }
-    items["1e"] = finalize(it, mo["1e"], (v) => v < t.topBrandShare && !comp?.amazonSells, (v) => v >= t.topBrandShare || Boolean(comp?.amazonSells));
+    // spec 016: сам факт «Amazon продаёт» больше не валит 1e — валит своя марка Amazon или доминация вендора.
+    items["1e"] = finalize(it, mo["1e"], (v) => v < t.topBrandShare && !azHard && !azWatch, (v) => v >= t.topBrandShare || azHard);
   }
   // 1f — Top-5 брендов
   {

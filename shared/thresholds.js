@@ -49,7 +49,7 @@ export const DEFAULT_THRESHOLDS = {
   // Этап 2 — конфигурация продукта (spec 010): область страниц, кэш, пачки AI, числовые поля как дискретные
   config: { topForSchema: 40, maxAsins: 150, cacheDays: 30, batchSize: 6, numericDistinctMax: 12, minAnalogs: 5 },
   // Amazon как продавец (spec 012): block — однозначно No-Go, consider — учитывать в общей картине (1e, scorecard, чеклист); область: вся ниша или ценовой диапазон
-  amazon: { mode: "block", scope: "niche" }, // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
+  amazon: { mode: "block", scope: "niche", vendorWatch: 0.15, vendorBlock: 0.6 }, // spec 016: своя марка Amazon — No-Go всегда; вендор — по доле рынка // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
 };
 
 /** Глубокое слияние пользовательских порогов с дефолтами. */

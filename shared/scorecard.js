@@ -21,7 +21,8 @@ export function scorecard(p) {
       const x = comp.top5Share; s = x < 0.30 ? 9.5 : x < 0.45 ? 7 : x < 0.65 ? 4 : 1; notes.push(`топ-5 ${(x * 100).toFixed(0)} %`);
       const tier = comp.reviewBarrier?.tier; if (tier === "moat") { s -= 2; notes.push("ров отзывов лидера непробиваем"); } else if (tier === "medium") { s -= 1; notes.push("средний барьер отзывов"); }
       if (comp.dominant) { s -= 1; notes.push("доминирующий бренд"); }
-      if (comp.amazonSells) { s -= 2; notes.push("Amazon продаёт сам"); }
+      const azl = p.amazon?.level; // spec 016: вендор с малой долей — обычный конкурент, минуса нет
+      if (comp.amazonSells && azl !== "normal") { s -= azl === "watch" ? 1 : 2; notes.push(azl === "own" ? "Amazon продаёт свою марку" : azl === "watch" ? "Amazon продаёт вендора с заметной долей" : "Amazon продаёт сам"); }
       s = clamp(s, 0, 10);
     }
     axes.competition = { score: s, note: notes.join("; ") || "нет данных" };

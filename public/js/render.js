@@ -297,15 +297,27 @@
       options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => "SV: " + fmtN(c.parsed.x) + " запросов/мес" } } }, scales: { x: { grid, ticks: { callback: (v) => fmtN(v) } }, y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 11 } } } } } });
   }
 
-  /** Какие именно листинги продаёт сам Amazon: чип называл только число, а решение No-Go проверить было нечем (2026-10-07). */
+  /** Кто именно продаёт в нише: своя марка Amazon или чужой бренд-вендор, и насколько он велик (spec 016). */
+  const AZ_LEVEL = { own: ["fail", "собственная марка Amazon"], dominant: ["fail", "вендор доминирует"], watch: ["warn", "смотрите внимательно"], normal: ["", "обычные конкуренты"], unknown: ["warn", "отмечено вручную"] };
   function amazonBlock(R) {
     const az = R.amazon; if (!az?.present) return "";
-    const cls = az.blocks ? "fail" : "warn";
-    const head = `<b>Amazon продаёт сам ${esc(az.scopeLabel)}</b>${az.blocks ? " — это решающий гейт: вердикт No-Go" : " — учитывается в общей картине (1e, scorecard, чеклист)"}. Режим и область меняются во вкладке «Пороги» → «Amazon как продавец».`;
-    if (!az.listings.length) return `<div class="notice ${cls}" style="margin-top:.6rem">${head} ${az.source === "user" ? "Отмечено вручную в чеклисте — конкретных листингов в Xray нет, проверьте выдачу сами." : "Листинги в отчёте не найдены."}</div>`;
-    const rows = az.listings.map((l) => `<tr><td><a href="${esc(l.url || "https://www.amazon.com/dp/" + l.asin)}" target="_blank" rel="noopener">${esc(l.asin)}</a>${l.title ? `<br><small class="muted">${esc(String(l.title).slice(0, 80))}</small>` : ""}</td><td>${esc(l.brand || "—")}</td><td class="num">${fmtMoney(l.price, 2)}</td><td class="num">${fmtK(l.revenue)}</td><td class="num">${fmtPct(l.share, 1)}</td><td class="num">${fmtN(l.reviews)}</td><td>${l.by === "seller" ? "продавец" : "отгрузка"}</td></tr>`).join("");
-    return `<div class="notice ${cls}" style="margin-top:.6rem">${head} Ниже — ${fmtN(az.listings.length)} листинг(ов) из отчёта${isNum(az.revenueShare) ? `, вместе ${fmtPct(az.revenueShare)} выручки` : ""}; откройте и посмотрите, с чем именно придётся конкурировать.</div>
-      <div class="tablewrap" style="max-height:320px;overflow:auto;margin-top:.4rem"><table class="amztable"><thead><tr><th>ASIN</th><th>Бренд</th><th class="num">Цена</th><th class="num">Выручка</th><th class="num">Доля ниши</th><th class="num">Отзывы</th><th>Признак</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    const [cls, label] = AZ_LEVEL[az.level] || ["", ""];
+    const pct = (x) => fmtPct(x, 1);
+    const verdictLine = az.blocks ? "это решающий гейт: вердикт No-Go"
+      : az.level === "watch" ? "вердикт не блокируется, но за этим брендом стоит следить"
+      : az.level === "normal" ? "на вердикт не влияет — это обычные конкуренты"
+      : "учитывается в общей картине (1e, scorecard, чеклист)";
+    const why = az.level === "own" ? `Amazon продаёт <b>свою марку</b> (${esc(az.ownBrands.map((b) => b.brand).join(", "))}) — против неё не заходят ни при какой доле.`
+      : az.level === "unknown" ? "Отмечено вручную в чеклисте — конкретных листингов в Xray нет, проверьте выдачу сами."
+      : `Amazon продаёт чужие бренды (вендоры). Решает доля рынка: до ${pct(az.watchAt)} — обычный конкурент, ${pct(az.watchAt)}–${pct(az.blockAt)} — смотреть внимательно, выше ${pct(az.blockAt)} — No-Go.`;
+    const trend = (t) => (!t ? '<span class="muted">тренд не посчитан — нужен POE</span>'
+      : `${t.dir === "up" ? "растёт" : t.dir === "down" ? "сжимается" : "держится"} · клики ${pct(t.t360)} за год → ${pct(t.t90)} за 90 дней`);
+    const vendorRows = az.vendors.map((v) => `<tr><td>${esc(v.brand)}</td><td class="num">${pct(v.share)}</td><td class="num">${fmtN(v.listings)}</td><td class="num">${fmtK(v.revenue)}</td><td>${trend(v.trend)}</td></tr>`).join("");
+    const vendorTable = az.vendors.length ? `<div class="tablewrap" style="margin-top:.4rem"><table class="amztable"><thead><tr><th>Бренд, который продаёт Amazon</th><th class="num">Доля ниши</th><th class="num">Листингов</th><th class="num">Выручка</th><th>Тренд</th></tr></thead><tbody>${vendorRows}</tbody></table></div>` : "";
+    const listRows = az.listings.map((l) => `<tr><td><a href="${esc(l.url || "https://www.amazon.com/dp/" + l.asin)}" target="_blank" rel="noopener">${esc(l.asin)}</a>${l.title ? `<br><small class="muted">${esc(String(l.title).slice(0, 80))}</small>` : ""}</td><td>${esc(l.brand || "—")}</td><td class="num">${fmtMoney(l.price, 2)}</td><td class="num">${fmtK(l.revenue)}</td><td class="num">${pct(l.share)}</td><td class="num">${fmtN(l.reviews)}</td><td>${l.by === "seller" ? "продавец" : "отгрузка"}</td></tr>`).join("");
+    const listTable = az.listings.length ? `<div class="tablewrap" style="max-height:320px;overflow:auto;margin-top:.4rem"><table class="amztable"><thead><tr><th>ASIN</th><th>Бренд</th><th class="num">Цена</th><th class="num">Выручка</th><th class="num">Доля ниши</th><th class="num">Отзывы</th><th>Признак</th></tr></thead><tbody>${listRows}</tbody></table></div>` : "";
+    return `<div class="notice ${cls}" style="margin-top:.6rem"><b>Amazon продаёт сам ${esc(az.scopeLabel)} — ${esc(label)}</b>: ${verdictLine}. ${why}
+      ${az.count ? `Листингов в отчёте: ${fmtN(az.count)}${isNum(az.revenueShare) ? `, вместе ${pct(az.revenueShare)} выручки` : ""}.` : ""} Пороги и область меняются во вкладке «Пороги» → «Amazon как продавец».</div>${vendorTable}${listTable}`;
   }
 
   function secCompetitors(A, R) {

@@ -36,8 +36,9 @@ export function compute(analysis) {
   p.competition = competition(p);
   // Amazon как продавец (spec 012): область по порогу; 1e, scorecard и чеклист смотрят туда же, куда и вердикт
   const compAll = band.active ? competition(whole) : p.competition;
-  const amazon = amazonPresence({ whole: compAll, band: band.active ? p.competition : null, th: th.amazon, bandLabel: band.label });
+  const amazon = amazonPresence({ whole: compAll, band: band.active ? p.competition : null, th: th.amazon, bandLabel: band.label, poe: whole.poe });
   p.competition = { ...p.competition, amazonSells: amazon.present, amazonSellsSource: amazon.source };
+  p.amazon = amazon; // spec 016: 1e и scorecard смотрят на уровень (своя марка / доминация / внимательно / обычный конкурент)
   p.traffic = traffic(whole);
   p.criterion1 = criterion1(p);
   if (band.active) {
