@@ -73,6 +73,11 @@ export function compute(analysis) {
   // Промо по нише (spec 014): если чеклист «Купоны/дилы» не заполнен вручную — берём из промо листингов этапа 2
   const promo = analysis.config?.table ? promoStats(agg.listings, whole.xray?.asins, Object.keys(analysis.config.table.rows)) : null;
   if (promo?.saturation && (inputs.checklist?.couponsDealsSaturation ?? "unknown") === "unknown") { p.inputs = { ...p.inputs, checklist: { ...p.inputs.checklist, couponsDealsSaturation: promo.saturation } }; promo.appliedToChecklist = true; }
+  // Патентный скан отвечает на пункт чеклиста «Патенты / FTO» сам, пока менеджер не ответил вручную (2026-10-23):
+  // раньше скан проходил, а в чеклисте оставалось «не проверял» — и критерий 8 со scorecard считали по «не проверено».
+  const patentStatus = ["clear", "unsure", "conflict"].includes(analysis.patents?.status) ? analysis.patents.status : null;
+  const patentsToChecklist = Boolean(patentStatus) && (inputs.checklist?.patentSearch ?? "none") === "none";
+  if (patentsToChecklist) p.inputs = { ...p.inputs, checklist: { ...p.inputs.checklist, patentSearch: patentStatus, patentSearchFromScan: true } };
   p.challenger = challenger(p);
   p.scorecard = scorecard(p);
   const g0 = gate0(whole);
@@ -83,6 +88,7 @@ export function compute(analysis) {
     reconciliation: reconciliation(p), cvrHint: hint,
     entry: p.entry, cashflow: p.cashflow,
     clickPrice: clickWeightedPrice(whole.poe, { priceMedian: (band.active ? band.whole?.priceMedian : null) ?? p.criterion1.items["1b"].value, myPrice: price, band }, th.entry),
+    patentsToChecklist, // значение пункта «Патенты / FTO» подставлено из скана
     regulatory: regulatoryTriggers({ niche: analysis.niche, coreKeyword: analysis.coreKeyword, xray: whole.xray, poe: whole.poe, cerebro: whole.cerebro }),
     dataNotes: poeDataNotes(whole.xray, whole.poe, th.entry),
     hero: heroListing({ xray: p.xray || whole.xray, poe: whole.poe, excludedBrands: inputs.excludedBrands }) || heroListing({ xray: whole.xray, poe: whole.poe, excludedBrands: inputs.excludedBrands }), // фото ниши для шапки и истории

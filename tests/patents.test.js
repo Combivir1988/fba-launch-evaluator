@@ -121,3 +121,23 @@ test("патентный ландшафт: белые пятна, держате
   for (const t of ["Патентный ландшафт", "Белые пятна", "ультразвуковая очистка", "Joyoung", "минное поле", "Eternal East", "USD878847S", "nut milk maker filter basket"]) assert.ok(xml.includes(t), "в файле нет: " + t);
   assert.match(patentsFileName({ niche: "nut milk maker", date: "2026-09-25" }), /Patents-nut-milk-maker-2026-09-25\.docx/);
 });
+
+test("скан отвечает за менеджера в чеклисте «Патенты / FTO», ручной ответ главнее", () => {
+  const mk = (patents, manual) => { const a = newAnalysis({ niche: "n", coreKeyword: "k" }); if (patents) a.patents = patents; if (manual) a.inputs.checklist.patentSearch = manual; return compute(a); };
+  const none = mk(null);
+  assert.equal(none.patentsToChecklist, false); assert.equal(none.challenger.gate4Discussed, false, "без скана Gate 4 не обсуждён");
+  for (const st of ["clear", "unsure", "conflict"]) {
+    const r = mk({ status: st, items: [] });
+    assert.equal(r.patentsToChecklist, true, st); assert.equal(r.challenger.gate4Discussed, true, "после скана Gate 4 считается обсуждённым: " + st);
+  }
+  const manual = mk({ status: "conflict", items: [] }, "clear");
+  assert.equal(manual.patentsToChecklist, false, "ручной ответ не перебивается сканом");
+  assert.equal(manual.challenger.items["8"].kind, "confirmed", "ответ человека — зелёный, не допущение");
+  // ГЛАВНОЕ: подставленное сканом значение остаётся допущением и не превращает критерий 8 в зелёный обязательный
+  const auto = mk({ status: "clear", items: [] });
+  assert.equal(auto.challenger.items["8"].kind, "assumed");
+  assert.equal(auto.challenger.mandatoryOk, false, "AI-скан не засчитывается как подтверждение человека");
+  assert.match(auto.challenger.items["8"].note, /подтвердите статус вручную/);
+  const weird = mk({ status: "error", items: [] });
+  assert.equal(weird.patentsToChecklist, false, "непонятный статус скана в чеклист не попадает");
+});

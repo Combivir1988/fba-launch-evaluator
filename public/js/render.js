@@ -578,7 +578,7 @@
       ${(P.holders || []).length ? `<div style="margin-top:.5rem"><h4>Кто владеет патентами</h4><ul class="tight">${P.holders.map((h) => `<li><b>${esc(h.name)}</b> — ${esc(h.focus)}${(h.patents || []).length ? ` <span class="muted">(${esc(h.patents.join(", "))})</span>` : ""}</li>`).join("")}</ul></div>` : ""}
       <div class="two" style="margin-top:.7rem"><div><h4>Запросы (проверить вручную в Google Patents)</h4><div class="chips">${(P.queries || []).map((q) => `<a class="chip" href="${esc(q.url)}" target="_blank" rel="noopener" title="${esc(q.purpose)}">${esc(q.q)}</a>`).join("")}</div>${P.concepts?.length ? `<p class="muted" style="font-size:.85rem">Патентуемые признаки ТЗ: ${P.concepts.map(esc).join("; ")}</p>` : ""}</div>
       <div class="textcol"><h4>Следующие шаги</h4><ol>${(P.nextSteps || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ol><p class="muted" style="font-size:.85rem"><b>Design patents:</b> ${esc(P.designPatentNote || "")}${P.designHits?.length ? ` Найдено по названию: ${P.designHits.slice(0, 5).map((d) => `<a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.number)}</a>`).join(", ")}.` : ""}</p></div></div>
-      <div class="notice" style="margin-top:.6rem">${esc(P.disclaimer)} Подтвердить статус: панель «Риски и compliance» → «Патенты / FTO».</div>`;
+      <div class="notice" style="margin-top:.6rem">${esc(P.disclaimer)} ${R.patentsToChecklist ? "Статус скана уже подставлен в чеклист «Патенты / FTO» — поменяйте вручную, если не согласны." : "Подтвердить статус: панель «Риски и compliance» → «Патенты / FTO»."}</div>`;
   }
 
   function secScorecard(A, R) {

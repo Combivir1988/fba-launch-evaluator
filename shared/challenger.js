@@ -65,7 +65,9 @@ export function challenger(p) {
     const map = { clear: ["ok", "патентов не найдено (USPTO/Google Patents)"], design_around: ["ok", "есть явный design-around"], conflict: ["fail", "прямое совпадение с живым патентом"], unsure: ["warn", "есть похожие патенты — нужна оценка юриста"], none: ["na", "поиск не проводился — Gate 4 не обсуждён"] };
     let [status, note] = map[ps] || map.none;
     let kind = status === "na" ? "unknown" : "confirmed";
-    if (ps === "none" && patents?.status) {
+    // Значение, подставленное патентным сканом, остаётся допущением: зелёным критерий 8 делает только ответ человека.
+    const fromScan = inputs.checklist?.patentSearchFromScan === true;
+    if ((ps === "none" || fromScan) && patents?.status) {
       // AI-скан — только 🟡 допущение: подтверждение (🟢) ставит человек/поверенный через поле «Патенты / FTO»
       const hi = (patents.items || []).filter((x) => x.risk === "high").length, med = (patents.items || []).filter((x) => x.risk === "med").length;
       status = patents.status === "conflict" ? "fail" : patents.status === "unsure" ? "warn" : "ok"; kind = "assumed";

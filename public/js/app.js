@@ -148,7 +148,7 @@ document.addEventListener("input", (e) => {
   const el = e.target;
   if (el.dataset.field) { S.a[el.dataset.field] = el.value; if (el.dataset.field === "coreKeyword") reannotateCerebro(); markDirty(); scheduleFull(); return; }
   if (el.dataset.input) { applyInput(el); markDirty(); if (el.type === "range") { setOutput(el); scheduleEcon(); } else scheduleFull(); return; }
-  if (el.dataset.check) { const k = el.dataset.check; S.a.inputs.checklist[k] = el.type === "checkbox" ? el.checked : el.type === "number" ? numOrNull(el.value) : el.value; markDirty(); scheduleFull(); return; }
+  if (el.dataset.check) { const k = el.dataset.check; S.a.inputs.checklist[k] = el.type === "checkbox" ? el.checked : el.type === "number" ? numOrNull(el.value) : el.value; if (k === "patentSearch") S.a.inputs.checklist.patentSearchFromScan = false; /* человек ответил сам — это уже не допущение */ markDirty(); scheduleFull(); return; }
   if (el.dataset.axis) { S.a.inputs.axisManual[el.dataset.axis] = Number(el.value); setOutput(el); markDirty(); scheduleEcon(); return; }
   if (el.dataset.quick) { // ползунки в дашборде
     const k = el.dataset.quick; const scale = Number(el.dataset.scale || 1); S.a.inputs[k] = Number(el.value) / scale;
@@ -470,6 +470,8 @@ async function startPatentScan(resumeJobId = null) {
     const scan = await runPatentScan(S.a, { niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} },
       { resumeJobId, onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
     S.a.patents = scan; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.staleSince = new Date().toISOString(); // AI-вердикт считался без этих данных
+    // Скан прошёл — отвечаем за менеджера в чеклисте «Патенты / FTO», если он там ничего не выбирал.
+    if ((S.a.inputs.checklist?.patentSearch ?? "none") === "none" && ["clear", "unsure", "conflict"].includes(scan.status)) { S.a.inputs.checklist.patentSearch = scan.status; S.a.inputs.checklist.patentSearchFromScan = true; syncForm(); }
     renderAll(); await persistJobResult("Патентный скан");
     setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[scan.status] || scan.status}`);
     toast("Патентный скан завершён — критерий 8 получил статус «допущение»");

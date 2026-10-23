@@ -17,7 +17,7 @@ export function defaultInputs() {
     horizonMonths: null, rampMonths: null, startSalesMonthly: null, firstBatchUnits: null, startupCosts: 0, reviewRate: null, vineReviews: null,
     adsReserve: 0, budget: null, canDifferentiate: "unknown", myAsins: [], myBrand: "", evaluateAsNewEntrant: true,
     excludedBrands: [], clusterKeywords: [], clusterMinSv: null, clusterMinCompetitors: null, manualOverrides: {}, challenger: {}, patentFeature: "",
-    checklist: { gatedCategory: false, dangerousGoods: false, certificates: "none", patentSearch: "none", trademarkSearch: "none",
+    checklist: { gatedCategory: false, dangerousGoods: false, certificates: "none", patentSearch: "none", patentSearchFromScan: false, trademarkSearch: "none",
       reviewMergingSuspected: false, amazonSells: "auto", couponsDealsSaturation: "unknown", designTestScore: null, lifecycleMonths: null, listingsInSearch: null },
     axisManual: { brandFit: null, opRisk: null },
   };
