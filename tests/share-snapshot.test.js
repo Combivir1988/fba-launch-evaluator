@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixtureAnalysis } from "./helpers/fixture-analysis.js";
-import { buildSnapshot, findEconomicsLeaks, collectEconomicsValues, valuePatterns, HIDDEN_NOTE } from "../shared/share-snapshot.js";
+import { buildSnapshot, findEconomicsLeaks, findStage3Leaks, collectEconomicsValues, valuePatterns, HIDDEN_NOTE } from "../shared/share-snapshot.js";
 import { buildAiPayload } from "../shared/ai-payload.js";
 import { mockVerdict } from "../server/mock-verdict.js";
 
@@ -26,7 +26,8 @@ test("полный режим: без сырых ключей Cerebro и вну�
   assert.equal(s.type, "fba-launch-evaluator/share"); assert.equal(s.mode, "full"); assert.equal(s.preparedBy, "Анна Коваль"); assert.deepEqual(s.hidden, []); assert.equal(s.redactions, 0);
   assert.equal(s.analysis.aggregates.cerebro.keywords, undefined); assert.equal(s.analysis.aggregates.cerebro.keywordCount, a.aggregates.cerebro.keywords.length);
   assert.notEqual(s.analysis.id, a.id);
-  assert.deepEqual(s.analysis.results, JSON.parse(JSON.stringify(a.results))); assert.deepEqual(s.analysis.inputs, JSON.parse(JSON.stringify(a.inputs))); assert.deepEqual(s.analysis.ai, JSON.parse(JSON.stringify(a.ai)));
+  { const want = JSON.parse(JSON.stringify(a.results)); delete want.stage3; // этап 3 наружу не отдаётся (spec 017)
+    assert.deepEqual(s.analysis.results, want); assert.equal(s.analysis.results.stage3, undefined); } assert.deepEqual(s.analysis.inputs, JSON.parse(JSON.stringify(a.inputs))); assert.deepEqual(s.analysis.ai, JSON.parse(JSON.stringify(a.ai)));
   assert.ok(s.analysis.aggregates.poe && s.analysis.aggregates.xray.asins.length > 50);
   const kb = JSON.stringify(s).length / 1024; assert.ok(kb < 250, `снимок ${kb.toFixed(0)} KB`);
   assert.ok(a.aggregates.cerebro.keywords.length > 1000, "исходный анализ не изменён");
@@ -87,4 +88,35 @@ test("анализ без AI, патентов и экономики; ошибк
   const s = buildSnapshot(a, { mode: "no_economics" });
   assert.equal(s.analysis.ai, null); assert.equal(s.analysis.patents, null); assert.deepEqual(findEconomicsLeaks(s, a), []);
   assert.throws(() => buildSnapshot({}, {}), /нечем делиться/); assert.throws(() => buildSnapshot(a, { mode: "secret" }), /режим/);
+});
+
+test("spec 017: этап 3 не уходит в снимок — ни документ листинга, ни расчёт, ни ключи", () => {
+  const a = analysisWithAi();
+  a.listing = { draft: { title: "Stainless Steel Dog Bowl Set for Large Breeds", highlights: "Dishwasher safe, non-slip base",
+    bullets: ["Holds 32 ounces of water without spilling"], description: "Secret internal description", backendTerms: "puppy feeder gift" }, editedAt: "2026-10-27T10:00:00.000Z", model: "mock" };
+  const R = a.results.stage3;
+  assert.ok(R && R.keywords.items.length > 0, "в самом анализе этап 3 посчитан");
+
+  for (const mode of ["full", "no_economics"]) {
+    const s = buildSnapshot(a, { mode, preparedBy: "Анна" });
+    assert.equal(s.analysis.listing, undefined, mode + ": документа листинга нет");
+    assert.equal(s.analysis.results.stage3, undefined, mode + ": расчёта этапа 3 нет");
+    assert.deepEqual(findStage3Leaks(s, a), [], mode + ": ловушка молчит");
+    const text = JSON.stringify(s);
+    assert.equal(text.includes("Secret internal description"), false, mode + ": текста карточки в файле снимка нет");
+    assert.equal(text.includes("Stainless Steel Dog Bowl Set"), false, mode + ": тайтла в файле снимка нет");
+  }
+  assert.ok(a.listing && a.results.stage3, "исходный анализ не изменён");
+});
+
+test("ловушка этапа 3 ловит утечку, если её когда-нибудь сломают", () => {
+  const a = analysisWithAi();
+  a.listing = { draft: { title: "Stainless Steel Dog Bowl Set for Large Breeds", bullets: [], description: "", highlights: "", backendTerms: "" } };
+  a.results = a.results; // расчёт уже содержит stage3
+  const bad = buildSnapshot(a, { mode: "full", preparedBy: "Анна" });
+  bad.analysis.listing = JSON.parse(JSON.stringify(a.listing)); // имитируем регресс
+  bad.analysis.results.stage3 = JSON.parse(JSON.stringify(a.results.stage3));
+  const leaks = findStage3Leaks(bad, a);
+  assert.ok(leaks.includes("analysis.listing") && leaks.includes("results.stage3"), JSON.stringify(leaks));
+  assert.ok(leaks.some((x) => x.startsWith("listing.title")), "текст карточки тоже назван");
 });

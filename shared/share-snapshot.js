@@ -113,6 +113,10 @@ export function buildSnapshot(analysis, { mode = "full", preparedBy = "", snapsh
   if (a.aggregates?.poeParts) delete a.aggregates.poeParts; // для просмотра хватает объединённого POE
   if (a.aggregates?.listings) delete a.aggregates.listings; // кэш страниц этапа 2 диаграммам не нужен
   if (a.config?.tz) { a.config = { ...a.config }; delete a.config.tz; } // ТЗ производителю в публичную ссылку не попадает (spec 010, FR-006)
+  // Этап 3 целиком внутренний (spec 017, FR-011): вырезаем и документ листинга, и его расчёт — в файле снимка их нет,
+  // а не спрятаны при показе. Иначе карта ключей и текст карточки уехали бы получателю ссылки.
+  delete a.listing;
+  if (a.results) { a.results = { ...a.results }; delete a.results.stage3; }
   a.id = "share"; delete a.status;
   let redactions = 0; const hidden = [];
   if (mode === "no_economics") { redactions = redactEconomics(a, analysis); hidden.push("economics", "budget", "cashflow"); }
@@ -120,6 +124,24 @@ export function buildSnapshot(analysis, { mode = "full", preparedBy = "", snapsh
 }
 
 /** Для тестов и серверной самопроверки: какие «закупочные» значения всё ещё встречаются в снимке (в идеале — пусто). */
+/** Ловушка на утечку этапа 3: ищем в снимке документ листинга, его расчёт и характерные тексты (spec 017, SC-007). */
+export function findStage3Leaks(snapshot, sourceAnalysis) {
+  const out = [];
+  const a = snapshot?.analysis || snapshot || {};
+  if (a.listing) out.push("analysis.listing");
+  if (a.results?.stage3) out.push("results.stage3");
+  const text = JSON.stringify(snapshot || {});
+  const draft = sourceAnalysis?.listing?.draft || null;
+  for (const [k, v] of Object.entries(draft || {})) {
+    const probe = Array.isArray(v) ? v[0] : v;
+    if (typeof probe === "string" && probe.length > 12 && text.includes(probe)) out.push("listing." + k);
+  }
+  for (const kw of (sourceAnalysis?.results?.stage3?.keywords?.items || []).slice(0, 5)) {
+    if (kw.phrase && kw.phrase.length > 8 && text.includes('"' + kw.phrase + '"')) out.push("keyword:" + kw.phrase);
+  }
+  return out;
+}
+
 export function findEconomicsLeaks(snapshot, sourceAnalysis) {
   const re = valuePatterns(collectEconomicsValues(sourceAnalysis)); if (!re) return [];
   const leaks = []; const { aggregates, ...rest } = snapshot.analysis || {};

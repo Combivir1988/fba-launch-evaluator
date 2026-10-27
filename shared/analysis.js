@@ -30,6 +30,7 @@ export function newAnalysis(partial = {}) {
     niche: "", coreKeyword: "", marketplace: "US", createdAt: now, updatedAt: now, status: "draft",
     sources: { xray: null, cerebro: null, poe: null, sqp: null },
     inputs: defaultInputs(), thresholds: {}, aggregates: {}, results: null, ai: null, patents: null, config: null,
+    listing: null, // этап 3 (spec 017): черновик карточки и необязательный аудит; наружу не отдаётся
     ...partial,
   };
 }

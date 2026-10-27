@@ -21,6 +21,9 @@ import { amazonPresence } from "./amazon.js";
 import { promoStats } from "./promo-stats.js";
 import { priceByConfig } from "./price-config.js";
 import { heroListing } from "./hero-image.js";
+import { targetKeywords } from "./keywords-target.js";
+import { coverage as listingCoverage } from "./listing-coverage.js";
+import { scoreListing, listingBans } from "./listing-score.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -98,6 +101,15 @@ export function compute(analysis) {
   results.config = configStats(analysis.config, whole.xray, { band, th: th.config }); // этап 2 (spec 010): null, пока таблица характеристик не извлечена
   if (results.config) { results.config.promo = promo; results.priceConfig = priceByConfig({ config: analysis.config, stats: results.config.whole, xray: whole.xray, listings: agg.listings || {}, choice: analysis.config.priceChoice || {}, inputs, th: { minAnalogs: th.config.minAnalogs, marginMin: th.economics.marginMin } }); } else results.priceConfig = null; // spec 013/014
   if (whole.xray?.asins?.length) { const sc = configScope(analysis, th); results.configScope = { count: sc.asins.length, total: sc.total, excluded: sc.excluded, capped: sc.capped }; } else results.configScope = null;
+  // Этап 3 (spec 017): целевые ключи и покрытие считаем всегда — это дёшево и нужно сразу при открытии вкладки.
+  // Оценка текста появляется, только когда черновик листинга есть. Своё покрытие (аудит) сюда НЕ подмешивается — см. spec 017, FR-008.
+  {
+    const kws = targetKeywords({ cerebro: whole.cerebro, poe: whole.poe, sqp: whole.sqp, brands: (compAll.brands || []).map((x) => x.brand), th });
+    const cov = listingCoverage({ keywords: kws.items, listings: agg.listings, own: null, th });
+    const bans = listingBans({ patents: analysis.patents, regulatory: results.regulatory });
+    const draft = analysis.listing?.draft || null;
+    results.stage3 = { keywords: kws, coverage: cov, bans, score: draft ? scoreListing({ listing: draft, keywords: kws.items, bans, th }) : null };
+  }
   results.borderline = borderline(results, th);
   results.verdict = verdictCeiling(results);
   results.computedAt = new Date().toISOString();
