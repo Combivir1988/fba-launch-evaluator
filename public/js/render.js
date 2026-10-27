@@ -789,7 +789,10 @@
     // этап 3 — SEO-листинг (spec 017)
     "Целевые ключи": "Запросы, по которым продаётся ниша: объём из Cerebro, доли кликов из POE, воронка из SQP. Чужие бренды и ASIN-фразы отсеяны — их в свой листинг не берут.",
     "Ключей в работе": "Сколько запросов взято в работу из всех найденных: берутся самые весомые, сначала те, по которым в SQP есть покупки.",
-    "Дают покупки": "По этим запросам в SQP есть не только клики, но и покупки. Такой ключ дороже объёмного, но пустого: трафик без покупок съедает рекламный бюджет.",
+    "Продаж ниши по ключам": "Сколько штук ниша продаёт в месяц по целевым ключам — оценка Helium 10 (Keyword Sales), а не факт Amazon. Для нового листинга это единственный доступный признак «по этому запросу покупают»: SQP выдаётся только по своим ASIN.",
+    "Покупают у нас": "По этим запросам покупки есть в вашем SQP. Отчёт выдаётся только по своим ASIN, поэтому карточка появляется, лишь когда вы уже торгуете в этой нише.",
+    "Продажи/мес": "Оценка Helium 10: сколько штук ниша продаёт по этому запросу за месяц. Оценка, а не факт Amazon.",
+    "Конверсия ниши": "Доля поисков по запросу, которые закончились покупкой — по всей нише, из POE. Высокая конверсия при скромном объёме часто выгоднее большого, но «смотрящего» запроса.",
     "Обязательных": "Ключи, которые стоят в тайтлах у большинства конкурентов. Без них товар просто не найдут — это не место для оригинальности.",
     "Белых пятен": "Объём выше медианы, но в тайтлах нет ни у кого. Место, которое можно занять дёшево, пока его не заняли другие.",
     "keywords|В тайтле": "У скольких конкурентов все значимые слова этого ключа стоят в тайтле. Порядок слов не важен: Amazon индексирует слова, а не фразу целиком.",
@@ -1156,29 +1159,33 @@
     const S = R.stage3; if (!S) return "";
     const K = S.keywords, C = S.coverage;
     if (!K.items.length) return `<h2>Целевые ключи</h2><div class="empty">${esc(K.note || "ключей нет")} — загрузите Cerebro, POE или SQP.</div>`;
-    const buys = K.items.filter((i) => i.buys).length;
+    const sells = K.sellsCount ?? 0, buys = K.buysCount ?? 0;
+    const salesSub = isNum(K.salesTotal) ? `оценка Cerebro по ${fmtN(K.salesKnown)} ключам из ${fmtN(K.kept)}` : K.sellsSource === "poe" ? "оценки продаж нет — считаем по конверсии запроса в нише" : "ни оценки продаж, ни конверсии";
     const must = C.items.filter((i) => i.mustHave).length, white = C.items.filter((i) => i.whiteSpace).length;
     const t = (k, v, sub, cls = "") => `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub || ""}</div></div>`;
     const noPages = !C.listings;
+    const mustAt = C.mustAt ?? 0.5;
     const rows = C.items.map((c, i) => {
       const k = K.items[i] || {};
       const share = (n) => (C.listings ? `${fmtN(n)} <small class="muted">${fmtPct(n / C.listings)}</small>` : "—");
       const marks = [c.mustHave ? '<span class="chip fail" title="Есть в тайтлах у большинства конкурентов — без этого ключа вас просто не найдут">обязательное</span>' : "",
         c.whiteSpace ? '<span class="chip ok" title="Объём выше медианы, но в тайтлах нет ни у кого — место, которое можно занять">белое пятно</span>' : "",
-        k.buys ? '<span class="chip" title="По этому запросу в SQP есть покупки, а не только клики">даёт покупки</span>' : k.trafficOnly ? '<span class="chip warn" title="Клики есть, покупок нет — такой трафик съедает бюджет">только трафик</span>' : ""].filter(Boolean).join(" ");
-      return `<tr><td>${c.phrase}${marks ? "<br>" + marks : ""}</td><td class="num">${fmtN(k.sv)}${k.svSource && k.svSource !== "cerebro" ? ` <small class="muted">${esc(k.svSource)}</small>` : ""}</td><td class="num">${isNum(k.clickShare) ? fmtPct(k.clickShare, 1) : "—"}</td><td class="num">${share(c.inTitle)}</td><td class="num">${share(c.inBullets)}</td><td class="num">${share(c.inSpecs)}</td></tr>`;
+        k.sells ? `<span class="chip ok" title="${k.sellsSource === "cerebro" ? "Продажи ниши по этому запросу выше медианы: " + fmtN(k.sales) + " шт/мес по оценке Helium 10" : "Конверсия запроса в нише выше медианы — по нему покупают, а не только смотрят"}">сильный по продажам</span>` : "",
+        k.buys ? '<span class="chip" title="По этому запросу в SQP есть покупки у НАС — так бывает только при аудите своего листинга">покупают у нас</span>' : k.trafficOnly ? '<span class="chip warn" title="Клики есть, покупок нет — такой трафик съедает бюджет">только трафик</span>' : ""].filter(Boolean).join(" ");
+      return `<tr><td>${c.phrase}${marks ? "<br>" + marks : ""}</td><td class="num">${fmtN(k.sv)}${k.svSource && k.svSource !== "cerebro" ? ` <small class="muted">${esc(k.svSource)}</small>` : ""}</td><td class="num">${isNum(k.sales) ? fmtN(k.sales) : "—"}</td><td class="num">${isNum(k.conv) ? fmtPct(k.conv, 1) : "—"}</td><td class="num">${isNum(k.clickShare) ? fmtPct(k.clickShare, 1) : "—"}</td><td class="num">${share(c.inTitle)}</td><td class="num">${share(c.inBullets)}</td><td class="num">${share(c.inSpecs)}</td></tr>`;
     }).join("");
     return `<h2>Целевые ключи <span class="chip ${K.hasVolume ? "ok" : "warn"}">${fmtN(K.kept)} из ${fmtN(K.total)}</span></h2>
       ${K.note ? `<div class="notice">${esc(K.note)}</div>` : ""}
       <div class="tiles">
         ${t("Ключей в работе", fmtN(K.kept), `из ${fmtN(K.total)} после отсева чужих брендов`)}
-        ${t("Дают покупки", fmtN(buys), buys ? "по данным SQP" : "SQP не загружен", buys ? "ok" : "na")}
-        ${t("Обязательных", fmtN(must), "есть в тайтлах у большинства", must ? "warn" : "na")}
+        ${t("Продаж ниши по ключам", isNum(K.salesTotal) ? fmtN(K.salesTotal) + " шт/мес" : fmtN(sells) + " ключей", salesSub, isNum(K.salesTotal) || sells ? "ok" : "na")}
+        ${K.hasSqp ? t("Покупают у нас", fmtN(buys), "по данным SQP — только свои ASIN", buys ? "ok" : "na") : ""}
+        ${t("Обязательных", fmtN(must), noPages ? "нужны страницы этапа 2" : `в тайтлах минимум у ${fmtPct(mustAt)} конкурентов`, must ? "warn" : "na")}
         ${t("Белых пятен", fmtN(white), "объём есть, в тайтлах ни у кого", white ? "ok" : "na")}
       </div>
       ${noPages ? '<div class="notice" style="margin-top:.6rem">Матрицы покрытия не будет: страницы листингов не загружены. Запустите шаг 1 этапа 2 — тексты конкурентов возьмутся оттуда, без новых трат.</div>'
         : `<p class="muted" style="font-size:.8rem;margin-top:.6rem">Покрытие по ${fmtN(C.listings)} листингам из кэша этапа 2${C.fetchedAt ? `, загружены ${fmtDate(C.fetchedAt)}` : ""}. Ключ считается покрытым, если в поле есть <b>все его значимые слова</b> — порядок не важен: Amazon индексирует слова, а не фразу целиком.</p>`}
-      <div class="tablewrap" style="max-height:520px;overflow:auto"><table><thead><tr><th>Ключ</th><th class="num">Объём/мес</th><th class="num">Доля кликов</th><th class="num">В тайтле</th><th class="num">В буллетах</th><th class="num">В характеристиках</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      <div class="tablewrap" style="max-height:520px;overflow:auto"><table><thead><tr><th>Ключ</th><th class="num">Объём/мес</th><th class="num">Продажи/мес</th><th class="num">Конверсия ниши</th><th class="num">Доля кликов</th><th class="num">В тайтле</th><th class="num">В буллетах</th><th class="num">В характеристиках</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   // ---------- две вкладки дашборда: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) ----------

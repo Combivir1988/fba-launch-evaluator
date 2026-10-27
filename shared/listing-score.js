@@ -54,7 +54,7 @@ export function scoreListing({ listing = {}, keywords = [], bans = [], th } = {}
     const inTitle = words.length > 0 && words.every((w) => tokens(text.title).has(w));
     weightTotal += k.weight || 0;
     if (covered) { count++; weight += k.weight || 0; }
-    return { phrase: k.phrase, weight: k.weight || 0, buys: Boolean(k.buys), covered, inTitle, missing: words.filter((w) => !allTokens.has(w)) };
+    return { phrase: k.phrase, weight: k.weight || 0, buys: Boolean(k.buys), sells: Boolean(k.sells), covered, inTitle, missing: words.filter((w) => !allTokens.has(w)) };
   });
 
   const limits = [];

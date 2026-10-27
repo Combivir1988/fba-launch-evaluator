@@ -37,6 +37,32 @@ test("ключи с покупками идут впереди более объ
   assert.equal(r.items[1].trafficOnly, true, "клики есть, покупок нет — это только трафик");
 });
 
+test("новый листинг без SQP: «продаёт» берём с рынка — оценка продаж Cerebro, иначе конверсия ниши", () => {
+  // SQP выдаётся только по своим ASIN: в чужой нише он пустой, и признак покупок раньше всегда был нулём.
+  const r = targetKeywords({
+    cerebro: cerebro([kw("bike chain", 9031, { keywordSales: 249 }), kw("bmx chain", 3662), kw("chain tool", 800, { keywordSales: 0 })]),
+    poe: { searchTermMetrics: [{ term: "bmx chain", svT360: 43944, clickShareT360: 0.04, convT360: 0.032 }, { term: "chain tool", svT360: 9600, clickShareT360: 0.01, convT360: 0.004 }] },
+    th: TH,
+  });
+  const by = Object.fromEntries(r.items.map((i) => [i.phrase, i]));
+  assert.equal(by["bike chain"].sells, true); assert.equal(by["bike chain"].sellsSource, "cerebro"); assert.equal(by["bike chain"].sales, 249);
+  assert.equal(by["bmx chain"].sells, true, "оценки продаж нет — смотрим конверсию запроса в нише");
+  assert.equal(by["bmx chain"].sellsSource, "poe");
+  assert.equal(by["chain tool"].sells, false, "Cerebro говорит: продаж по ключу нет");
+  assert.equal(r.sellsCount, 2); assert.equal(r.sellsSource, "cerebro"); assert.equal(r.hasSqp, false); assert.equal(r.buysCount, 0);
+  assert.deepEqual(r.items.map((i) => i.phrase), ["bike chain", "bmx chain", "chain tool"], "продающие ключи впереди");
+});
+
+test("аудит: покупки из SQP главнее рыночного признака", () => {
+  const r = targetKeywords({
+    cerebro: cerebro([kw("market seller", 50000, { keywordSales: 900 }), kw("our seller", 1200, { keywordSales: 0 })]),
+    sqp: { rows: [{ query: "our seller", volume: 1200, impressions: 400, clicks: 60, purchases: 9 }] },
+    th: TH,
+  });
+  assert.deepEqual(r.items.map((i) => i.phrase), ["our seller", "market seller"]);
+  assert.equal(r.items[0].buys, true); assert.equal(r.items[0].sells, false);
+  assert.equal(r.hasSqp, true); assert.equal(r.buysCount, 1);
+});
 test("без Cerebro вес берётся из POE: год делим на 12, и об этом сказано", () => {
   const r = targetKeywords({ poe: { searchTermMetrics: [{ term: "cat tree", svT360: 240000, clickShareT360: 0.3 }] }, th: TH });
   assert.equal(r.items[0].sv, 20000);

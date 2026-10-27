@@ -51,7 +51,7 @@ export const DEFAULT_THRESHOLDS = {
   // Amazon как продавец (spec 012): block — однозначно No-Go, consider — учитывать в общей картине (1e, scorecard, чеклист); область: вся ниша или ценовой диапазон
   // Этап 3 — SEO-листинг (spec 017): сколько ключей берём в работу, что считаем обязательным и белым пятном, лимиты полей Amazon.
   // Лимиты вынесены в пороги намеренно: правила Amazon меняются, и это не повод править код. backendBytes — БАЙТЫ UTF-8, остальное — знаки.
-  stage3: { topKeywords: 50, mustHaveShare: 0.6, whiteSpaceShare: 0.05, titleMax: 75, highlightsMax: 125, bulletMax: 500, backendBytes: 250 },
+  stage3: { topKeywords: 50, mustHaveShare: 0.5, whiteSpaceShare: 0.05, titleMax: 75, highlightsMax: 125, bulletMax: 500, backendBytes: 250 },
   amazon: { mode: "block", scope: "niche", vendorWatch: 0.15, vendorBlock: 0.6 }, // spec 016: своя марка Amazon — No-Go всегда; вендор — по доле рынка // ценовой диапазон: меньше smallSample листингов — предупреждение, меньше minSample — конкурентные показатели не считаются
 };
 

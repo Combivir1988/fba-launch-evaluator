@@ -32,7 +32,7 @@ const covers = (set, words) => words.length > 0 && words.every((w) => set.has(w)
  */
 export function coverage({ keywords = [], listings = {}, own = null, th } = {}) {
   const t = th?.stage3 || {};
-  const mustAt = typeof t.mustHaveShare === "number" ? t.mustHaveShare : 0.6;
+  const mustAt = typeof t.mustHaveShare === "number" ? t.mustHaveShare : 0.5;
   const whiteAt = typeof t.whiteSpaceShare === "number" ? t.whiteSpaceShare : 0.05;
 
   const pages = Object.values(listings || {}).filter((l) => l && !l.error && (l.title || l.bullets?.length));
@@ -51,7 +51,7 @@ export function coverage({ keywords = [], listings = {}, own = null, th } = {}) 
     const titleShare = n ? inTitle / n : null;
     const anyShare = n ? parsed.filter((f) => covers(f.title, words) || covers(f.bullets, words) || covers(f.specs, words)).length / n : null;
     return {
-      phrase: k.phrase, weight: k.weight || 0, buys: Boolean(k.buys), words,
+      phrase: k.phrase, weight: k.weight || 0, buys: Boolean(k.buys), sells: Boolean(k.sells), words,
       inTitle, inBullets, inSpecs, titleShare, anyShare,
       mustHave: n > 0 && titleShare >= mustAt,
       whiteSpace: n > 0 && titleShare <= whiteAt && (k.weight || 0) >= medianWeight,
@@ -59,5 +59,5 @@ export function coverage({ keywords = [], listings = {}, own = null, th } = {}) 
     };
   });
 
-  return { items, listings: n, fetchedAt, own: ownFields ? { asin: own.asin || null, fetchedAt: own.fetchedAt || null } : null };
+  return { items, listings: n, fetchedAt, mustAt, whiteAt, own: ownFields ? { asin: own.asin || null, fetchedAt: own.fetchedAt || null } : null };
 }

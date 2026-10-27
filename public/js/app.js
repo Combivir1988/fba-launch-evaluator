@@ -1014,7 +1014,7 @@ async function openLastIfEmpty() {
 $("#set-migrate").addEventListener("click", async (e) => { e.target.disabled = true; try { await migrateLocalHistory($("#set-migrate-msg")); } catch (err) { $("#set-migrate-msg").textContent = err.message; } e.target.disabled = false; });
 
 // ---------- thresholds tab ----------
-const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет", traffic: "Трафик по ключам и Cerebro", poe: "POE / концентрация", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения", config: "Этап 2 — конфигурация продукта", amazon: "Amazon как продавец" };
+const THR_NAMES = { criterion1: "Критерий 1 — рыночный контекст", economics: "Экономика (Gate 1 / Gate 2 / Критерий 2)", budget: "Бюджет", traffic: "Трафик по ключам и Cerebro", poe: "POE / концентрация", challenger: "Критерии 3–8 против доминирующего игрока", reviewsMoat: "Ров отзывов лидера", scorecard: "Scorecard", reconciliation: "Сверка источников", checklist: "Чеклист рисков", priceBand: "Ценовой диапазон анализа", entry: "Вход в нишу: трафик и новички (пороги предварительные)", cashflow: "Деньги по месяцам и отзывы", borderline: "Пограничные значения", config: "Этап 2 — конфигурация продукта", amazon: "Amazon как продавец", stage3: "Этап 3 — SEO-листинг" };
 // Человеческие подписи порогов: [название, единица/подсказка]. Доли — в долях единицы (0.25 = 25 %).
 const THR_LABELS = {
   "criterion1.passCount": ["Минимум зелёных подпунктов из 8", "шт (порог прохождения Критерия 1)"],
@@ -1057,6 +1057,11 @@ const THR_LABELS = {
   "amazon.scope": ["Где искать Amazon", "niche — вся ниша; band — только мой ценовой диапазон (без диапазона — вся ниша)"],
   "config.topForSchema": ["Схема полей — листингов для AI", "шт (первые по выручке)"], "config.maxAsins": ["Извлечение — максимум страниц за запуск", "шт"], "config.cacheDays": ["Кэш страниц", "дней"],
   "config.batchSize": ["Листингов на один вызов AI", "шт"], "config.numericDistinctMax": ["Числовое поле как дискретное — различных значений до", "шт (больше — интервалы)"], "config.minAnalogs": ["Цена конфигурации — аналогов для надёжного ориентира", "шт (меньше — ослабляем совпадение полей до 80 % и 60 %)"],
+  "stage3.topKeywords": ["Ключей в работе", "шт (первые по покупкам и объёму)"],
+  "stage3.mustHaveShare": ["«Обязательный» ключ — доля тайтлов конкурентов", "0,5 = половина. Выше — ключ считается обязательным: без него не найдут"],
+  "stage3.whiteSpaceShare": ["«Белое пятно» — доля тайтлов не выше", "0,05 = 5 %. При объёме выше медианы это место можно занять"],
+  "stage3.titleMax": ["Тайтл, максимум", "знаков"], "stage3.highlightsMax": ["Item Highlights, максимум", "знаков"],
+  "stage3.bulletMax": ["Буллет, максимум", "знаков"], "stage3.backendBytes": ["Backend search terms, максимум", "байт UTF-8"],
   "checklist.designTestMin": ["Тест дизайна (PickFu) — минимум голосов", "%"], "checklist.lifecycleMonthsMin": ["Жизненный цикл, минимум", "мес"], "checklist.listingsHigh": ["Листингов в выдаче — высокая конкуренция от", "шт"],
 };
 const THR_OPTIONS = { "amazon.mode": [["block", "однозначно No-Go"], ["consider", "учитывать в общей картине"]], "amazon.scope": [["niche", "вся ниша"], ["band", "мой ценовой диапазон"]] };

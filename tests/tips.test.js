@@ -49,6 +49,7 @@ test("FR-008: осиротевших пояснений нет — каждое 
   const withAi = entryFixture(); withAi.ai = AI; withAi.patents = PATENTS; withAi.niche = "antibacterial baby teether"; withAi.results = compute(withAi); variants.push(withAi);
   const cer = fixtureAnalysis(); cer.coreKeyword = "bike tube"; delete cer.aggregates.poe; cer.inputs.clusterKeywords = cer.aggregates.cerebro.keywords.slice(0, 12).map((k) => k.phrase); cer.results = compute(cer); variants.push(cer); // трафик по Cerebro, без POE
   const sqp = fixtureAnalysis(); sqp.sources.sqp = { fileName: "sqp.csv", rows: 3 }; variants.push(sqp);
+  const ownSqp = withConfig(entryFixture()); ownSqp.aggregates.sqp = { rows: [{ query: "dog bowl", volume: 1200, impressions: 800, clicks: 90, purchases: 11 }] }; ownSqp.results = compute(ownSqp); variants.push(ownSqp); // этап 3: аудит своего листинга, SQP загружен
   variants.push(withConfig(entryFixture())); const band = withConfig(entryFixture()); band.inputs.priceMin = 10; band.inputs.priceMax = 40; band.results = compute(band); variants.push(band); // этап 2: конфигурация, диапазон и ТЗ
   for (const a of variants) { const el = draw(a); tips = el.__w.FBARender.tips; for (const k of tips.used) used.add(k); }
   const RARE = new Set(["Конкуренты", "Цена ниши", "SQP", "ПРОКСИ POE", "Срок"]); // показываются только в редких состояниях (нет ни одного отчёта и т. п.)
