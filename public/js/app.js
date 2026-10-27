@@ -182,7 +182,7 @@ function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
 function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); renderCvrHint(); autosave(); }
 // Вкладки «Этап 1 / Этап 2» рисует render.js внутри дашборда; приложение лишь помнит выбор.
-try { S.stage = localStorage.getItem("fba_stage") === "2" ? 2 : 1; } catch { S.stage = 1; }
+try { const st = Number(localStorage.getItem("fba_stage")); S.stage = st === 2 || st === 3 ? st : 1; } catch { S.stage = 1; }
 const setStage = (n) => R().setStage(dash, S.a, n);
 function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
 const scheduleFull = debounce(renderAll, 250);

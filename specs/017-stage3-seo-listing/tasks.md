@@ -8,28 +8,28 @@ MVP — фазы 1–3: карта целевых ключей с матрице
 
 Тесты первыми: это чистые функции на фикстурах, так быстрее и надёжнее, чем проверять через интерфейс.
 
-- [ ] T001 [P] Тесты целевых ключей в `tests/keywords-target.test.js`: объединение Cerebro × POE × SQP по нормализованной фразе; вес из `sv`, а без Cerebro — из `svT360`/12 с пометкой; признак `buys` по покупкам SQP и `trafficOnly` при кликах без покупок; брендовые и ASIN-фразы отсеяны; срез по `th.stage3.topKeywords`
-- [ ] T002 [P] Тесты матрицы покрытия в `tests/listing-coverage.test.js`: токенизация (регистр, пунктуация, простое множественное число, стоп-слова); ключ покрыт, только если есть ВСЕ значимые токены; раздельный счёт по title / bullets / specs; `mustHave` и `whiteSpace` по порогам; **`own: null` не добавляет ни колонок, ни пометок**
-- [ ] T003 [P] Тесты оценки текста в `tests/listing-score.test.js`: покрытие в штуках и в весе; лимиты знаков для тайтла и Item Highlights; **байты UTF-8 для backend terms**; повторы слов между backend и тайтлом/буллетами; найденные запрещённые утверждения
-- [ ] T004 Целевые ключи в `shared/keywords-target.js` (`targetKeywords({ cerebro, poe, sqp, inputs, th })`)
-- [ ] T005 Матрица покрытия в `shared/listing-coverage.js` (`coverage({ keywords, listings, own = null, th })`)
-- [ ] T006 Оценка текста в `shared/listing-score.js` (`scoreListing({ listing, keywords, bans, th })`), чистая и синхронная
-- [ ] T007 Пороги группы `stage3` в `shared/thresholds.js` (topKeywords 50, mustHaveShare 0.6, whiteSpaceShare 0.05, titleMax 75, highlightsMax 125, bulletMax 500, backendBytes 250) и их подписи в `public/js/app.js` (`THR_NAMES`, `THR_LABELS`)
+- [x] T001 [P] Тесты целевых ключей в `tests/keywords-target.test.js`: объединение Cerebro × POE × SQP по нормализованной фразе; вес из `sv`, а без Cerebro — из `svT360`/12 с пометкой; признак `buys` по покупкам SQP и `trafficOnly` при кликах без покупок; брендовые и ASIN-фразы отсеяны; срез по `th.stage3.topKeywords`
+- [x] T002 [P] Тесты матрицы покрытия в `tests/listing-coverage.test.js`: токенизация (регистр, пунктуация, простое множественное число, стоп-слова); ключ покрыт, только если есть ВСЕ значимые токены; раздельный счёт по title / bullets / specs; `mustHave` и `whiteSpace` по порогам; **`own: null` не добавляет ни колонок, ни пометок**
+- [x] T003 [P] Тесты оценки текста в `tests/listing-score.test.js`: покрытие в штуках и в весе; лимиты знаков для тайтла и Item Highlights; **байты UTF-8 для backend terms**; повторы слов между backend и тайтлом/буллетами; найденные запрещённые утверждения
+- [x] T004 Целевые ключи в `shared/keywords-target.js` (`targetKeywords({ cerebro, poe, sqp, inputs, th })`)
+- [x] T005 Матрица покрытия в `shared/listing-coverage.js` (`coverage({ keywords, listings, own = null, th })`)
+- [x] T006 Оценка текста в `shared/listing-score.js` (`scoreListing({ listing, keywords, bans, th })`), чистая и синхронная
+- [x] T007 Пороги группы `stage3` в `shared/thresholds.js` (topKeywords 50, mustHaveShare 0.6, whiteSpaceShare 0.05, titleMax 75, highlightsMax 125, bulletMax 500, backendBytes 250) и их подписи в `public/js/app.js` (`THR_NAMES`, `THR_LABELS`)
 
 ## Фаза 2 — Встраивание и граница наружу (блокирует вкладку)
 
-- [ ] T008 `results.stage3` (ключи, покрытие, оценка черновика, если он есть) в `shared/compute.js`; поле исключено из контрольных отпечатков в `tests/helpers/results-hash.js`
-- [ ] T009 Поле `core.listing` в документе анализа в `shared/analysis.js` (+ `migrate` для старых документов)
-- [ ] T010 Вырезание этапа 3 из снимка в `shared/share-snapshot.js` (`core.listing` и `results.stage3` удаляются при создании снимка) + ловушка `findStage3Leaks` и её тест в `tests/share-snapshot.test.js` — **в файле снимка данных нет, а не спрятаны**
+- [x] T008 `results.stage3` (ключи, покрытие, оценка черновика, если он есть) в `shared/compute.js`; поле исключено из контрольных отпечатков в `tests/helpers/results-hash.js`
+- [x] T009 Поле `core.listing` в документе анализа в `shared/analysis.js` (+ `migrate` для старых документов)
+- [x] T010 Вырезание этапа 3 из снимка в `shared/share-snapshot.js` (`core.listing` и `results.stage3` удаляются при создании снимка) + ловушка `findStage3Leaks` и её тест в `tests/share-snapshot.test.js` — **в файле снимка данных нет, а не спрятаны**
 
 ## Фаза 3 — US1: карта ключей и покрытие конкурентами (MVP)
 
 **Цель**: менеджер видит, по каким запросам продаётся ниша и кто их занимает, без AI и без трат Scrapfly.
 **Независимая проверка**: открыть вкладку на анализе с Cerebro и заполненным этапом 2 — ключи и матрица построены; AI не вызывался, кредиты не потрачены.
 
-- [ ] T011 [US1] Третья вкладка в `public/js/render.js`: `STAGE3`, `stageOf` до 3, `stageTabsHtml` рисует её **только при `o.static !== true`**, переключение и перерисовка секций
-- [ ] T012 [US1] Секция «Целевые ключи» в `public/js/render.js`: таблица ключей (вес, «даёт покупки», доля кликов) и матрица покрытия по конкурентам, пометки «обязательное» и «белое пятно», дата кэша страниц, пояснение, что покрытие считается по словам
-- [ ] T013 [US1] Вкладка в `public/js/app.js` (запоминание выбранного этапа, состояние «нужен Cerebro/POE» и «нет страниц этапа 2») и пункт справки об этапе 3 в `public/index.html`
+- [x] T011 [US1] Третья вкладка в `public/js/render.js`: `STAGE3`, `stageOf` до 3, `stageTabsHtml` рисует её **только при `o.static !== true`**, переключение и перерисовка секций
+- [x] T012 [US1] Секция «Целевые ключи» в `public/js/render.js`: таблица ключей (вес, «даёт покупки», доля кликов) и матрица покрытия по конкурентам, пометки «обязательное» и «белое пятно», дата кэша страниц, пояснение, что покрытие считается по словам
+- [x] T013 [US1] Вкладка в `public/js/app.js` (запоминание выбранного этапа, состояние «нужен Cerebro/POE» и «нет страниц этапа 2») и пункт справки об этапе 3 в `public/index.html`
 
 ## Фаза 4 — US2 и US3: предложенный листинг и его оценка
 

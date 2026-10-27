@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixtureAnalysis } from "./helpers/fixture-analysis.js";
-import { buildSnapshot, findEconomicsLeaks, findStage3Leaks, collectEconomicsValues, valuePatterns, HIDDEN_NOTE } from "../shared/share-snapshot.js";
+import { buildSnapshot, findEconomicsLeaks, findStage3Leaks, stripStage3, collectEconomicsValues, valuePatterns, HIDDEN_NOTE } from "../shared/share-snapshot.js";
 import { buildAiPayload } from "../shared/ai-payload.js";
 import { mockVerdict } from "../server/mock-verdict.js";
 
@@ -107,6 +107,13 @@ test("spec 017: этап 3 не уходит в снимок — ни докум
     assert.equal(text.includes("Stainless Steel Dog Bowl Set"), false, mode + ": тайтла в файле снимка нет");
   }
   assert.ok(a.listing && a.results.stage3, "исходный анализ не изменён");
+
+  // Автономный HTML кладёт в файл ВЕСЬ документ анализа — там этап 3 тоже должен быть вырезан, а не спрятан вкладкой.
+  const forHtml = stripStage3(JSON.parse(JSON.stringify(a)));
+  assert.equal(forHtml.listing, undefined);
+  assert.equal(forHtml.results.stage3, undefined);
+  assert.equal(JSON.stringify(forHtml).includes("Secret internal description"), false);
+  assert.ok(a.listing.draft.description === "Secret internal description", "исходный документ не тронут");
 });
 
 test("ловушка этапа 3 ловит утечку, если её когда-нибудь сломают", () => {

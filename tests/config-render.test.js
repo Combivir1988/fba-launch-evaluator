@@ -92,17 +92,22 @@ test("подсказки графиков: только числа с едини
   assert.equal(pie.cfg.options.plugins.tooltip.displayColors, false);
 });
 
-test("вкладки «Этап 1 / Этап 2» внутри дашборда: есть в приложении, в снимке ссылки и без app.js; без Xray вкладок нет; переключение перерисовывает секции", () => {
+test("вкладки этапов внутри дашборда: в приложении три, в снимке ссылки — две (этап 3 внутренний); переключение перерисовывает секции", () => {
   const a = withConfig(entryFixture()); const el = draw(a, { stage: 1 });
-  const tabs = el.querySelectorAll("[data-stagetabs] [data-stage]"); assert.equal(tabs.length, 2); assert.equal(el.dataset.stage, "1"); assert.equal(tabs[0].classList.contains("active"), true);
+  const tabs = el.querySelectorAll("[data-stagetabs] [data-stage]"); assert.equal(tabs.length, 3, "этап 1, этап 2 и внутренний этап 3"); assert.equal(el.dataset.stage, "1"); assert.equal(tabs[0].classList.contains("active"), true);
+  assert.match(tabs[2].textContent, /Этап 3 · SEO-листинг/);
   assert.match(tabs[1].textContent, /ТЗ готово/); assert.equal(el.querySelectorAll("[data-stagetabs] button").length, 0, "вкладки — не кнопки: публичная страница остаётся без элементов управления");
   let seen = null; el.__w.FBARender.setStage(el, a, 2); el.__w.FBARender.update(el, a, { onStage: (n) => { seen = n; } }, []);
   assert.equal(el.dataset.stage, "2"); assert.equal(el.querySelector('[data-stagetabs] [data-stage="2"]').classList.contains("active"), true);
   const before = el.__w.__charts.length; el.querySelector('[data-stagetabs] [data-stage="1"]').dispatchEvent(new el.__w.MouseEvent("click", { bubbles: true, cancelable: true }));
   assert.equal(el.dataset.stage, "1"); assert.equal(seen, 1, "приложению сообщён выбор"); assert.ok(el.__w.__charts.length > before, "секции этапа 1 перерисованы (графики созданы заново)");
   const snap = buildSnapshot(a, { mode: "full" }); const sh = draw(snap.analysis, { static: true, hidden: snap.hidden, stage: 2 });
-  assert.equal(sh.querySelectorAll("[data-stagetabs] [data-stage]").length, 2, "в публичной ссылке вкладки есть"); assert.equal(sh.dataset.stage, "2"); assert.match(sh.querySelector('[data-stagetabs] [data-stage="2"]').textContent, /извлечено/, "ТЗ в снимке нет — бейдж «извлечено»");
-  assert.equal(draw(entryFixture({ withXray: false })).querySelector("[data-stagetabs]"), null, "без Xray этапа 2 нет — вкладок нет");
+  assert.equal(sh.querySelectorAll("[data-stagetabs] [data-stage]").length, 2, "в публичной ссылке только этапы 1 и 2");
+  assert.equal(sh.querySelector('[data-stagetabs] [data-stage="3"]'), null, "этап 3 наружу не показывается (spec 017)");
+  assert.equal(sh.querySelector("#sec-keywords")?.textContent.trim() || "", "", "и его секция пуста"); assert.equal(sh.dataset.stage, "2"); assert.match(sh.querySelector('[data-stagetabs] [data-stage="2"]').textContent, /извлечено/, "ТЗ в снимке нет — бейдж «извлечено»");
+  const noXray = draw(entryFixture({ withXray: false }));
+  assert.equal(noXray.querySelector('[data-stagetabs] [data-stage="2"]'), null, "без Xray этапа 2 нет");
+  assert.ok(noXray.querySelector('[data-stagetabs] [data-stage="3"]'), "а этап 3 есть: ключи берутся из POE");
   assert.equal(draw(entryFixture({ withXray: false }), { stage: 2 }).dataset.stage, "1");
 });
 
@@ -145,4 +150,21 @@ test("блок «Цена вашей конфигурации» и «Промо 
   const old = withConfig(entryFixture(), { tz: false }); for (const l of Object.values(old.aggregates.listings)) delete l.promo; old.results = compute(old); const e2 = draw(old); assert.match(text(e2, "#sec-config"), /появятся после повторной загрузки страниц/);
   const btn = e2.querySelector('#sec-config [data-action="config-promo"]'); assert.ok(btn, "кнопка «Обновить промо» при кэше без промо"); assert.match(btn.textContent, new RegExp(`Обновить промо · ${Object.keys(old.config.table.rows).length} стр`));
   assert.equal(el.querySelector('#sec-config [data-action="config-promo"]'), null, "промо есть у всех — кнопки нет"); assert.equal(draw(old, { static: true }).querySelector('#sec-config [data-action="config-promo"]'), null, "в снимке кнопки нет");
+});
+
+test("spec 017: вкладка этапа 3 показывает ключи и матрицу покрытия, а в снимке её нет", () => {
+  const a = withConfig(entryFixture());
+  const el = draw(a, { stage: 3 });
+  assert.equal(el.dataset.stage, "3");
+  const t = text(el, "#sec-keywords");
+  assert.match(t, /Целевые ключи/);
+  assert.match(t, /Ключей в работе/);
+  assert.match(t, /все его значимые слова/, "объяснили, что покрытие считается по словам");
+  assert.ok(el.querySelectorAll("#sec-keywords tbody tr").length > 0, "таблица ключей не пуста");
+  assert.equal(el.dataset.stage, "3", "по data-stage стили прячут секции этапа 1");
+
+  const snap = buildSnapshot(a, { mode: "full" });
+  const sh = draw(snap.analysis, { static: true, hidden: snap.hidden, stage: 3 });
+  assert.equal(sh.dataset.stage, "1", "в снимке третьего этапа нет — показываем первый");
+  assert.equal(JSON.stringify(snap).includes("Целевые ключи"), false);
 });

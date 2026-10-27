@@ -782,6 +782,15 @@
   }
 
   const TIPS = {
+    // этап 3 — SEO-листинг (spec 017)
+    "Целевые ключи": "Запросы, по которым продаётся ниша: объём из Cerebro, доли кликов из POE, воронка из SQP. Чужие бренды и ASIN-фразы отсеяны — их в свой листинг не берут.",
+    "Ключей в работе": "Сколько запросов взято в работу из всех найденных: берутся самые весомые, сначала те, по которым в SQP есть покупки.",
+    "Дают покупки": "По этим запросам в SQP есть не только клики, но и покупки. Такой ключ дороже объёмного, но пустого: трафик без покупок съедает рекламный бюджет.",
+    "Обязательных": "Ключи, которые стоят в тайтлах у большинства конкурентов. Без них товар просто не найдут — это не место для оригинальности.",
+    "Белых пятен": "Объём выше медианы, но в тайтлах нет ни у кого. Место, которое можно занять дёшево, пока его не заняли другие.",
+    "keywords|В тайтле": "У скольких конкурентов все значимые слова этого ключа стоят в тайтле. Порядок слов не важен: Amazon индексирует слова, а не фразу целиком.",
+    "keywords|В буллетах": "То же самое по буллетам конкурентов — туда уходят ключи, которые не влезли в тайтл.",
+    "keywords|В характеристиках": "То же по полям характеристик: там ключи индексируются, но покупатель их почти не читает.",
     // этап 2 — конфигурация продукта (spec 010)
     "Конфигурация продукта — этап 2": "Какие характеристики товара собирают выручку ниши: страницы листингов читает Scrapfly, AI заполняет таблицу по схеме полей, доли считаются по выручке ASIN из Xray.",
     "Доминирующая конфигурация": "По каждому полю — значение с наибольшей выручкой ниши. Это «база» товара: так выглядит то, что покупают чаще всего.",
@@ -1138,17 +1147,53 @@
     doc.__fbaTipsHide = () => { if (cur && !doc.contains(cur)) hide(); };
   }
 
+  // ---------- этап 3: целевые ключи и покрытие конкурентами (spec 017) ----------
+  function secKeywords(A, R, o) {
+    const S = R.stage3; if (!S) return "";
+    const K = S.keywords, C = S.coverage;
+    if (!K.items.length) return `<h2>Целевые ключи</h2><div class="empty">${esc(K.note || "ключей нет")} — загрузите Cerebro, POE или SQP.</div>`;
+    const buys = K.items.filter((i) => i.buys).length;
+    const must = C.items.filter((i) => i.mustHave).length, white = C.items.filter((i) => i.whiteSpace).length;
+    const t = (k, v, sub, cls = "") => `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub || ""}</div></div>`;
+    const noPages = !C.listings;
+    const rows = C.items.map((c, i) => {
+      const k = K.items[i] || {};
+      const share = (n) => (C.listings ? `${fmtN(n)} <small class="muted">${fmtPct(n / C.listings)}</small>` : "—");
+      const marks = [c.mustHave ? '<span class="chip fail" title="Есть в тайтлах у большинства конкурентов — без этого ключа вас просто не найдут">обязательное</span>' : "",
+        c.whiteSpace ? '<span class="chip ok" title="Объём выше медианы, но в тайтлах нет ни у кого — место, которое можно занять">белое пятно</span>' : "",
+        k.buys ? '<span class="chip" title="По этому запросу в SQP есть покупки, а не только клики">даёт покупки</span>' : k.trafficOnly ? '<span class="chip warn" title="Клики есть, покупок нет — такой трафик съедает бюджет">только трафик</span>' : ""].filter(Boolean).join(" ");
+      return `<tr><td>${c.phrase}${marks ? "<br>" + marks : ""}</td><td class="num">${fmtN(k.sv)}${k.svSource && k.svSource !== "cerebro" ? ` <small class="muted">${esc(k.svSource)}</small>` : ""}</td><td class="num">${isNum(k.clickShare) ? fmtPct(k.clickShare, 1) : "—"}</td><td class="num">${share(c.inTitle)}</td><td class="num">${share(c.inBullets)}</td><td class="num">${share(c.inSpecs)}</td></tr>`;
+    }).join("");
+    return `<h2>Целевые ключи <span class="chip ${K.hasVolume ? "ok" : "warn"}">${fmtN(K.kept)} из ${fmtN(K.total)}</span></h2>
+      ${K.note ? `<div class="notice">${esc(K.note)}</div>` : ""}
+      <div class="tiles">
+        ${t("Ключей в работе", fmtN(K.kept), `из ${fmtN(K.total)} после отсева чужих брендов`)}
+        ${t("Дают покупки", fmtN(buys), buys ? "по данным SQP" : "SQP не загружен", buys ? "ok" : "na")}
+        ${t("Обязательных", fmtN(must), "есть в тайтлах у большинства", must ? "warn" : "na")}
+        ${t("Белых пятен", fmtN(white), "объём есть, в тайтлах ни у кого", white ? "ok" : "na")}
+      </div>
+      ${noPages ? '<div class="notice" style="margin-top:.6rem">Матрицы покрытия не будет: страницы листингов не загружены. Запустите шаг 1 этапа 2 — тексты конкурентов возьмутся оттуда, без новых трат.</div>'
+        : `<p class="muted" style="font-size:.8rem;margin-top:.6rem">Покрытие по ${fmtN(C.listings)} листингам из кэша этапа 2${C.fetchedAt ? `, загружены ${fmtDate(C.fetchedAt)}` : ""}. Ключ считается покрытым, если в поле есть <b>все его значимые слова</b> — порядок не важен: Amazon индексирует слова, а не фразу целиком.</p>`}
+      <div class="tablewrap" style="max-height:520px;overflow:auto"><table><thead><tr><th>Ключ</th><th class="num">Объём/мес</th><th class="num">Доля кликов</th><th class="num">В тайтле</th><th class="num">В буллетах</th><th class="num">В характеристиках</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
   // ---------- две вкладки дашборда: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) ----------
   // Живут внутри контейнера, поэтому есть и в приложении, и в публичной ссылке, и в автономном HTML. Состояние — container.__opts.stage.
   const STAGE2 = new Set(["config", "tz"]);
+  // Этап 3 (spec 017): существует только внутри приложения — в снимке публичной ссылки и в автономном HTML вкладки нет вовсе.
+  const STAGE3 = new Set(["keywords"]);
+  const hasStage3 = (A, o) => !o?.static && Boolean(A.results?.stage3?.keywords?.items?.length);
   const hasStage2 = (A) => Boolean(A.aggregates?.xray?.asins?.length);
   function stageState(A) { const C = A.config || {}; return !hasStage2(A) ? ["na", "нужен Xray"] : C.tz ? ["ok", "ТЗ готово"] : C.table ? ["ok", "извлечено"] : C.schema ? ["warn", "схема есть"] : ["na", "не начат"]; }
-  const stageOf = (A, o) => (hasStage2(A) && o.stage === 2 ? 2 : 1);
+  const stageOf = (A, o) => (hasStage3(A, o) && o.stage === 3 ? 3 : hasStage2(A) && o.stage === 2 ? 2 : 1);
   function stageTabsHtml(A, o) {
-    if (o.stageTabs === false || !hasStage2(A)) return "";
+    if (o.stageTabs === false || (!hasStage2(A) && !hasStage3(A, o))) return "";
     const n = stageOf(A, o); const [cls, text] = stageState(A);
     const tab = (k, label) => `<a href="#" role="tab" data-stage="${k}" class="${n === k ? "active" : ""}" aria-selected="${n === k}">${label}</a>`;
-    return `<nav class="stagetabs noprint" data-stagetabs role="tablist" aria-label="Этапы анализа">${tab(1, "Этап 1 · оценка ниши")}${tab(2, `Этап 2 · конфигурация продукта и ТЗ <span class="chip ${cls}">${esc(text)}</span>`)}</nav>`;
+    const kw = A.results?.stage3?.keywords;
+    const third = hasStage3(A, o) ? tab(3, `Этап 3 · SEO-листинг <span class="chip ${kw.hasVolume ? "ok" : "warn"}">${fmtN(kw.kept)} ключей</span>`) : "";
+    const second = hasStage2(A) ? tab(2, `Этап 2 · конфигурация продукта и ТЗ <span class="chip ${cls}">${esc(text)}</span>`) : "";
+    return `<nav class="stagetabs noprint" data-stagetabs role="tablist" aria-label="Этапы анализа">${tab(1, "Этап 1 · оценка ниши")}${second}${third}</nav>`;
   }
   function refreshStageTabs(container, A) {
     const o = container.__opts || {}; container.dataset.stage = String(stageOf(A, o));
@@ -1157,9 +1202,9 @@
   }
   /** Переключить вкладку: графики, нарисованные в скрытой вкладке, имеют нулевой размер — секции показанного этапа перерисовываются. */
   function setStage(container, A, n, { scroll = false } = {}) {
-    const R = A?.results; if (!R) return; const o = (container.__opts = { ...(container.__opts || {}), stage: n === 2 ? 2 : 1 });
+    const R = A?.results; if (!R) return; const o = (container.__opts = { ...(container.__opts || {}), stage: n === 3 ? 3 : n === 2 ? 2 : 1 });
     const prev = container.dataset.stage; refreshStageTabs(container, A); const cur = container.dataset.stage;
-    if (cur !== prev) for (const [id] of SECTIONS) if (cur === "2" ? STAGE2.has(id) || id === "hero" : !STAGE2.has(id)) fill(container, id, A, R, o);
+    if (cur !== prev) for (const [id] of SECTIONS) if (cur === "3" ? STAGE3.has(id) || id === "hero" : cur === "2" ? STAGE2.has(id) || id === "hero" : !STAGE2.has(id) && !STAGE3.has(id)) fill(container, id, A, R, o);
     if (typeof o.onStage === "function") o.onStage(Number(cur));
     if (scroll && typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1172,7 +1217,7 @@
     ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget], ["cashflow", secCashflow, drawCashflow],
     ["traffic", secTraffic, drawTraffic], ["entry", secEntry], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
     ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)], ["config", secConfig, drawConfig],
-    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["tz", secTz], ["conclusion", secConclusion], ["ai", secAi],
+    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["tz", secTz], ["keywords", secKeywords], ["conclusion", secConclusion], ["ai", secAi],
   ];
   const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "cashflow", "entry", "pricing", "borderline", "challenger", "scorecard", "conclusion", "ai"];
 
