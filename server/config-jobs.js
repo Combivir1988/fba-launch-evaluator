@@ -5,7 +5,7 @@ import { fetchMany, totalCost } from "./scrapfly.js";
 import { FIELDS_SCHEMA, EXTRACT_SCHEMA, TZ_SCHEMA, SYS_FIELDS, SYS_EXTRACT, SYS_TZ, fieldsUser, extractUser, tzUser, normalizeSection, normalizePriority } from "./config-prompts.js";
 import { mockFields, mockExtract, mockTz } from "./mock-config.js";
 import { sanitizeSchema, mergeExtraction } from "../shared/config-extract.js";
-import { collectTzNumbers, markUnverified } from "../shared/tz-payload.js";
+import { collectTzNumbers, markUnverified, priceFacts } from "../shared/tz-payload.js";
 import { log } from "./log.js";
 
 const ASIN_RE = /^B0[A-Z0-9]{8}$/;
@@ -142,7 +142,7 @@ export async function* tzStream(body, cfg, deps = {}) {
     yield { event: "stage", data: { stage: "ai", text: "AI составляет ТЗ по фактам этапов 1–2…" } };
     const raw = cfg.mock ? mockTz({ payload }) : await retryAi(() => aiJson({ cfg, model, system: SYS_TZ, user: tzUser({ niche: body.niche, coreKeyword: body.coreKeyword, payload }), schema: TZ_SCHEMA, signal: deps.signal, fetchImpl: deps.fetchImpl, maxTokens: 10000 }), { pauseMs: deps.aiPauseMs ?? 15000, signal: deps.signal });
     const tz = markUnverified({ title: String(raw.title || "").slice(0, 200), summary: String(raw.summary || "").slice(0, 2000), rows: (raw.rows || []).filter((r) => r && (r.requirement || r.param)).slice(0, 60).map((r) => ({ section: normalizeSection(r.section), param: String(r.param || "").slice(0, 120), requirement: String(r.requirement || "").slice(0, 600), rationale: String(r.rationale || "").slice(0, 600), priority: normalizePriority(r.priority), source: String(r.source || "").slice(0, 200) })),
-      openQuestions: (raw.openQuestions || []).slice(0, 20).map((q) => String(q).slice(0, 300)), generatedAt: new Date().toISOString(), model: cfg.mock ? "mock" : model, editedAt: null }, collectTzNumbers(payload));
+      openQuestions: (raw.openQuestions || []).slice(0, 20).map((q) => String(q).slice(0, 300)), generatedAt: new Date().toISOString(), model: cfg.mock ? "mock" : model, editedAt: null }, collectTzNumbers(payload), priceFacts(payload));
     log("info", "config tz done", { rows: tz.rows.length, unverified: tz.rows.filter((r) => r.unverified).length, ms: Date.now() - t0 });
     yield { event: "done", data: { tz, durationMs: Date.now() - t0 } };
   } catch (e) { log("warn", "config tz error", toErr(e)); yield { event: "error", data: toErr(e) }; }

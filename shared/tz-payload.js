@@ -41,17 +41,59 @@ export function buildTzPayload(analysis) {
 export function collectTzNumbers(payload) {
   const out = new Set();
   const add = (v) => { if (typeof v !== "number" || !Number.isFinite(v)) return; for (const x of [v, Math.round(v), round(v, 1), round(v, 2)]) out.add(x); if (v > 0 && v <= 1) { out.add(Math.round(v * 100)); out.add(round(v * 100, 1)); } };
-  const walk = (n) => { if (Array.isArray(n)) n.forEach(walk); else if (n && typeof n === "object") Object.values(n).forEach(walk); else add(n); };
+  const addFromText = (t) => { for (const m of String(t).matchAll(/\d+(?:[.,]\d+)?/g)) add(Number(m[0].replace(",", "."))); };
+  // Значения характеристик приходят строками («126», «5,62 мм», «11/128"») — если их не разобрать, они выглядят выдуманными.
+  const walk = (n) => { if (Array.isArray(n)) n.forEach(walk); else if (n && typeof n === "object") Object.values(n).forEach(walk); else if (typeof n === "string") addFromText(n); else add(n); };
   walk(payload); return out;
 }
 
 const NUM_RE = /\d+(?:[.,]\d+)?/g;
-/** Строка ТЗ «не проверена», если в требовании/обосновании есть число ≥ 10 или с дробной частью, которого нет среди чисел пейлоада. */
-export function markUnverified(tz, numbers) {
+const MONEY_RE = /\$\s?(\d+(?:[.,]\d+)?)(?:\s*[-–—]\s*(\d+(?:[.,]\d+)?))?/g;
+/** Цены, которые приложение считало само: только они имеют право стоять в ТЗ со знаком доллара. */
+export function priceFacts(payload) {
+  const p = payload?.pricing || {};
+  const out = [p.marketPrice, p.entryPrice, p.ceilingPrice, p.marketPriceWithCoupons, p.cogsCeilingForMinMargin];
+  return new Set(out.filter((v) => typeof v === "number" && Number.isFinite(v)).flatMap((v) => [v, round(v, 1), Math.round(v)]));
+}
+
+// Слова, после которых цена перестаёт быть ценой чужого товара и становится нашей.
+const OWN_PRICE_RE = /позиционир|премиум-сегмент|целев\w* цен|целев\w* рознич|наша цена|нашу цену|продавать по|рознич\w* цена нашего|RRP|рекоменд\w* цен/i;
+
+/** Цена НАШЕГО товара, которой нет среди посчитанных. Проверяем только фразы о позиционировании:
+ *  цены конкурентов и средние по характеристикам в ТЗ законны, а вот «позиционирование в премиум-сегменте ($35–47)»
+ *  при рыночной цене аналогов $15,88 модель взяла из головы — сегменты ниши описывают весь рынок, а не наш товар (2026-10-27). */
+export function strayPrices(text, prices) {
+  const out = [];
+  for (const sentence of String(text || "").split(/[.;!?\n]+/)) {
+    if (!OWN_PRICE_RE.test(sentence)) continue;
+    for (const m of sentence.matchAll(MONEY_RE)) {
+      for (const raw of [m[1], m[2]]) {
+        if (!raw) continue;
+        const v = Number(raw.replace(",", "."));
+        if (Number.isFinite(v) && !prices.has(v) && !prices.has(round(v, 1)) && !prices.has(Math.round(v))) out.push(v);
+      }
+    }
+  }
+  return out;
+}
+
+/** Числа текста, которых нет среди фактов: берём только «значащие» — от 10 или с дробной частью. */
+function strayNumbers(text, numbers) {
+  return [...String(text || "").matchAll(NUM_RE)].map((m) => Number(m[0].replace(",", ".")))
+    .filter((n) => Number.isFinite(n) && (n >= 10 || !Number.isInteger(n)))
+    .filter((n) => !numbers.has(n) && !numbers.has(round(n, 1)) && !numbers.has(Math.round(n)));
+}
+
+/** Строка ТЗ «не проверена», если в требовании/обосновании есть число, которого нет среди фактов.
+ *  Итоговую фразу проверяем так же: именно там модель выдумывала ценовое позиционирование («премиум-сегмент $35–47»
+ *  при рыночной цене аналогов $15,88), и раньше этого никто не ловил — проверялись только строки (2026-10-27). */
+export function markUnverified(tz, numbers, prices = null) {
   const rows = (tz?.rows || []).map((row) => {
     const text = `${row.requirement || ""} ${row.rationale || ""}`;
-    const found = [...text.matchAll(NUM_RE)].map((m) => Number(m[0].replace(",", "."))).filter((n) => Number.isFinite(n) && (n >= 10 || !Number.isInteger(n)));
-    return { ...row, unverified: found.some((n) => !numbers.has(n) && !numbers.has(round(n, 1)) && !numbers.has(Math.round(n))) };
+    return { ...row, unverified: strayNumbers(text, numbers).length > 0 || (prices ? strayPrices(text, prices).length > 0 : false) };
   });
-  return { ...tz, rows };
+  const texts = [tz?.summary || "", ...(tz?.openQuestions || [])];
+  const summaryUnverified = [...new Set(texts.flatMap((t) => strayNumbers(t, numbers)))].sort((a, b) => a - b);
+  const strayMoney = prices ? [...new Set([...texts, ...(tz?.rows || []).map((r) => `${r.requirement || ""} ${r.rationale || ""}`)].flatMap((t) => strayPrices(t, prices)))].sort((a, b) => a - b) : [];
+  return { ...tz, rows, summaryUnverified, strayPrices: strayMoney };
 }

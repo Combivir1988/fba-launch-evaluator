@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { configScope, topForSchema, isFresh, freshListings } from "../shared/config-scope.js";
 import { normalizeValue, parseNumber, sanitizeSchema, mergeExtraction, setCell, renameOption, fillFromText } from "../shared/config-extract.js";
 import { configStats, NO_DATA } from "../shared/config-stats.js";
-import { buildTzPayload, collectTzNumbers, markUnverified } from "../shared/tz-payload.js";
+import { buildTzPayload, collectTzNumbers, markUnverified, priceFacts, strayPrices } from "../shared/tz-payload.js";
 import { mergeThresholds } from "../shared/thresholds.js";
 import { newAnalysis } from "../shared/analysis.js";
 import { compute } from "../shared/compute.js";
@@ -146,6 +146,28 @@ test("buildTzPayload / markUnverified: факты из этапов 1–2, чи�
     { requirement: "3 режима", rationale: "мелкие числа не проверяются" },
   ] }, nums);
   assert.deepEqual(tz.rows.map((r) => r.unverified), [false, true, false]);
+});
+
+test("ТЗ: выдуманная цена нашего товара и непроверенные числа в итоговой фразе", () => {
+  const p = { pricing: { marketPrice: 15.88, entryPrice: 15.88, ceilingPrice: 17.32, cogsCeilingForMinMargin: 4.82 }, prices: { nicheMedian: 19.42, segments: [{ min: 21.99, max: 73.56 }] }, configuration: [{ premium: [{ avgPrice: 47.24 }] }] };
+  const prices = priceFacts(p);
+  assert.ok(prices.has(15.88) && prices.has(17.32) && prices.has(4.82));
+  assert.equal(prices.has(73.56), false, "сегменты ниши — не цена нашего товара");
+
+  // Ровно тот случай, из-за которого завели проверку: рыночная цена аналогов $15,88, а ТЗ предлагало премиум $35–47.
+  assert.deepEqual(strayPrices("Позиционирование в премиум-сегменте ($35–47) при рознице ~$35.", prices), [35, 47, 35]);
+  assert.deepEqual(strayPrices("Целевая цена $15,88, потолок $17.32.", prices), []);
+  assert.deepEqual(strayPrices("Лидер ниши продаётся по $47.24, средняя цена премиальных значений $52.44.", prices), [], "чужие цены не трогаем");
+
+  const nums = collectTzNumbers(p);
+  const tz = markUnverified({
+    summary: "Цепь 126 звеньев. Позиционирование в премиум-сегменте ($35–47).",
+    openQuestions: ["Подтвердить вес 310 г?"],
+    rows: [{ requirement: "Цена $15,88", rationale: "рыночная цена аналогов" }, { requirement: "Позиционирование по $40", rationale: "" }],
+  }, nums, prices);
+  assert.deepEqual(tz.strayPrices, [35, 40, 47]);
+  assert.deepEqual(tz.rows.map((r) => r.unverified), [false, true]);
+  assert.ok(tz.summaryUnverified.includes(126) && tz.summaryUnverified.includes(310), "итоговая фраза и вопросы проверяются так же, как строки");
 });
 
 test("снимок ссылки: без ТЗ и кэша страниц, диаграммы и таблица остаются", () => {
