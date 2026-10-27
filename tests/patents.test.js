@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parsePatentHtml, estimateExpiry, searchGooglePatents, patentScanStream, QUERIES_SCHEMA, ASSESS_SCHEMA } from "../server/patents.js";
+import { parsePatentHtml, estimateExpiry, searchGooglePatents, patentScanStream, QUERIES_SCHEMA, ASSESS_SCHEMA, SYS_ASSESS, SYS_QUERIES } from "../server/patents.js";
 import { buildPatentsDocx, patentsFileName } from "../server/patents-docx.js";
 import zlib from "node:zlib";
 import { configFromEnv } from "../server/claude.js";
@@ -140,4 +140,11 @@ test("скан отвечает за менеджера в чеклисте «П
   assert.match(auto.challenger.items["8"].note, /подтвердите статус вручную/);
   const weird = mk({ status: "error", items: [] });
   assert.equal(weird.patentsToChecklist, false, "непонятный статус скана в чеклист не попадает");
+});
+
+test("скан отвечает по-русски: правило языка стоит в промпте, запросы к Google Patents остаются английскими", () => {
+  assert.match(SYS_ASSESS, /ЯЗЫК ОТВЕТА — РУССКИЙ/);
+  for (const f of ["summary", "claimed", "overlap", "designAround", "nextSteps", "designPatentNote", "howToUse"]) assert.ok(SYS_ASSESS.includes(f), "в правиле языка перечислено поле " + f);
+  assert.ok(SYS_ASSESS.includes("FTO") && SYS_ASSESS.includes("prior art"), "термины и аббревиатуры оставляем как есть");
+  assert.match(SYS_QUERIES, /поле q — только английский/);
 });
