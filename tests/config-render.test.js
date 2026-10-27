@@ -162,6 +162,8 @@ test("spec 017: вкладка этапа 3 показывает ключи и �
   assert.match(t, /все его значимые слова/, "объяснили, что покрытие считается по словам");
   assert.ok(el.querySelectorAll("#sec-keywords tbody tr").length > 0, "таблица ключей не пуста");
   assert.equal(el.dataset.stage, "3", "по data-stage стили прячут секции этапа 1");
+  assert.equal(text(el, "#sec-hero").trim(), "", "шапка с вердиктом ниши на этапе 3 не рисуется — это другая работа");
+  assert.match(text(draw(a, { stage: 1 }), "#sec-hero"), /Потолок по правилам|Вердикт/, "на этапе 1 шапка на месте");
 
   const snap = buildSnapshot(a, { mode: "full" });
   const sh = draw(snap.analysis, { static: true, hidden: snap.hidden, stage: 3 });

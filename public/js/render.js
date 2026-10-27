@@ -119,6 +119,7 @@
     return `<a class="herophoto" href="https://www.amazon.com/dp/${esc(h.asin)}" target="_blank" rel="noopener" title="${esc(tip)}"><img src="${esc(h.imageUrl)}" alt="${esc(h.title || h.asin)}" loading="lazy" referrerpolicy="no-referrer"></a>`;
   }
   function secHero(A, R, o) {
+    if (o?.stage === 3) return ""; // на этапе 3 шапка с вердиктом ниши не нужна: это другая работа — текст листинга
     const ai = A.ai; const v = ai?.verdict || R.verdict.ceiling;
     const srcs = ["xray", "cerebro", "poe", "sqp"].filter((k) => A.sources?.[k]).map((k) => { const m = A.sources[k]; return `<span class="chip" title="${esc(k === "poe" && m.parts?.length > 1 ? m.parts.map((p) => p.nicheTitle || p.fileName).join(" + ") : m.fileName || "")}">${SRC_LABEL[k]}${k === "poe" && m.parts?.length > 1 ? ` · ${m.parts.length} ниш(и)` : ""} · ${fmtN(m.rows)} ${k === "xray" || k === "poe" ? "ASIN" : "строк"}${m.duplicatesDropped ? ` · дублей удалено ${m.duplicatesDropped}` : ""}</span>`; }).join(" ");
     const snap = o.snapshot ? `<div class="notice info snapnote">Подготовил(а): <b>${esc(o.snapshot.preparedBy || "—")}</b> · снимок от ${fmtDate(o.snapshot.snapshotAt)} · только чтение${o.snapshot.mode === "no_economics" ? " · закупочная экономика скрыта автором" : ""}</div>` : "";
@@ -1237,7 +1238,7 @@
     const R = A.results; if (!R) { container.innerHTML = '<div class="panel section empty">Нет результатов — загрузите файлы или введите данные.</div>'; return; }
     container.classList.add("dash"); container.__A = A; container.dataset.stage = String(stageOf(A, container.__opts));
     container.innerHTML = stageTabsHtml(A, container.__opts) + SECTIONS.map(([id]) => `<section class="panel section" data-section="${id}" id="sec-${id}"></section>`).join("");
-    for (const [id] of SECTIONS) fill(container, id, A, R, opts);
+    for (const [id] of SECTIONS) fill(container, id, A, R, container.__opts);
     bindStageTabs(container);
   }
   function fill(container, id, A, R, opts) {
