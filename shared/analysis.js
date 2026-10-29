@@ -1,5 +1,6 @@
 // Документ анализа: создание, миграции схемы, slug для имён файлов.
 import { METHODOLOGY_VERSION } from "./thresholds.js";
+import { humanizeTz } from "./tz-human.js";
 
 export const SCHEMA_VERSION = 1;
 
@@ -44,6 +45,7 @@ export function migrate(doc) {
   out.inputs.checklist = { ...defaultInputs().checklist, ...(doc.inputs?.checklist || {}) };
   if (typeof out.inputs.checklist.amazonSells === "boolean") out.inputs.checklist.amazonSells = out.inputs.checklist.amazonSells ? "yes" : "auto"; // старые документы
   out.inputs.axisManual = { ...defaultInputs().axisManual, ...(doc.inputs?.axisManual || {}) };
+  if (out.config?.tz) out.config = { ...out.config, tz: humanizeTz(out.config.tz) }; // старые ТЗ с именами полей вида «pricing.marketPrice»
   out.schemaVersion = SCHEMA_VERSION;
   return out;
 }
