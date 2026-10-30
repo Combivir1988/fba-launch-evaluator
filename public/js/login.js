@@ -28,7 +28,10 @@ async function initGoogle() {
   const params = new URLSearchParams(location.search); const err = params.get("error");
   const REASONS = { idle: "Сеанс завершён из-за бездействия — так настроил администратор. Изменения были сохранены; войдите снова, чтобы продолжить.", max: "Сеанс завершён: истёк максимальный срок, заданный администратором. Войдите снова." };
   const reason = params.get("reason");
+  // Причину сервер помнит 10 минут и теряет при перезапуске: если ушли надолго, в ответе её уже нет.
+  // Без объяснения страница входа выглядит так, будто приложение «просто перезагрузилось», — поэтому говорим хотя бы общее.
   if (reason && REASONS[reason]) { show($("#login-msg"), REASONS[reason]); params.delete("reason"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); }
+  else if (params.get("next")) show($("#login-msg"), "Сеанс закончился — войдите снова, и вы вернётесь на ту же страницу. Если это повторяется слишком часто, администратор меняет правило в «Настройки → Сеансы».");
   if (err && GOOGLE_ERRORS[err]) { show($("#login-msg"), GOOGLE_ERRORS[err]); params.delete("error"); history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); }
   $("#google-btn").href = "/api/auth/google/start?next=" + encodeURIComponent(nextUrl());
   if (document.documentElement.dataset.google === "1") return; // сервер уже сказал: блок нарисован сразу, ничего не двигаем
