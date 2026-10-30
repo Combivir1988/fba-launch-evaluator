@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { configScope, topForSchema, isFresh, freshListings } from "../shared/config-scope.js";
 import { normalizeValue, parseNumber, sanitizeSchema, mergeExtraction, setCell, renameOption, fillFromText } from "../shared/config-extract.js";
 import { configStats, NO_DATA } from "../shared/config-stats.js";
-import { buildTzPayload, collectTzNumbers, markUnverified, priceFacts, strayPrices } from "../shared/tz-payload.js";
+import { buildTzPayload, collectTzNumbers, markUnverified, priceFacts, strayPrices, pipelineTalk } from "../shared/tz-payload.js";
 import { mergeThresholds } from "../shared/thresholds.js";
 import { newAnalysis } from "../shared/analysis.js";
 import { compute } from "../shared/compute.js";
@@ -223,4 +223,26 @@ test("добор из текста: модель пропустила «24 Pack�
   const list4 = { A1: { brand: "Citrus Products", title: "Citrus Products Urinal Screen, Midnight Coast", bullets: [], specs: [] } };
   fillFromText({ schema, rows: rows4, listings: list4 });
   assert.equal(rows4.A1.values.scent?.value ?? null, null, "название бренда не считается значением поля");
+});
+
+test("ТЗ не пересказывает внутренности приложения: «патентный скан не передан (null)» помечается, а пустые разделы в факты не уходят", () => {
+  // живой случай 2026-10-30: у камер патентный скан БЫЛ (status clear, 12 патентов), а ТЗ написало «не передан (null)»
+  const payload = { pricing: { marketPrice: 25.98 }, patents: { status: "clear", summary: "пересечений нет" } };
+  const tz = markUnverified({ summary: "Делаем камеру TPU 700c.", rows: [
+    { requirement: "Провести FTO-поиск по ниппелю до запуска", rationale: "Патентный скан не передан (null) — риск нарушения прав", source: "патентный скан" },
+    { requirement: "Проверить сертификацию", rationale: "Регуляторные триггеры не переданы", source: "регуляторика" },
+    { requirement: "Материал TPU, толщина 0,6 мм", rationale: "доминирующая конфигурация ниши", source: "этап 2" },
+  ] }, collectTzNumbers(payload), priceFacts(payload));
+  assert.deepEqual(tz.rows.map((r) => r.internal), [true, true, false]);
+  assert.equal(tz.internalRows, 2);
+  // текст про сам товар не трогаем: «фактура» — не «факты», «не указано на корпусе» — требование, а не жалоба на данные
+  for (const ok of ["Фактура поверхности матовая", "Давление не указано на корпусе камеры", "Нет острых кромок"]) assert.equal(pipelineTalk(ok), false, ok);
+  for (const bad of ["нет данных в фактах", "факт не предоставлен", "значение null"]) assert.equal(pipelineTalk(bad), true, bad);
+
+  // пустой раздел не отправляется вовсе — пересказывать как «не передано» будет нечего
+  const a = newAnalysis(); a.results = { regulatory: { triggers: [] } };
+  const p = buildTzPayload(a);
+  assert.equal("regulatory" in p, false, "пустые триггеры в факты не уходят");
+  a.results.regulatory.triggers = [{ agency: "CPSC", kind: "type", title: "детский товар", meaning: "нужна проверка" }];
+  assert.equal(buildTzPayload(a).regulatory.length, 1, "непустой раздел уходит как есть");
 });
