@@ -39,7 +39,8 @@ const same = (field, a, b) => {
 /**
  * @param {object} o { config: core.config, stats: results.config.whole, xray, listings, choice: config.priceChoice, inputs, th }
  * @returns {object|null} { fields, selectedCount, tier, analogs, market, entry, ceiling, marketEff, cogsCeiling, contributions, warn }
- * Потолок себестоимости — по определению маржи Gate 1: COGS ≤ цена × (1 − referral − маржа) − FBA − доставка до склада.
+ * Потолок себестоимости: COGS ≤ цена × (1 − referral − маржа) − FBA − доставка до склада − реклама на единицу,
+ * и одновременно не выше порога Gate 1 (там маржа считается без рекламы, а в дешёвом сегменте планка выше).
  */
 export function priceByConfig({ config, stats, xray, listings = {}, choice = {}, inputs = {}, th = {} } = {}) {
   const rows = Object.entries(config?.table?.rows || {}); if (!stats || !rows.length) return null;
@@ -72,14 +73,26 @@ export function priceByConfig({ config, stats, xray, listings = {}, choice = {},
   const referral = isNum(inputs.referralPct) ? inputs.referralPct : 0.15;
   const fbaKnown = isNum(inputs.fbaFee) && inputs.fbaFee > 0, shipKnown = isNum(inputs.shippingPerUnit) && inputs.shippingPerUnit > 0;
   const fba = fbaKnown ? inputs.fbaFee : 0, ship = shipKnown ? inputs.shippingPerUnit : 0;
-  // Дешёвый сегмент: Gate 1 там требует больше (cheapMarginMin вместо marginMin) — при цене ниже $25 прибыль $15/шт недостижима,
-  // так что потолок по 30 % обещал бы себестоимость, с которой гейт всё равно не пропустит.
+  // Реклама — такой же расход на единицу, как FBA: покупку надо сначала купить. Считаем её как Gate 2:
+  // цена клика ÷ конверсия = стоимость заказа, умноженная на долю продаж с рекламы.
+  const cvr = isNum(inputs.cvr) && inputs.cvr > 0 ? inputs.cvr : 0.1, ppc = isNum(inputs.ppcShare) ? inputs.ppcShare : 0.7;
+  const adKnown = isNum(inputs.cpc) && inputs.cpc > 0;
+  const ad = adKnown ? (inputs.cpc / cvr) * ppc : 0;
+  // Две планки, и обе должны выполняться. Основная — маржа ПОСЛЕ рекламы; вторая — Gate 1 без рекламы, где
+  // для дешёвого сегмента порог выше (при цене ниже $25 прибыль $15/шт недостижима). Берём меньшее:
+  // потолок не вправе обещать себестоимость, с которой гейт не пропустит.
   const cheapPrice = isNum(th?.cheapPrice) ? th.cheapPrice : null;
   const cheap = isNum(market) && cheapPrice !== null && market < cheapPrice;
-  const marginMin = (cheap && isNum(th?.cheapMarginMin) ? th.cheapMarginMin : th?.marginMin) ?? 0.3;
-  const cogsCeiling = isNum(market) ? round(market * (1 - referral - marginMin) - fba - ship, 2) : null;
-  // Не задано — значит не вычтено: честнее сказать, что потолок завышен, чем молча считать сбор нулевым.
-  const cogsCeilingMissing = [!fbaKnown ? "FBA-сбор" : null, !shipKnown ? "доставка до склада Amazon" : null].filter(Boolean);
+  const marginAds = th?.marginMin ?? 0.3;
+  const marginNoAds = (cheap && isNum(th?.cheapMarginMin) ? th.cheapMarginMin : th?.marginMin) ?? 0.3;
+  const byAds = isNum(market) ? market * (1 - referral - marginAds) - fba - ship - ad : null;
+  const byGate1 = isNum(market) ? market * (1 - referral - marginNoAds) - fba - ship : null;
+  const adBinds = adKnown && isNum(byAds) && byAds <= byGate1; // без цены клика реклама не вычтена — потолок не «после рекламы»
+  const cogsCeiling = isNum(market) ? round(Math.min(byAds, byGate1), 2) : null;
+  const marginMin = adBinds ? marginAds : marginNoAds;
+  // Не задано — значит не вычтено: честнее сказать, что потолок завышен, чем молча считать расход нулевым.
+  const cogsCeilingMissing = [!fbaKnown ? "FBA-сбор" : null, !shipKnown ? "доставка до склада Amazon" : null, !adKnown ? "реклама (нет цены клика)" : null].filter(Boolean);
   const leader = analogs.slice().sort((a, b) => b.w - a.w)[0] || null;
-  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, cogsCeilingCheap: cheap, cheapPrice, cogsCeilingMissing, cogsCeilingParts: { referral, fba, ship }, contributions, warn, analogAsins: analogs.map((a) => a.asin).slice(0, 50) };
+  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, cogsCeilingCheap: cheap, cheapPrice, cogsCeilingMissing, cogsCeilingAfterAds: adBinds, adCostPerUnit: adKnown ? round(ad, 2) : null,
+    cogsCeilingParts: { referral, fba, ship, ad: adKnown ? round(ad, 2) : null, cpc: adKnown ? inputs.cpc : null, cvr, ppcShare: ppc }, contributions, warn, analogAsins: analogs.map((a) => a.asin).slice(0, 50) };
 }

@@ -70,26 +70,40 @@ test("нет аналогов под сочетание: вместо тупик
   assert.equal(ok.fallback, null, "когда аналоги есть, ничего не меняется");
 });
 
-test("потолок себестоимости согласован с Gate 1: при COGS = потолку маржа без рекламы ровно минимальная", () => {
+test("потолок себестоимости согласован с экономикой: при COGS = потолку маржа ПОСЛЕ рекламы ровно минимальная", () => {
   const { config, stats, xray, listings } = build();
-  const inputs = { referralPct: 0.15, fbaFee: 5, shippingPerUnit: 2.4 };
+  const inputs = { referralPct: 0.15, fbaFee: 5, shippingPerUnit: 2.4, cpc: 1.2, cvr: 0.1, ppcShare: 0.7, unitsPerDay: 10 };
   const th = { minAnalogs: 5, marginMin: 0.3, cheapPrice: 25, cheapMarginMin: 0.4 };
   const pc = priceByConfig({ config, stats, xray, listings, inputs, th });
-  assert.equal(pc.cogsCeiling, Math.round((pc.market * (1 - 0.15 - 0.3) - 5 - 2.4) * 100) / 100, "доставка до склада вычитается, как в Gate 1");
-  // главная проверка: подставляем потолок в ту же экономику, что считает гейт
+  const ad = (1.2 / 0.1) * 0.7; // стоимость заказа × доля продаж с рекламы
+  assert.equal(pc.adCostPerUnit, Math.round(ad * 100) / 100); assert.equal(pc.cogsCeilingAfterAds, true);
+  assert.equal(pc.cogsCeiling, Math.round((pc.market * (1 - 0.15 - 0.3) - 5 - 2.4 - ad) * 100) / 100, "реклама и доставка вычитаются");
+  // главная проверка: подставляем потолок в ту же экономику, что считает дашборд
   const e = economics({ ...inputs, price: pc.market, cogs: pc.cogsCeiling }, mergeThresholds({}));
-  assert.ok(Math.abs(e.gate1.margin0 - 0.3) < 0.002, `маржа при COGS = потолку должна быть ровно 30 %, получилось ${(e.gate1.margin0 * 100).toFixed(1)} %`);
+  assert.ok(Math.abs(e.marginWithAds - 0.3) < 0.002, `маржа с рекламой при COGS = потолку должна быть 30 %, получилось ${(e.marginWithAds * 100).toFixed(1)} %`);
+  assert.ok(e.gate1.margin0 > 0.3, "без рекламы остаётся запас");
   assert.deepEqual(pc.cogsCeilingMissing, [], "всё задано — оговорки нет");
+  // без цены клика рекламу вычесть не из чего — потолок выше и помечен
+  const noAd = priceByConfig({ config, stats, xray, listings, inputs: { ...inputs, cpc: null }, th });
+  assert.equal(noAd.cogsCeilingAfterAds, false); assert.ok(noAd.cogsCeilingMissing.includes("реклама (нет цены клика)"));
+  assert.ok(noAd.cogsCeiling > pc.cogsCeiling);
 
   // доставка не задана: её не из чего вычесть, поэтому потолок выше и помечен
-  const noShip = priceByConfig({ config, stats, xray, listings, inputs: { referralPct: 0.15, fbaFee: 5 }, th });
+  const noShip = priceByConfig({ config, stats, xray, listings, inputs: { ...inputs, shippingPerUnit: null }, th });
   assert.deepEqual(noShip.cogsCeilingMissing, ["доставка до склада Amazon"]);
   assert.equal(Math.round((noShip.cogsCeiling - pc.cogsCeiling) * 100) / 100, 2.4);
   // FBA-сбор не задан — тоже оговорка
-  assert.deepEqual(priceByConfig({ config, stats, xray, listings, inputs: {}, th }).cogsCeilingMissing, ["FBA-сбор", "доставка до склада Amazon"]);
+  assert.deepEqual(priceByConfig({ config, stats, xray, listings, inputs: {}, th }).cogsCeilingMissing, ["FBA-сбор", "доставка до склада Amazon", "реклама (нет цены клика)"]);
 
   // дешёвый сегмент: Gate 1 требует там больше, потолок считается по той же планке
-  const cheap = priceByConfig({ config, stats, xray, listings, inputs, th: { ...th, cheapPrice: 200 } });
-  assert.equal(cheap.cogsCeilingCheap, true); assert.equal(cheap.marginMin, 0.4);
-  assert.equal(cheap.cogsCeiling, Math.round((cheap.market * (1 - 0.15 - 0.4) - 5 - 2.4) * 100) / 100);
+  // дешёвый сегмент: порог Gate 1 без рекламы выше, и потолок берёт меньшее из двух правил
+  const cheapNoAd = priceByConfig({ config, stats, xray, listings, inputs: { ...inputs, cpc: 0.05 }, th: { ...th, cheapPrice: 200 } });
+  assert.equal(cheapNoAd.cogsCeilingCheap, true); assert.equal(cheapNoAd.cogsCeilingAfterAds, false, "дешёвая реклама — ограничивает Gate 1");
+  assert.equal(cheapNoAd.marginMin, 0.4);
+  assert.equal(cheapNoAd.cogsCeiling, Math.round((cheapNoAd.market * (1 - 0.15 - 0.4) - 5 - 2.4) * 100) / 100);
+  // реклама дороже разницы планок (10 % цены) — тогда ограничивает она
+  const cheapAd = priceByConfig({ config, stats, xray, listings, inputs: { ...inputs, cpc: 2.5 }, th: { ...th, cheapPrice: 200 } });
+  assert.equal(cheapAd.cogsCeilingAfterAds, true, "дорогая реклама — ограничивает она");
+  assert.equal(cheapAd.cogsCeiling, Math.round((cheapAd.market * (1 - 0.15 - 0.3) - 5 - 2.4 - (2.5 / 0.1) * 0.7) * 100) / 100);
+  assert.ok(cheapAd.cogsCeiling < cheapNoAd.cogsCeiling);
 });

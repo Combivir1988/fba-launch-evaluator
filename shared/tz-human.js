@@ -7,7 +7,7 @@
 const PATHS = [
   ["pricing.marketPriceWithCoupons", "рыночная цена с учётом купонов"],
   ["pricing.cogsCeilingForMinMargin", "потолок себестоимости при минимальной марже"],
-  ["pricing.amazonReferralPct", "комиссия Amazon"], ["pricing.fbaFeePerUnit", "FBA-сбор за единицу"], ["pricing.shippingPerUnitToAmazon", "доставка до склада Amazon за единицу"],
+  ["pricing.amazonReferralPct", "комиссия Amazon"], ["pricing.adCostPerUnit", "стоимость рекламы на единицу"], ["pricing.fbaFeePerUnit", "FBA-сбор за единицу"], ["pricing.shippingPerUnitToAmazon", "доставка до склада Amazon за единицу"],
   ["pricing.cogsCeilingWarning", "оговорка к потолку себестоимости"], ["pricing.cogsCeilingIsAfter", "что уже вычтено из потолка себестоимости"],
   ["pricing.matchedFieldsPct", "совпадение полей конфигурации"],
   ["pricing.marketPrice", "рыночная цена аналогов такой же конфигурации"],
@@ -36,7 +36,7 @@ const PATHS = [
 ];
 // Одиночные имена полей, которые модель пишет без префикса.
 const KEYS = [
-  ["marketPriceWithCoupons", "рыночная цена с учётом купонов"], ["cogsCeilingForMinMargin", "потолок себестоимости при минимальной марже"], ["amazonReferralPct", "комиссия Amazon"], ["fbaFeePerUnit", "FBA-сбор за единицу"], ["shippingPerUnitToAmazon", "доставка до склада Amazon за единицу"],
+  ["marketPriceWithCoupons", "рыночная цена с учётом купонов"], ["cogsCeilingForMinMargin", "потолок себестоимости при минимальной марже"], ["amazonReferralPct", "комиссия Amazon"], ["adCostPerUnit", "стоимость рекламы на единицу"], ["fbaFeePerUnit", "FBA-сбор за единицу"], ["shippingPerUnitToAmazon", "доставка до склада Amazon за единицу"],
   ["marketPrice", "рыночная цена аналогов"], ["ceilingPrice", "потолок цены"], ["entryPrice", "цена входа"], ["minMarginPct", "минимальная маржа"],
   ["discountRevSharePct", "доля выручки со скидкой"], ["couponRevSharePct", "доля выручки с купонами"], ["dealRevSharePct", "доля выручки с дилами"],
   ["avgDiscountPct", "средний размер скидки"], ["avgCouponPct", "средний размер купона"],
