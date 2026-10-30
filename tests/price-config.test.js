@@ -7,6 +7,8 @@ import { mergeExtraction } from "../shared/config-extract.js";
 import { entryFixture } from "./helpers/entry-fixture.js";
 import { withConfig } from "./helpers/config-fixture.js";
 import { compute } from "../shared/compute.js";
+import { economics } from "../shared/economics.js";
+import { mergeThresholds } from "../shared/thresholds.js";
 
 const asin = (i) => "B0" + String(i).padStart(8, "0");
 const schema = { fields: [{ id: "conn", name: "Подключение", type: "choice", unit: null, options: ["BT", "wire"], hint: "" }, { id: "zones", name: "Зоны", type: "number", unit: "шт", options: [], hint: "" }, { id: "note", name: "УТП", type: "text", unit: null, options: [], hint: "" }] };
@@ -66,4 +68,28 @@ test("нет аналогов под сочетание: вместо тупик
   assert.equal(pc.analogs, 12, "в основе — все листинги области");
   const ok = priceByConfig({ config, stats, xray, listings, choice: { conn: "BT", zones: 9 }, inputs: {}, th: { minAnalogs: 5, marginMin: 0.3 } });
   assert.equal(ok.fallback, null, "когда аналоги есть, ничего не меняется");
+});
+
+test("потолок себестоимости согласован с Gate 1: при COGS = потолку маржа без рекламы ровно минимальная", () => {
+  const { config, stats, xray, listings } = build();
+  const inputs = { referralPct: 0.15, fbaFee: 5, shippingPerUnit: 2.4 };
+  const th = { minAnalogs: 5, marginMin: 0.3, cheapPrice: 25, cheapMarginMin: 0.4 };
+  const pc = priceByConfig({ config, stats, xray, listings, inputs, th });
+  assert.equal(pc.cogsCeiling, Math.round((pc.market * (1 - 0.15 - 0.3) - 5 - 2.4) * 100) / 100, "доставка до склада вычитается, как в Gate 1");
+  // главная проверка: подставляем потолок в ту же экономику, что считает гейт
+  const e = economics({ ...inputs, price: pc.market, cogs: pc.cogsCeiling }, mergeThresholds({}));
+  assert.ok(Math.abs(e.gate1.margin0 - 0.3) < 0.002, `маржа при COGS = потолку должна быть ровно 30 %, получилось ${(e.gate1.margin0 * 100).toFixed(1)} %`);
+  assert.deepEqual(pc.cogsCeilingMissing, [], "всё задано — оговорки нет");
+
+  // доставка не задана: её не из чего вычесть, поэтому потолок выше и помечен
+  const noShip = priceByConfig({ config, stats, xray, listings, inputs: { referralPct: 0.15, fbaFee: 5 }, th });
+  assert.deepEqual(noShip.cogsCeilingMissing, ["доставка до склада Amazon"]);
+  assert.equal(Math.round((noShip.cogsCeiling - pc.cogsCeiling) * 100) / 100, 2.4);
+  // FBA-сбор не задан — тоже оговорка
+  assert.deepEqual(priceByConfig({ config, stats, xray, listings, inputs: {}, th }).cogsCeilingMissing, ["FBA-сбор", "доставка до склада Amazon"]);
+
+  // дешёвый сегмент: Gate 1 требует там больше, потолок считается по той же планке
+  const cheap = priceByConfig({ config, stats, xray, listings, inputs, th: { ...th, cheapPrice: 200 } });
+  assert.equal(cheap.cogsCeilingCheap, true); assert.equal(cheap.marginMin, 0.4);
+  assert.equal(cheap.cogsCeiling, Math.round((cheap.market * (1 - 0.15 - 0.4) - 5 - 2.4) * 100) / 100);
 });

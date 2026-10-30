@@ -39,6 +39,7 @@ const same = (field, a, b) => {
 /**
  * @param {object} o { config: core.config, stats: results.config.whole, xray, listings, choice: config.priceChoice, inputs, th }
  * @returns {object|null} { fields, selectedCount, tier, analogs, market, entry, ceiling, marketEff, cogsCeiling, contributions, warn }
+ * Потолок себестоимости — по определению маржи Gate 1: COGS ≤ цена × (1 − referral − маржа) − FBA − доставка до склада.
  */
 export function priceByConfig({ config, stats, xray, listings = {}, choice = {}, inputs = {}, th = {} } = {}) {
   const rows = Object.entries(config?.table?.rows || {}); if (!stats || !rows.length) return null;
@@ -64,8 +65,21 @@ export function priceByConfig({ config, stats, xray, listings = {}, choice = {},
   const items = analogs.map((s) => ({ v: s.price, w: s.w || 1 })), effItems = analogs.map((s) => ({ v: s.eff ?? s.price, w: s.w || 1 }));
   const market = wquantile(items, 0.5), entry = wquantile(items, 0.25), ceiling = wquantile(items, 0.75), marketEff = wquantile(effItems, 0.5);
   const contributions = selected.map((f) => { const cur = f.values.find((v) => same(f.field, v.value, f.value)); const dom = f.values.find((v) => same(f.field, v.value, f.dominant)); return { id: f.id, name: f.name, value: f.label, dominant: f.dominantLabel, isDominant: f.dominant !== null && same(f.field, f.value, f.dominant), avgPrice: cur?.avgPrice ?? null, dominantAvgPrice: dom?.avgPrice ?? null, delta: isNum(cur?.avgPrice) && isNum(dom?.avgPrice) ? round(cur.avgPrice - dom.avgPrice, 2) : null, premium: Boolean(cur?.premium), share: cur?.share ?? 0 }; });
-  const referral = isNum(inputs.referralPct) ? inputs.referralPct : 0.15, fba = isNum(inputs.fbaFee) ? inputs.fbaFee : 0, marginMin = th?.marginMin ?? 0.3;
-  const cogsCeiling = isNum(market) ? round(market * (1 - referral) - fba - market * marginMin, 2) : null;
+  // Потолок себестоимости считается по ТОМУ ЖЕ определению маржи, что и Gate 1 (shared/economics.js):
+  //   нетто = цена − COGS − доставка до склада − комиссия Amazon − FBA,  маржа = нетто / цена,
+  // отсюда COGS ≤ цена × (1 − referral − маржа) − FBA − доставка. Доставка за единицу раньше не вычиталась вовсе —
+  // потолок был завышен ровно на неё, и товар с таким COGS Gate 1 не проходил.
+  const referral = isNum(inputs.referralPct) ? inputs.referralPct : 0.15;
+  const fbaKnown = isNum(inputs.fbaFee) && inputs.fbaFee > 0, shipKnown = isNum(inputs.shippingPerUnit) && inputs.shippingPerUnit > 0;
+  const fba = fbaKnown ? inputs.fbaFee : 0, ship = shipKnown ? inputs.shippingPerUnit : 0;
+  // Дешёвый сегмент: Gate 1 там требует больше (cheapMarginMin вместо marginMin) — при цене ниже $25 прибыль $15/шт недостижима,
+  // так что потолок по 30 % обещал бы себестоимость, с которой гейт всё равно не пропустит.
+  const cheapPrice = isNum(th?.cheapPrice) ? th.cheapPrice : null;
+  const cheap = isNum(market) && cheapPrice !== null && market < cheapPrice;
+  const marginMin = (cheap && isNum(th?.cheapMarginMin) ? th.cheapMarginMin : th?.marginMin) ?? 0.3;
+  const cogsCeiling = isNum(market) ? round(market * (1 - referral - marginMin) - fba - ship, 2) : null;
+  // Не задано — значит не вычтено: честнее сказать, что потолок завышен, чем молча считать сбор нулевым.
+  const cogsCeilingMissing = [!fbaKnown ? "FBA-сбор" : null, !shipKnown ? "доставка до склада Amazon" : null].filter(Boolean);
   const leader = analogs.slice().sort((a, b) => b.w - a.w)[0] || null;
-  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, contributions, warn, analogAsins: analogs.map((a) => a.asin).slice(0, 50) };
+  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, cogsCeilingCheap: cheap, cheapPrice, cogsCeilingMissing, cogsCeilingParts: { referral, fba, ship }, contributions, warn, analogAsins: analogs.map((a) => a.asin).slice(0, 50) };
 }
