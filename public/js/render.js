@@ -659,10 +659,76 @@
     return (v > 0 ? "+" : "") + fmtN(v) + " %";
   }
   function pieRows(f) {
-    const vals = f.values.slice(0, PIE_MAX); const rest = f.values.slice(PIE_MAX);
-    if (rest.length) vals.push({ label: `прочее (${rest.length})`, share: rest.reduce((s, v) => s + v.share, 0), revenue: rest.reduce((s, v) => s + v.revenue, 0), count: rest.reduce((s, v) => s + v.count, 0), avgPrice: null, other: true });
-    if (f.noData.count) vals.push({ label: "нет данных", share: f.noData.share, revenue: f.noData.revenue, count: f.noData.count, avgPrice: null, noData: true });
+    const vals = f.values.slice(0, PIE_MAX).map((v) => ({ ...v, pick: [v.label] })); const rest = f.values.slice(PIE_MAX);
+    if (rest.length) vals.push({ label: `прочее (${rest.length})`, share: rest.reduce((s, v) => s + v.share, 0), revenue: rest.reduce((s, v) => s + v.revenue, 0), count: rest.reduce((s, v) => s + v.count, 0), avgPrice: null, other: true, pick: rest.map((v) => v.label) });
+    if (f.noData.count) vals.push({ label: "нет данных", share: f.noData.share, revenue: f.noData.revenue, count: f.noData.count, avgPrice: null, noData: true, pick: [] }); // «нет данных» — отдельная группа, её условие помечается флагом nd, а не меткой: метка могла бы совпасть со значением поля
     return vals;
+  }
+
+  // ---------- перекрёстный срез диаграмм этапа 2 ----------
+  // Клик по сектору оставляет листинги с этим значением, и ОСТАЛЬНЫЕ диаграммы считаются только по ним.
+  // Диаграмма поля, по которому идёт срез, остаётся полной: иначе в ней был бы один сектор и выбрать другое значение стало бы нечем.
+  // Срез живёт только в интерфейсе (container.__opts.configFilter): ни ТЗ, ни цена конфигурации, ни этап 3 его не видят.
+  const cfgPicks = (o) => (Array.isArray(o?.configFilter) ? o.configFilter : []);
+  const meanOf = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null);
+  const medianOf = (a) => { const v = [...a].sort((x, y) => x - y); if (!v.length) return null; const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
+  /** ASIN-ы одного условия среза (метки внутри поля объединяются: сектор «прочее» — это несколько значений). */
+  function pickAsins(SS, p) {
+    const f = SS.fields.find((x) => x.id === p.id); if (!f) return null;
+    const out = new Set();
+    if (p.nd) for (const a of f.noData.asins || []) out.add(a);
+    for (const lb of p.labels) for (const a of f.values.find((v) => v.label === lb)?.asins || []) out.add(a);
+    return out;
+  }
+  /** Пересечение условий, кроме поля exceptId. null — условий нет. */
+  function cfgKeep(SS, picks, exceptId = null) {
+    let keep = null;
+    for (const p of picks) { if (p.id === exceptId) continue; const s = pickAsins(SS, p); if (!s) continue; keep = keep === null ? s : new Set([...keep].filter((a) => s.has(a))); }
+    return keep;
+  }
+  /** Поле, пересчитанное по оставшимся листингам: доли, премия и покрытие считаются внутри среза, группы значений — те же. */
+  function sliceField(f, keep, byAsin, n, totalRevenue) {
+    const take = (g) => (g.asins || []).filter((a) => keep.has(a));
+    const byCount = totalRevenue <= 0; const share = (rev, cnt) => (n === 0 ? 0 : byCount ? cnt / n : rev / totalRevenue);
+    const prices = [];
+    const values = f.values.map((v) => {
+      const as = take(v); const revenue = as.reduce((s, a) => s + revenueOf(byAsin.get(a)), 0);
+      const pr = as.map((a) => byAsin.get(a)?.price).filter(isNum); prices.push(...pr);
+      return { ...v, asins: as, count: as.length, revenue, share: share(revenue, as.length), listingShare: n ? as.length / n : 0, avgPrice: meanOf(pr) };
+    }).filter((v) => v.count > 0).sort((x, y) => y.revenue - x.revenue || y.count - x.count || String(x.label).localeCompare(String(y.label), "ru"));
+    const med = medianOf(prices);
+    for (const v of values) v.premium = v.count >= 2 && v.share > v.listingShare && isNum(v.avgPrice) && isNum(med) && v.avgPrice > med;
+    const nd = take(f.noData); const ndRev = nd.reduce((s, a) => s + revenueOf(byAsin.get(a)), 0);
+    const d = values[0] || null;
+    return { ...f, values, noData: { ...f.noData, asins: nd, count: nd.length, revenue: ndRev, share: share(ndRev, nd.length) },
+      dominant: d ? { value: d.value, label: d.label, share: d.share, listingShare: d.listingShare, avgPrice: d.avgPrice } : null,
+      coverage: n ? 1 - nd.length / n : 0, priceMedian: med };
+  }
+  /** keeps[i] — множество ASIN для i-го поля (null — поле не режется), total — множество для подвала и счётчика. */
+  function cfgSlice(SS, keeps, byAsin, total) {
+    const rev = (set) => [...set].reduce((s, a) => s + revenueOf(byAsin.get(a)), 0);
+    const n = total.size; const tr = rev(total);
+    return { ...SS, asins: n, withRevenue: [...total].filter((a) => revenueOf(byAsin.get(a)) > 0).length, totalRevenue: tr, weightLabel: tr > 0 ? "revenue" : "count",
+      fields: SS.fields.map((f, i) => (keeps[i] ? sliceField(f, keeps[i], byAsin, keeps[i].size, rev(keeps[i])) : f)) };
+  }
+  /** Что показывать при текущем срезе: dom — доминанта и таблица (все условия), pie — диаграммы (без условия своего поля). */
+  function cfgViews(A, R, o) {
+    const st = R.config; const view = o.configView === "band" && st.band ? "band" : "whole"; const SS0 = st[view];
+    const picks = cfgPicks(o).filter((p) => SS0.fields.some((f) => f.id === p.id));
+    const byAsin = new Map((A.aggregates?.xray?.asins || []).map((a) => [a.asin, a]));
+    const keep = picks.length ? cfgKeep(SS0, picks) : null;
+    const dom = keep ? cfgSlice(SS0, SS0.fields.map(() => keep), byAsin, keep) : SS0;
+    const pie = keep ? cfgSlice(SS0, SS0.fields.map((f) => cfgKeep(SS0, picks, f.id)), byAsin, keep) : SS0;
+    return { view, SS0, picks, byAsin, keep, dom, pie };
+  }
+  /** Выбран ли этот сектор: метки сектора в точности совпали с условием по его полю. */
+  const cfgIsPicked = (picks, f, row) => { const p = picks.find((x) => x.id === f.id); return Boolean(p && Boolean(p.nd) === Boolean(row.noData) && p.labels.length === row.pick.length && row.pick.every((l) => p.labels.includes(l))); };
+  function cfgBar(V, SS0, o) {
+    if (!V.picks.length) return `<p class="muted" style="font-size:.8rem;margin:.4rem 0 0">Клик по сектору диаграммы (или по строке под ней) оставит только листинги с этим значением — остальные диаграммы и доминанта пересчитаются по ним.</p>`;
+    const chips = V.picks.map((p, i) => `<button type="button" class="chip band" data-cfg-drop="${i}" title="Убрать это условие">${esc(p.name)}: ${esc(p.title)} ✕</button>`).join("");
+    const n = V.keep ? V.keep.size : 0;
+    return `<div class="cfgfilter noprint"><span class="muted">Срез:</span>${chips}<button type="button" class="chip" data-cfg-reset>Сбросить</button>
+      <span class="muted">${fmtN(n)} из ${fmtN(SS0.asins)} листингов${n ? " · диаграмма поля, по которому идёт срез, остаётся полной — чтобы выбрать другое значение" : ""}</span></div>${n ? "" : '<div class="notice" style="margin:.4rem 0">Ни одного листинга с таким сочетанием значений — уберите одно из условий.</div>'}`;
   }
   function secConfig(A, R, o) {
     if (!A.aggregates?.xray?.asins?.length) return "";
@@ -682,12 +748,12 @@
     if (!C.table || !st) return head + btns + fieldsHtml + `<p class="muted">Схема готова — проверьте поля («Править схему»: переименовать, объединить значения, добавить или убрать поле) и запустите извлечение.</p>`;
     const rowsAll = Object.values(C.table.rows || {}); const missing = C.schema.fields.filter((f) => !rowsAll.some((r) => r.values && f.id in r.values));
     const stale = missing.length ? `<div class="notice" style="margin:.5rem 0"><b>Схема изменилась после извлечения:</b> по ${missing.length === C.schema.fields.length ? "всем полям" : `полям ${missing.map((f) => "«" + esc(f.name) + "»").join(", ")}`} данных ещё нет. ${o.static ? "Таблицу нужно извлечь заново." : "Нажмите «Извлечь заново» — страницы уже в кэше, кредиты Scrapfly не тратятся, ручные правки клеток сохранятся."}</div>` : "";
-    const view = o.configView === "band" && st.band ? "band" : "whole"; const SS = st[view];
+    const V = cfgViews(A, R, o); const view = V.view; const SS = V.dom;
     const toggle = st.band ? `<div class="row" style="gap:1rem;margin:.4rem 0;flex-wrap:wrap"><label class="row" style="gap:.3rem"><input type="radio" name="cfg-view" value="whole" data-config-view ${view === "whole" ? "checked" : ""}> вся ниша (${fmtN(st.whole.asins)} листингов)</label><label class="row" style="gap:.3rem"><input type="radio" name="cfg-view" value="band" data-config-view ${view === "band" ? "checked" : ""}> мой ценовой диапазон ${esc(R.priceBand?.label || "")} (${fmtN(st.band.asins)})</label></div>` : "";
     const dom = `<div class="tablewrap" style="margin-top:.6rem"><h3>Доминирующая конфигурация${view === "band" ? ` <span class="chip warn">диапазон ${esc(R.priceBand?.label || "")}</span>` : ""}</h3><table><thead><tr><th>Поле</th><th>Значение</th><th class="num">Доля выручки</th><th class="num">Доля листингов</th><th class="num">Средняя цена</th><th>Премия</th><th class="num">Покрытие</th></tr></thead><tbody>${SS.fields.map((f) => (f.dominant ? `<tr><td>${esc(f.name)}</td><td><b>${esc(f.dominant.label)}</b>${f.values.length > 1 ? `<br><small class="muted">затем: ${f.values.slice(1, 3).map((v) => esc(v.label) + " " + fmtPct(v.share)).join(", ")}</small>` : ""}</td><td class="num">${fmtPct(f.dominant.share, 1)}</td><td class="num">${fmtPct(f.dominant.listingShare, 1)}</td><td class="num">${fmtMoney(f.dominant.avgPrice, 2)}</td><td>${f.values.filter((v) => v.premium).map((v) => `<span class="chip prem" title="Доля выручки выше доли листингов при средней цене выше медианы поля — за это значение покупатель платит больше">★ ${esc(v.label)}</span>`).join(" ") || "—"}</td><td class="num">${fmtPct(f.coverage)}</td></tr>` : `<tr><td>${esc(f.name)}</td><td colspan="6" class="muted">нет данных ни по одному листингу</td></tr>`)).join("")}</tbody></table>
       <p class="muted" style="font-size:.8rem">Вес — ${SS.weightLabel === "revenue" ? "выручка ASIN по Xray" : "число листингов (выручки в Xray нет)"} · листингов ${fmtN(SS.asins)}${SS.weightLabel === "revenue" ? `, с выручкой ${fmtN(SS.withRevenue)}, всего ${fmtK(SS.totalRevenue)}/мес` : ""}. «Нет данных» — отдельный сектор, сумма долей по полю всегда 100 %.</p></div>`;
-    const pies = `<div class="piegrid">${SS.fields.map((f) => `<div class="pie"><h4>${esc(f.name)}${f.unit ? ` <small class="muted">${esc(f.unit)}</small>` : ""} <span class="chip ${f.coverage >= 0.7 ? "ok" : f.coverage >= 0.4 ? "warn" : "na"}" title="Покрытие: доля листингов, где значение найдено">${fmtPct(f.coverage)}</span>${f.bucketed ? '<span class="chip na" title="Значений слишком много — показаны интервалы">интервалы</span>' : ""}</h4><div class="chartbox short"><canvas id="ch-cfg-${esc(f.id)}"></canvas></div><table class="pietab"><tbody>${pieRows(f).map((v) => `<tr class="${v.noData ? "muted" : ""}"><td>${v.premium ? "★ " : ""}${esc(v.label)}</td><td class="num">${fmtPct(v.share, 1)}</td><td class="num">${SS.weightLabel === "revenue" ? fmtK(v.revenue) : "—"}</td><td class="num">${fmtN(v.count)} лист.</td><td class="num">${fmtMoney(v.avgPrice)}</td></tr>`).join("")}</tbody></table></div>`).join("")}</div>`;
-    return head + btns + stale + toggle + fieldsHtml + dom + priceBlock(A, R, o) + promoBlock(st.promo, o) + pies + cfgTable(A, C, o);
+    const pies = `<div class="piegrid">${V.pie.fields.map((f, fi) => `<div class="pie"><h4>${esc(f.name)}${f.unit ? ` <small class="muted">${esc(f.unit)}</small>` : ""} <span class="chip ${f.coverage >= 0.7 ? "ok" : f.coverage >= 0.4 ? "warn" : "na"}" title="Покрытие: доля листингов, где значение найдено">${fmtPct(f.coverage)}</span>${f.bucketed ? '<span class="chip na" title="Значений слишком много — показаны интервалы">интервалы</span>' : ""}</h4><div class="chartbox short"><canvas id="ch-cfg-${esc(f.id)}"></canvas></div><table class="pietab"><tbody>${pieRows(f).map((v, ri) => `<tr class="${v.noData ? "muted" : ""}${cfgIsPicked(V.picks, f, v) ? " picked" : ""}" data-cfg-pick="${fi}|${ri}" title="${cfgIsPicked(V.picks, f, v) ? "Убрать срез по этому значению" : "Оставить только листинги с этим значением"}"><td>${v.premium ? "★ " : ""}${esc(v.label)}</td><td class="num">${fmtPct(v.share, 1)}</td><td class="num">${V.pie.weightLabel === "revenue" ? fmtK(v.revenue) : "—"}</td><td class="num">${fmtN(v.count)} лист.</td><td class="num">${fmtMoney(v.avgPrice)}</td></tr>`).join("")}</tbody></table></div>`).join("")}</div>`;
+    return head + btns + stale + toggle + fieldsHtml + cfgBar(V, st[view], o) + dom + priceBlock(A, R, o) + promoBlock(st.promo, o) + pies + cfgTable(A, C, o, V.keep);
   }
   /** Пустые клетки таблицы, которые можно попробовать добрать из текста листинга (числа и списки). */
   const emptyCells = (A, C) => {
@@ -744,27 +810,42 @@
     return s.length > 24 ? s.slice(0, 23) + "…" : s;
   };
   const promoChips = (p) => (p === undefined || p === null ? '<span class="muted" title="нет данных о промо: страница загружена до появления этой функции — нажмите «Обновить промо»">—</span>' : [isNum(p.discountPct) && p.discountPct > 0 ? `<span class="chip warn" title="скидка от List Price ${fmtMoney(p.listPrice, 2)}">−${p.discountPct} %</span>` : "", p.coupon ? `<span class="chip fail" title="${esc(p.coupon.text)}">купон ${p.coupon.unit === "%" ? p.coupon.value + " %" : "$" + p.coupon.value}</span>` : "", p.deal ? `<span class="chip fail">${esc(p.deal)}</span>` : "", p.sns ? `<span class="chip" title="Subscribe & Save: подписка с автодоставкой${isNum(p.sns.min) ? "" : " (процент скидки на странице не указан)"}">S&S${isNum(p.sns.min) ? ` ${p.sns.min}${isNum(p.sns.max) && p.sns.max !== p.sns.min ? "–" + p.sns.max : ""} %` : ""}</span>` : "", ...(p.promotions || []).map((t) => `<span class="chip" title="${esc(t)}">${esc(shortPromo(t))}</span>`)].filter(Boolean).join(" ") || '<span class="muted">нет</span>');
-  function cfgTable(A, C, o) {
+  function cfgTable(A, C, o, keep = null) {
     const byAsin = new Map((A.aggregates.xray?.asins || []).map((a) => [a.asin, a])); const fields = C.schema.fields;
-    const rows = Object.entries(C.table.rows).sort((x, y) => revenueOf(byAsin.get(y[0])) - revenueOf(byAsin.get(x[0])));
+    const all = Object.entries(C.table.rows).sort((x, y) => revenueOf(byAsin.get(y[0])) - revenueOf(byAsin.get(x[0])));
+    const rows = keep ? all.filter(([asin]) => keep.has(asin)) : all; // срез по диаграммам виден и в таблице: кто эти листинги
     const cell = (asin, f, c) => { const v = c?.value; const none = v === null || v === undefined; const txt = none ? "нет данных" : f.type === "number" ? fmtN(v, 2) + (f.unit ? " " + f.unit : "") : String(v);
       const title = [c?.source ? "источник: " + (CFG_SRC[c.source] || c.source) + (c?.auto ? " (добрано из текста листинга без AI)" : "") : "", c?.unlisted ? "значение вне списка схемы — добавьте его в список поля («Править схему») или объедините с существующим" : ""].filter(Boolean).join(" · ");
       return `<td class="${none ? "muted" : ""}${c?.unlisted ? " unlisted" : ""}${o.static ? "" : " editable"}"${o.static ? "" : ` data-cell="${esc(asin)}|${esc(f.id)}"`}${title ? ` title="${esc(title)}"` : ""}>${esc(txt)}${c?.unlisted ? " *" : ""}${c?.auto ? " ·" : ""}${c?.source === "manual" ? " ✎" : ""}</td>`; };
     const failed = C.table.failed || [];
-    return `<details class="cfgtable" ${o.configTableOpen ? "open" : ""}><summary>Таблица характеристик: ${fmtN(rows.length)} листингов × ${fields.length} полей${failed.length ? ` · не загружено ${failed.length}` : ""}${o.static ? "" : " — клетку можно править"}</summary>
+    return `<details class="cfgtable" ${o.configTableOpen ? "open" : ""}><summary>Таблица характеристик: ${fmtN(rows.length)}${keep ? ` из ${fmtN(all.length)}` : ""} листингов × ${fields.length} полей${failed.length ? ` · не загружено ${failed.length}` : ""}${o.static ? "" : " — клетку можно править"}</summary>
       <div class="tablewrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th>ASIN</th><th>Бренд</th><th class="num">Цена</th><th class="num">Выручка</th><th>Промо</th>${fields.map((f) => `<th title="${esc(f.hint || CFG_TYPE[f.type] || "")}">${esc(f.name)}</th>`).join("")}</tr></thead><tbody>${rows.map(([asin, r]) => { const a = byAsin.get(asin) || {}; return `<tr class="${r.status === "failed" ? "muted" : ""}"><td><a href="https://www.amazon.com/dp/${esc(asin)}" target="_blank" rel="noopener">${esc(asin)}</a>${r.status === "failed" ? '<br><small class="muted">страница не загрузилась</small>' : ""}</td><td>${esc(a.brand || "")}</td><td class="num">${fmtMoney(a.price, 2)}</td><td class="num">${fmtK(revenueOf(a))}</td><td class="promo">${promoChips(A.aggregates.listings?.[asin]?.promo)}</td>${fields.map((f) => cell(asin, f, r.values?.[f.id])).join("")}</tr>`; }).join("")}</tbody></table></div>
       ${C.table.stoodIn?.length ? `<p class="muted" style="font-size:.8rem">Выбранная модель ответила не на все пачки — часть листингов заполнила ${esc(C.table.stoodIn.join(", "))}.</p>` : ""}${C.table.aiErrors?.length ? `<div class="notice" style="margin-top:.4rem">AI не заполнил ${fmtN(C.table.aiErrors.reduce((n, e) => n + (e.asins?.length || 0), 0))} листинг(ов) из ${fmtN(Object.keys(C.table.rows).length)} — у них в таблице «нет данных». Причина: ${esc([...new Set(C.table.aiErrors.map((e) => e.message))].slice(0, 2).join("; "))}. Страницы уже загружены, повторное извлечение кредитов Scrapfly не потратит.</div>` : ""}
       <p class="muted" style="font-size:.8rem">Извлечено ${fmtDate(C.table.extractedAt)} · модель ${esc(C.table.model || "—")}${o.static ? "" : " · клик по клетке — исправить значение вручную (пометка ✎; повторное извлечение ручные значения не трогает)"}. Пометка · — клетку добрали прямо из текста листинга, без AI. Пометка * — значение найдено в листинге, но его нет в списке поля: оно учтено в диаграммах своей группой${o.static ? "" : "; добавьте его в список или объедините («Править схему»)"}.</p></details>`;
   }
   function drawConfig(container, R, A) {
-    const st = R.config; if (!st) return; const o = container.__opts || {}; const view = o.configView === "band" && st.band ? "band" : "whole"; const pal = series();
-    for (const f of st[view].fields) {
-      const rows = pieRows(f); if (!rows.length) continue;
-      mkChart(container, "ch-cfg-" + f.id, { type: "doughnut", desc: `Что это: доля выручки ниши по значениям поля «${f.name}» — вес каждого листинга равен его выручке по Xray. Сектор «нет данных» — листинги, где значение в тексте не найдено; сумма секторов 100 %.`, data: { labels: rows.map((v) => v.label), datasets: [{ data: rows.map((v) => Math.round(v.share * 1000) / 10), backgroundColor: rows.map((v, i) => (v.noData ? cssVar("--na-bg") : v.other ? cssVar("--muted") : pal[i % pal.length])), borderWidth: 2, borderColor: cssVar("--surface") || "#fff" }] },
-        options: { cutout: "55%", plugins: { legend: { display: false }, tooltip: { callbacks: { title: () => "", label: (c) => { const v = rows[c.dataIndex]; return `${v.premium ? "★ " : ""}${c.label} · ${fmtN(c.parsed, 1)} %${st[view].weightLabel === "revenue" && !v.noData && !v.other ? " · " + fmtK(v.revenue) : ""} · ${fmtN(v.count)} лист.${isNum(v.avgPrice) ? " · " + fmtMoney(v.avgPrice) : ""}`; } } } } } });
-    }
+    const st = R.config; if (!st) return; const o = container.__opts || {}; const pal = series();
+    const V = cfgViews(A, R, o);
+    const apply = (picks) => { container.__opts = { ...(container.__opts || {}), configFilter: picks }; fill(container, "config", A, R, container.__opts); };
+    /** Клик по сектору или строке: то же условие — убрать, другое по тому же полю — заменить. */
+    const toggle = (fi, ri) => {
+      const f = V.pie.fields[fi]; if (!f) return; const row = pieRows(f)[ri]; if (!row) return;
+      const picks = V.picks; const i = picks.findIndex((p) => p.id === f.id);
+      const next = { id: f.id, name: f.name, title: row.label, labels: row.pick, nd: Boolean(row.noData) };
+      apply(i < 0 ? [...picks, next] : cfgIsPicked(picks, f, row) ? picks.filter((_, k) => k !== i) : picks.map((p, k) => (k === i ? next : p)));
+    };
+    V.pie.fields.forEach((f, fi) => {
+      const rows = pieRows(f); if (!rows.length) return;
+      const picked = rows.map((v) => cfgIsPicked(V.picks, f, v));
+      mkChart(container, "ch-cfg-" + f.id, { type: "doughnut", desc: `Что это: доля выручки ниши по значениям поля «${f.name}» — вес каждого листинга равен его выручке по Xray. Сектор «нет данных» — листинги, где значение в тексте не найдено; сумма секторов 100 %. Клик по сектору оставит только листинги с этим значением.`, data: { labels: rows.map((v) => v.label), datasets: [{ data: rows.map((v) => Math.round(v.share * 1000) / 10), backgroundColor: rows.map((v, i) => (v.noData ? cssVar("--na-bg") : v.other ? cssVar("--muted") : pal[i % pal.length])), offset: picked.map((p) => (p ? 12 : 0)), borderWidth: 2, borderColor: cssVar("--surface") || "#fff" }] },
+        options: { cutout: "55%", onClick: (_e, els) => { if (els && els.length) toggle(fi, els[0].index); }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: () => "", label: (c) => { const v = rows[c.dataIndex]; return `${v.premium ? "★ " : ""}${c.label} · ${fmtN(c.parsed, 1)} %${V.pie.weightLabel === "revenue" && !v.noData && !v.other ? " · " + fmtK(v.revenue) : ""} · ${fmtN(v.count)} лист.${isNum(v.avgPrice) ? " · " + fmtMoney(v.avgPrice) : ""}`; } } } } } });
+    });
     // переключатель «вся ниша / диапазон» и раскрытие таблицы работают и в автономном HTML: состояние живёт на контейнере, секция перерисовывается
-    container.querySelectorAll("[data-config-view]").forEach((r) => r.addEventListener("change", () => { container.__opts = { ...o, configView: r.value }; fill(container, "config", A, R, container.__opts); }));
+    // при смене области срез сбрасывается: интервалы числовых полей считаются внутри области, и метка «112–122» там своя
+    container.querySelectorAll("[data-config-view]").forEach((r) => r.addEventListener("change", () => { container.__opts = { ...o, configView: r.value, configFilter: [] }; fill(container, "config", A, R, container.__opts); }));
+    container.querySelectorAll("#sec-config [data-cfg-pick]").forEach((tr) => tr.addEventListener("click", () => { const [fi, ri] = tr.dataset.cfgPick.split("|").map(Number); toggle(fi, ri); }));
+    container.querySelectorAll("#sec-config [data-cfg-drop]").forEach((b) => b.addEventListener("click", () => apply(V.picks.filter((_, k) => k !== Number(b.dataset.cfgDrop)))));
+    const reset = container.querySelector("#sec-config [data-cfg-reset]"); if (reset) reset.addEventListener("click", () => apply([]));
     const det = container.querySelector("#sec-config details.cfgtable"); if (det) det.addEventListener("toggle", () => { container.__opts = { ...(container.__opts || {}), configTableOpen: det.open }; });
   }
   function secTz(A, R, o) {

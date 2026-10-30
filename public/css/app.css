@@ -300,6 +300,13 @@ label.row { flex-wrap: nowrap; align-items: flex-start; } label.row > input[type
 .pie .chartbox.short { height: 170px; }
 .pietab { width: 100%; font-size: .78rem; margin-top: .4rem; } .pietab td { padding: .15rem .3rem; }
 .chip.prem { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+/* перекрёстный срез диаграмм этапа 2: клик по сектору или по строке под диаграммой */
+.cfgfilter { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .5rem 0; }
+.cfgfilter .chip { cursor: pointer; font: inherit; font-size: .8rem; }
+.pie .chartbox canvas { cursor: pointer; }
+.pietab tr[data-cfg-pick] { cursor: pointer; }
+.pietab tr[data-cfg-pick]:hover td { background: var(--surface-2); }
+.pietab tr.picked td { background: var(--pending-bg); color: var(--pending); font-weight: 600; }
 td.editable { cursor: pointer; } td.editable:hover { outline: 1px dashed var(--accent); outline-offset: -1px; }
 td.editable select, td.editable input { font-size: .85rem; padding: .1rem .3rem; }
 .tztable td[contenteditable], [data-tz-summary][contenteditable], li[data-tz-q][contenteditable] { cursor: text; }

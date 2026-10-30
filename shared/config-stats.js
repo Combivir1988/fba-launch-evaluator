@@ -1,5 +1,6 @@
 // Этап 2 (spec 010, D7): диаграммы «характеристика → выручка» детерминированно из таблицы ASIN × поля.
 // Вес — выручка ASIN (Xray); сектор «нет данных» всегда есть, сумма долей = 100 %. Считается по всей нише и по ценовому диапазону.
+// У каждой группы значений есть список её ASIN: по нему дашборд делает перекрёстный срез по клику на сектор, не пересчитывая извлечение.
 import { mean, median, round } from "./num.js";
 import { inBand } from "./price-band.js";
 import { revenueOf } from "./config-scope.js";
@@ -31,19 +32,19 @@ function fieldStats(field, rows, byAsin, totalRevenue, th) {
       keyOf = (v) => (isNum(v) ? find(v).label : v); labelOf = (k) => k;
     }
   }
-  const groups = new Map(); const noData = { revenue: 0, count: 0, share: 0 };
+  const groups = new Map(); const noData = { revenue: 0, count: 0, share: 0, asins: [] };
   for (const c of cells) {
     const w = c.a ? revenueOf(c.a) : 0; const price = c.a?.price;
-    if (c.v === null || c.v === undefined) { noData.revenue += w; noData.count++; continue; }
-    const k = keyOf(c.v); const g = groups.get(k) || { value: field.type === "number" && !groupsDef ? c.v : k, label: labelOf(k), revenue: 0, count: 0, prices: [] };
-    g.revenue += w; g.count++; if (isNum(price)) g.prices.push(price); groups.set(k, g);
+    if (c.v === null || c.v === undefined) { noData.revenue += w; noData.count++; noData.asins.push(c.asin); continue; }
+    const k = keyOf(c.v); const g = groups.get(k) || { value: field.type === "number" && !groupsDef ? c.v : k, label: labelOf(k), revenue: 0, count: 0, prices: [], asins: [] };
+    g.revenue += w; g.count++; g.asins.push(c.asin); if (isNum(price)) g.prices.push(price); groups.set(k, g);
   }
   const n = cells.length; const byCount = totalRevenue <= 0;
   const share = (rev, cnt) => (n === 0 ? 0 : byCount ? cnt / n : rev / totalRevenue);
   const priceMedian = median(cells.filter((c) => c.v !== null && c.v !== undefined && isNum(c.a?.price)).map((c) => c.a.price));
   const values = [...groups.values()].map((g) => {
     const s = share(g.revenue, g.count), ls = n ? g.count / n : 0, avg = mean(g.prices);
-    return { value: g.value, label: g.label, revenue: g.revenue, share: s, count: g.count, listingShare: ls, avgPrice: avg, premium: g.count >= 2 && s > ls && isNum(avg) && isNum(priceMedian) && avg > priceMedian };
+    return { value: g.value, label: g.label, revenue: g.revenue, share: s, count: g.count, listingShare: ls, avgPrice: avg, asins: g.asins, premium: g.count >= 2 && s > ls && isNum(avg) && isNum(priceMedian) && avg > priceMedian };
   }).sort((x, y) => y.revenue - x.revenue || y.count - x.count || String(x.label).localeCompare(String(y.label), "ru"));
   noData.share = share(noData.revenue, noData.count);
   return { id: field.id, name: field.name, type: field.type, unit: field.unit || null, bucketed: Boolean(groupsDef), values, noData, dominant: values.length ? { value: values[0].value, label: values[0].label, share: values[0].share, listingShare: values[0].listingShare, avgPrice: values[0].avgPrice } : null, coverage: n ? 1 - noData.count / n : 0, priceMedian };

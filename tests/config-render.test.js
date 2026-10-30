@@ -7,6 +7,8 @@ import { entryFixture } from "./helpers/entry-fixture.js";
 import { withConfig } from "./helpers/config-fixture.js";
 import { compute } from "../shared/compute.js";
 import { buildSnapshot } from "../shared/share-snapshot.js";
+import { configStatsFor } from "../shared/config-stats.js";
+import { mergeThresholds } from "../shared/thresholds.js";
 
 const RENDER = readFileSync(new URL("../public/js/render.js", import.meta.url), "utf8");
 function makeWindow() {
@@ -169,4 +171,82 @@ test("spec 017: вкладка этапа 3 показывает ключи и �
   const sh = draw(snap.analysis, { static: true, hidden: snap.hidden, stage: 3 });
   assert.equal(sh.dataset.stage, "1", "в снимке третьего этапа нет — показываем первый");
   assert.equal(JSON.stringify(snap).includes("Целевые ключи"), false);
+});
+
+test("перекрёстный срез диаграмм: клик по сектору режет остальные поля, своё поле остаётся полным, повторный клик и «Сбросить» возвращают всё", () => {
+  const a = withConfig(entryFixture()); const el = draw(a); const w = el.__w;
+  const st = a.results.config.whole; const f0 = st.fields[0]; const f1 = st.fields[1];
+  const keep = new Set(f0.values[0].asins); assert.ok(keep.size > 0 && keep.size < st.asins, "срез должен быть уже ниши");
+  // до клика — подсказка, как срезать, и ни одного условия
+  assert.equal(el.querySelector("#sec-config .cfgfilter"), null);
+  assert.match(el.querySelector("#sec-config").textContent, /Клик по сектору диаграммы/);
+  const pie0 = el.querySelectorAll("#sec-config .pie")[0];
+  const before = pie0.querySelectorAll("tr[data-cfg-pick]").length;
+  pie0.querySelector('tr[data-cfg-pick="0|0"]').click();
+
+  // условие появилось, счётчик листингов — размер среза
+  const bar = el.querySelector("#sec-config .cfgfilter"); assert.ok(bar, "строка среза");
+  assert.ok(bar.textContent.includes(`${f0.name}: ${f0.values[0].label}`), bar.textContent);
+  assert.match(bar.textContent, new RegExp(`${keep.size} из ${st.asins} листингов`));
+  assert.equal(el.querySelector('#sec-config tr[data-cfg-pick="0|0"]').classList.contains("picked"), true);
+
+  // чужое поле пересчитано ровно по листингам среза, своё — показано целиком
+  const pies = el.querySelectorAll("#sec-config .pie");
+  const counts = (pie) => [...pie.querySelectorAll("tr[data-cfg-pick]")].map((tr) => Number(tr.children[3].textContent.replace(/[^\d]/g, "")));
+  assert.equal(counts(pies[1]).reduce((s, v) => s + v, 0), keep.size, "сумма по чужому полю = листинги среза");
+  assert.equal(counts(pies[0]).reduce((s, v) => s + v, 0), st.asins, "своё поле режется не им самим");
+  assert.equal(pies[0].querySelectorAll("tr[data-cfg-pick]").length, before, "секторы своего поля на месте — можно выбрать другое значение");
+  // доли чужого поля считаются внутри среза: сумма 100 %
+  const shares = [...pies[1].querySelectorAll("tr[data-cfg-pick]")].map((tr) => Number(tr.children[1].textContent.replace(/[^\d,]/g, "").replace(",", ".")));
+  assert.ok(Math.abs(shares.reduce((s, v) => s + v, 0) - 100) < 0.6, `сумма долей ${shares}`);
+  // счёт по чужому полю сходится с сырыми данными
+  for (const [i, v] of f1.values.entries()) {
+    const n = v.asins.filter((x) => keep.has(x)).length; if (!n) continue;
+    const tr = [...pies[1].querySelectorAll("tr[data-cfg-pick]")].find((r) => r.children[0].textContent.replace("★ ", "") === v.label);
+    assert.ok(tr, `значение ${v.label} (${i}) в срезе`); assert.equal(Number(tr.children[3].textContent.replace(/[^\d]/g, "")), n);
+  }
+  // доминанта и таблица характеристик — по всем условиям среза
+  assert.match(el.querySelector("#sec-config details.cfgtable summary").textContent, new RegExp(`${keep.size} из ${st.asins} листингов`));
+  assert.equal(el.querySelectorAll("#sec-config details.cfgtable tbody tr").length, keep.size);
+
+  // второе условие по другому полю — пересечение
+  const row1 = el.querySelectorAll("#sec-config .pie")[1].querySelector('tr[data-cfg-pick="1|0"]'); // внутри среза значения пересортированы по выручке
+  const second = f1.values.find((v) => v.label === row1.children[0].textContent.replace("★ ", ""));
+  const both = second.asins.filter((x) => keep.has(x)).length;
+  row1.click();
+  assert.equal(el.querySelectorAll("#sec-config .cfgfilter .chip[data-cfg-drop]").length, 2);
+  assert.match(el.querySelector("#sec-config .cfgfilter").textContent, new RegExp(`${both} из ${st.asins} листингов`));
+  // клик по сектору графика — то же действие (Chart.js отдаёт индекс сектора)
+  const pieCharts = w.__charts.filter((c) => c.cfg.type === "doughnut").slice(-4);
+  assert.equal(typeof pieCharts[0].cfg.options.onClick, "function");
+  assert.ok(pieCharts[0].cfg.data.datasets[0].offset.some((v) => v > 0), "выбранный сектор выдвинут");
+  pieCharts[1].cfg.options.onClick(null, [{ index: 0 }]); // повторный клик по тому же сектору снимает условие
+  assert.equal(el.querySelectorAll("#sec-config .cfgfilter .chip[data-cfg-drop]").length, 1);
+
+  // «Сбросить» возвращает всю нишу
+  el.querySelector("#sec-config [data-cfg-reset]").click();
+  assert.equal(el.querySelector("#sec-config .cfgfilter"), null);
+  assert.equal(el.querySelectorAll("#sec-config details.cfgtable tbody tr").length, st.asins);
+});
+
+test("срез в дашборде считается так же, как ядро по этим же листингам (render.js не разошёлся с shared/config-stats.js)", () => {
+  const a = withConfig(entryFixture()); const el = draw(a);
+  const st = a.results.config.whole; const keep = new Set(st.fields[0].values[1].asins);
+  el.querySelector('#sec-config tr[data-cfg-pick="0|1"]').click();
+  const rows = Object.fromEntries(Object.entries(a.config.table.rows).filter(([x]) => keep.has(x)));
+  const exp = configStatsFor({ ...a.config, table: { ...a.config.table, rows } }, a.aggregates.xray, { th: mergeThresholds(a.thresholds) });
+  assert.equal(exp.asins, keep.size);
+  const pies = el.querySelectorAll("#sec-config .pie");
+  for (let i = 1; i < exp.fields.length; i++) {
+    const f = exp.fields[i]; if (f.bucketed) continue; // интервалы числового поля намеренно остаются от всей ниши — иначе подписи менялись бы на каждый клик
+    const trs = [...pies[i].querySelectorAll("tr[data-cfg-pick]")];
+    const want = [...f.values, ...(f.noData.count ? [{ label: "нет данных", share: f.noData.share, count: f.noData.count }] : [])];
+    assert.equal(trs.length, want.length, `${f.name}: секторов`);
+    want.forEach((v, j) => {
+      assert.equal(trs[j].children[0].textContent.replace("★ ", ""), v.label, `${f.name}: значение ${j}`);
+      assert.equal(Number(trs[j].children[3].textContent.replace(/[^\d]/g, "")), v.count, `${f.name}: ${v.label} листингов`);
+      const got = Number(trs[j].children[1].textContent.replace(/[^\d,]/g, "").replace(",", "."));
+      assert.ok(Math.abs(got - v.share * 100) < 0.06, `${f.name}: ${v.label} доля ${got} против ${v.share * 100}`);
+    });
+  }
 });
