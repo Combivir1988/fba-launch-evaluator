@@ -185,7 +185,8 @@ test("перекрёстный срез диаграмм: клик по сект
   pie0.querySelector('tr[data-cfg-pick="0|0"]').click();
 
   // условие появилось, счётчик листингов — размер среза
-  const bar = el.querySelector("#sec-config .cfgfilter"); assert.ok(bar, "строка среза");
+  const bars = el.querySelectorAll("#sec-config .cfgfilter"); const bar = bars[0];
+  assert.equal(bars.length, 2, "строка среза и над доминантой, и над диаграммами — кнопка «Сбросить» рядом с тем, по чему кликали");
   assert.ok(bar.textContent.includes(`${f0.name}: ${f0.values[0].label}`), bar.textContent);
   assert.match(bar.textContent, new RegExp(`${keep.size} из ${st.asins} листингов`));
   assert.equal(el.querySelector('#sec-config tr[data-cfg-pick="0|0"]').classList.contains("picked"), true);
@@ -214,14 +215,14 @@ test("перекрёстный срез диаграмм: клик по сект
   const second = f1.values.find((v) => v.label === row1.children[0].textContent.replace("★ ", ""));
   const both = second.asins.filter((x) => keep.has(x)).length;
   row1.click();
-  assert.equal(el.querySelectorAll("#sec-config .cfgfilter .chip[data-cfg-drop]").length, 2);
+  assert.equal(el.querySelectorAll("#sec-config .cfgfilter")[0].querySelectorAll(".chip[data-cfg-drop]").length, 2);
   assert.match(el.querySelector("#sec-config .cfgfilter").textContent, new RegExp(`${both} из ${st.asins} листингов`));
   // клик по сектору графика — то же действие (Chart.js отдаёт индекс сектора)
   const pieCharts = w.__charts.filter((c) => c.cfg.type === "doughnut").slice(-4);
   assert.equal(typeof pieCharts[0].cfg.options.onClick, "function");
   assert.ok(pieCharts[0].cfg.data.datasets[0].offset.some((v) => v > 0), "выбранный сектор выдвинут");
   pieCharts[1].cfg.options.onClick(null, [{ index: 0 }]); // повторный клик по тому же сектору снимает условие
-  assert.equal(el.querySelectorAll("#sec-config .cfgfilter .chip[data-cfg-drop]").length, 1);
+  assert.equal(el.querySelectorAll("#sec-config .cfgfilter")[0].querySelectorAll(".chip[data-cfg-drop]").length, 1);
 
   // «Сбросить» возвращает всю нишу
   el.querySelector("#sec-config [data-cfg-reset]").click();
