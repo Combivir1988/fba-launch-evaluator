@@ -40,6 +40,9 @@ input[type="range"] { padding: 0; accent-color: var(--accent); }
 textarea { min-height: 3.2rem; resize: vertical; }
 label { display: block; font-size: .85rem; color: var(--text-2); margin-bottom: .15rem; }
 .field { margin-bottom: .6rem; }
+/* подсказка под полем: сколько можно платить за товар (потолок себестоимости из «Цены вашей конфигурации») */
+.fhint { display: block; margin-top: .15rem; font-size: .75rem; line-height: 1.25; color: var(--muted); }
+.fhint.over { color: var(--warn); } .fhint.none { color: var(--fail); }
 .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
 .row > * { flex: 1 1 140px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }

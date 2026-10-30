@@ -13,6 +13,7 @@ import { sanitizeSchema, setCell, renameOption, unlistedValues, fillFromText, co
 import { buildTzPayload } from "/shared/tz-payload.js";
 import { api, goLogin, isLeaving } from "/js/api.js";
 import { startIdleWatch } from "./idle.js";
+import { cogsHint } from "/shared/cogs-hint.js";
 import { exportAnalysisJson, exportHistoryJson, exportStandaloneHtml, download } from "./export.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -186,11 +187,21 @@ function markDirty() { S.dirty = true; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.
 
 // ---------- compute / render ----------
 function recompute() { S.a.results = compute(S.a); S.a.status = S.a.ai ? "ai_done" : "computed"; S.a.updatedAt = new Date().toISOString(); }
-function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); renderCvrHint(); autosave(); }
+function renderAll() { recompute(); R().render(dash, S.a, renderOpts()); syncForm(); renderBandPanel(); renderCvrHint(); renderCogsHint(); autosave(); }
 // Вкладки «Этап 1 / Этап 2» рисует render.js внутри дашборда; приложение лишь помнит выбор.
 try { const st = Number(localStorage.getItem("fba_stage")); S.stage = st === 2 || st === 3 ? st : 1; } catch { S.stage = 1; }
 const setStage = (n) => R().setStage(dash, S.a, n);
-function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } autosave(); }
+function renderEcon() { recompute(); R().update(dash, S.a, renderOpts()); const op = $('[data-axis="opRisk"]'); if (op.disabled) { op.value = S.a.results.scorecard.axes.opRisk.score; setOutput(op); } renderCogsHint(); autosave(); }
+
+/** Подсказка под COGS: потолок закупочной цены из «Цены вашей конфигурации» (этап 2) — сколько можно платить
+ *  за товар, чтобы осталась целевая маржа. Текст считает чистая функция, здесь только показ. */
+function renderCogsHint() {
+  const el = $("#cogs-hint"); if (!el) return;
+  const h = cogsHint(S.a.results?.priceConfig, S.a.inputs?.cogs);
+  if (!h) { el.hidden = true; return; }
+  el.className = "fhint" + (h.level === "ok" ? "" : " " + h.level); el.textContent = h.text; el.hidden = false;
+}
+
 const scheduleFull = debounce(renderAll, 250);
 let rafId = 0; function scheduleEcon() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(renderEcon); }
 
