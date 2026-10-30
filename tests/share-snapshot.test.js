@@ -127,3 +127,23 @@ test("ловушка этапа 3 ловит утечку, если её ког�
   assert.ok(leaks.includes("analysis.listing") && leaks.includes("results.stage3"), JSON.stringify(leaks));
   assert.ok(leaks.some((x) => x.startsWith("listing.title")), "текст карточки тоже назван");
 });
+
+test("no_economics: потолок себестоимости и реклама на единицу — тоже закупочная экономика, в ссылку не идут", async () => {
+  const { entryFixture } = await import("./helpers/entry-fixture.js");
+  const { withConfig } = await import("./helpers/config-fixture.js");
+  const { compute } = await import("../shared/compute.js");
+  const a = withConfig(entryFixture());
+  a.inputs = { ...a.inputs, cogs: 4.37, shippingPerUnit: 1.13, fbaFee: 5.41, cpc: 0.9, referralPct: 0.15 };
+  a.results = compute(a);
+  assert.ok(a.results.priceConfig.cogsCeiling > 0 && a.results.priceConfig.adCostPerUnit > 0, "в приложении потолок считается");
+
+  const full = buildSnapshot(a, { mode: "full" }).analysis.results.priceConfig;
+  assert.ok(full.cogsCeiling > 0, "полная ссылка показывает всё, как в приложении");
+
+  const red = buildSnapshot(a, { mode: "no_economics" }).analysis.results.priceConfig;
+  // по потолку читатель узнал бы, сколько автор может платить за товар — это ровно то, что режим прячет
+  for (const k of ["cogsCeiling", "cogsCeilingParts", "adCostPerUnit", "marginMin", "cogsCeilingMissing"]) assert.equal(k in red, false, "priceConfig." + k);
+  assert.equal(red.economicsHidden, true, "интерфейс объясняет пропуск, а не рисует пустоту");
+  assert.equal(red.market, full.market, "рыночная цена аналогов — не закупочная экономика, остаётся");
+  assert.equal(red.entry, full.entry); assert.equal(red.ceiling, full.ceiling);
+});

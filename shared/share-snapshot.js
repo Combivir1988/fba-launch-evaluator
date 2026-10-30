@@ -84,6 +84,13 @@ function redactEconomics(a, source) {
   delete R.economics; delete R.budget; delete R.cashflow; // помесячные деньги — тоже закупочная экономика
   if (R.borderline?.items) R.borderline.items = R.borderline.items.filter((i) => !i.economic);
   if (R.effective) R.effective = { price: R.effective.price, cpc: R.effective.cpc, cpcFromCerebro: R.effective.cpcFromCerebro, cpcSource: R.effective.cpcSource, priceFromMedian: R.effective.priceFromMedian };
+  // Потолок себестоимости и реклама на единицу — это и есть закупочная экономика, только посчитанная.
+  // Числа-источники (FBA, доставка, CPC) вычищает проверка ниже, а производные оставались видны: по ним
+  // читатель ссылки узнаёт, сколько автор может платить за товар. Режим «без экономики» их прятать обязан.
+  if (R.priceConfig) {
+    for (const k of ["cogsCeiling", "cogsCeilingParts", "cogsCeilingMissing", "cogsCeilingAfterAds", "cogsCeilingCheap", "cheapPrice", "adCostPerUnit", "marginMin"]) delete R.priceConfig[k];
+    R.priceConfig.economicsHidden = true;
+  }
   if (R.scorecard?.axes?.economics) R.scorecard.axes.economics.note = HIDDEN_NOTE;
   for (const k of ["2", "6"]) { const it = R.challenger?.items?.[k]; if (it) { it.note = HIDDEN_NOTE; it.value = null; } }
   const valueRe = valuePatterns(collectEconomicsValues(source));
