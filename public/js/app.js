@@ -96,6 +96,8 @@ async function initUser() {
   // Выход при бездействии (spec 008): правило приходит с сервера и обновляется при каждой сверке — менять его может только администратор.
   if (!S.idleWatch) S.idleWatch = startIdleWatch({ dialog: $("#idle-dlg"), getIdleMinutes: () => S.sessionPolicy?.idleMinutes || 0,
     ping: async () => { const m = await api("GET", "/api/auth/me"); if (m?.sessionPolicy) S.sessionPolicy = m.sessionPolicy; },
+    // Отдельно от ping: этот запрос сеанс не продлевает, поэтому им можно узнать правило и во время бездействия.
+    refreshPolicy: async () => { const p = await api("GET", "/api/session/policy", undefined, { noRedirect: true }); if (p && typeof p.idleMinutes === "number") S.sessionPolicy = p; },
     beforeLogout: async () => { if (S.dirty && !S.conflict) await saveNow(); },
     logout: async (reason, o = {}) => { if (!o.alreadyLoggedOut) { try { await api("POST", "/api/auth/logout", undefined, { noRedirect: true }); } catch {} } S.leaving = true; goLogin("", reason); } });
   const st = me.user.settings || {}; const patch = {};

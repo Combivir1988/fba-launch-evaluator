@@ -6,6 +6,7 @@ import { fixtureAnalysis } from "./helpers/fixture-analysis.js";
 import { createAnalyses } from "../server/analyses.js";
 import { createShares } from "../server/shares.js";
 import { splitDoc } from "../shared/analysis.js";
+import { findEconomicsLeaks } from "../shared/share-snapshot.js";
 
 let db, A, SH, clock, anna, ivan, olga, boss, doc;
 const DAY = 86400000; const code = (c) => (e) => e.code === c;
@@ -48,7 +49,8 @@ test("режим без закупочной экономики: данных н
   const snap = await SH.getPublic(s.path.slice(3));
   assert.equal(snap.mode, "no_economics"); assert.deepEqual(snap.hidden, ["economics", "budget", "cashflow"]);
   assert.equal(snap.analysis.results.economics, undefined); assert.equal("cogs" in snap.analysis.inputs, false);
-  const { aggregates, ...rest } = snap.analysis; assert.equal(JSON.stringify(rest).includes("4.37"), false);
+  // Ищем ЧИСЛО, а не подстроку: время в ISO («…T14:18:04.370Z») содержит «4.37» внутри секунд и раз в пару сотен прогонов роняло тест.
+  assert.deepEqual(findEconomicsLeaks(snap, doc), []);
 });
 
 test("истёкшая, отозванная, несуществующая ссылка и удалённый анализ — одинаково null", async () => {

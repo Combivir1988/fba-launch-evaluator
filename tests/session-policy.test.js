@@ -79,3 +79,22 @@ test("API: правила видит и меняет только админис
     assert.equal((await t.call("GET", "/api/auth/me", JSON_H)).status, 401); assert.equal((await (await t.call("GET", "/api/auth/me", JSON_H)).json()).reason, undefined, "без cookie причины нет");
   } finally { await t.close(); }
 });
+
+test("правило читается отдельным запросом, который сеанс НЕ продлевает: иначе проверка сама отменяла бы выход при бездействии", async () => {
+  const t = await startApp();
+  try {
+    const admin = await t.userWithSession({ login: "boss", role: "admin" });
+    assert.equal((await t.call("PUT", "/api/admin/session-policy", admin.headers, { idleMinutes: 30, maxDays: 0 })).status, 200);
+    // без сеанса: вкладка, чей сеанс уже закончился, тоже должна узнать правило — личных данных тут нет, два числа
+    const r = await t.call("GET", "/api/session/policy", JSON_H);
+    assert.equal(r.status, 200); assert.deepEqual(await r.json(), { idleMinutes: 30, maxDays: 0 });
+    // с сеансом: «последняя активность» в базе не двигается
+    const user = await t.userWithSession({ login: "ann" });
+    const th = hashToken(decodeURIComponent(user.headers.cookie.split("fba_sid=")[1].split(";")[0]));
+    await t.db.query("UPDATE sessions SET last_seen_at = now() - interval '20 minutes' WHERE token_hash = $1", [th]);
+    const seen = async () => new Date((await t.db.query("SELECT last_seen_at FROM sessions WHERE token_hash = $1", [th])).rows[0].last_seen_at).getTime();
+    const before = await seen();
+    for (let i = 0; i < 3; i++) assert.equal((await t.call("GET", "/api/session/policy", user.headers)).status, 200);
+    assert.equal(await seen(), before, "проверка правила не продлила сеанс");
+  } finally { await t.close(); }
+});

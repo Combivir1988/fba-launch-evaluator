@@ -52,6 +52,12 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   app.get("/api/health", (req, res) => res.json({ ok: true, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model,
     models: cfg.mock ? ["mock"] : cfg.provider === "openrouter" ? cfg.openrouterModels : [cfg.model], mock: cfg.mock, uptime: Math.round(process.uptime()), running: runningCount(), storage: db.kind, googleLogin: google.enabled, scrapfly: Boolean(cfg.mock || cfg.scrapflyKey) })); // БД не трогаем — Neon должен спать при простое
 
+  // Правила сеансов — ДО attachUser: вкладка узнаёт их, не продлевая сеанс. Иначе проверка правила сама отменяла бы выход
+  // при бездействии (любой запрос обновляет «последнюю активность»), а без неё вкладка, открытая до включения правила,
+  // не знает о нём вовсе: сервер молча закрывает сеанс, а браузер не предупреждает и не сохраняет несохранённое.
+  // Два числа, одинаковые для всех, — личных данных тут нет.
+  app.get("/api/session/policy", async (req, res) => { try { res.set("Cache-Control", "no-store").json(await appSettings.getSessionPolicy()); } catch { res.json({ idleMinutes: 0, maxDays: 0 }); } });
+
   // Лимиты тела — по роутам (contracts/api.md): 100 KB по умолчанию, 1 MB для AI-задач.
   const jsonSmall = express.json({ limit: "100kb" });
   const jsonMid = express.json({ limit: "1mb" });

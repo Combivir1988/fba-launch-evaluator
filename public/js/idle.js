@@ -3,6 +3,10 @@
 // Активность общая для всех вкладок приложения (localStorage), поэтому работа в одной вкладке не «выкидывает» остальные.
 const ACT_KEY = "fba_last_activity", OUT_KEY = "fba_idle_logout";
 const WARN_MS = 60 * 1000, PING_MS = 60 * 1000, WRITE_MS = 5 * 1000;
+// Вкладка узнаёт правило из ответа сервера, но запрос уходит только после активности — а правило работает как раз
+// во время бездействия. Вкладка, открытая до включения правила, считала бы, что ограничения нет: ни предупреждения,
+// ни сохранения перед выходом, просто 401 на первом же действии. Отдельная проверка правила сеанс НЕ продлевает.
+const POLICY_IDLE_MS = 5 * 60 * 1000, POLICY_WARN_MS = 30 * 1000;
 const EVENTS = ["mousemove", "mousedown", "keydown", "wheel", "scroll", "touchstart", "pointerdown"];
 
 /**
@@ -11,7 +15,7 @@ const EVENTS = ["mousemove", "mousedown", "keydown", "wheel", "scroll", "touchst
  */
 export function startIdleWatch(o) {
   const now = o.now || (() => Date.now());
-  let last = now(), lastWrite = 0, lastPing = now(), dirty = false, leaving = false, timer = 0;
+  let last = now(), lastWrite = 0, lastPing = now(), lastPolicy = 0, dirty = false, leaving = false, timer = 0;
   const dlg = o.dialog, left = dlg?.querySelector("[data-idle-left]");
   const stored = () => { try { return Number(localStorage.getItem(ACT_KEY)) || 0; } catch { return 0; } };
   const lastActivity = () => Math.max(last, stored());
@@ -26,6 +30,11 @@ export function startIdleWatch(o) {
     if (leaving || (!force && (!dirty || now() - lastPing < PING_MS))) return;
     dirty = false; lastPing = now(); o.ping().catch(() => {});
   }
+  /** Перечитать правило, не продлевая сеанс. gap — не чаще чем раз в столько. */
+  function maybePolicy(gap) {
+    if (leaving || !o.refreshPolicy || now() - lastPolicy < gap) return;
+    lastPolicy = now(); o.refreshPolicy().catch(() => {});
+  }
   async function leave() {
     if (leaving) return; leaving = true; clearTimeout(timer);
     try { localStorage.setItem(OUT_KEY, String(now())); } catch {}
@@ -35,10 +44,10 @@ export function startIdleWatch(o) {
   function check() {
     if (leaving) return;
     const limit = (o.getIdleMinutes() || 0) * 60 * 1000;
-    if (!limit) { if (dlg?.open) dlg.close(); return schedule(); }
+    if (!limit) { if (dlg?.open) dlg.close(); maybePolicy(POLICY_IDLE_MS); return schedule(); } // правила «нет» — но, может, его уже включили
     const idle = now() - lastActivity();
     if (idle >= limit) return void leave();
-    if (idle >= limit - WARN_MS) { if (dlg && !dlg.open) dlg.showModal(); if (left) left.textContent = String(Math.max(1, Math.ceil((limit - idle) / 1000))); }
+    if (idle >= limit - WARN_MS) { maybePolicy(POLICY_WARN_MS); if (dlg && !dlg.open) dlg.showModal(); if (left) left.textContent = String(Math.max(1, Math.ceil((limit - idle) / 1000))); } // перед выходом решаем по свежему правилу
     else { if (dlg?.open) dlg.close(); maybePing(); }
     schedule();
   }
