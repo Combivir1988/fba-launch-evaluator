@@ -195,7 +195,8 @@ function classify(status, txt, label = "OpenRouter") {
   let msg = ""; try { const j = JSON.parse(txt); const e = Array.isArray(j) ? j[0] : j; msg = e?.error?.message || e?.message || txt; } catch { msg = txt; }
   msg = String(msg).slice(0, 300);
   const google = label !== "OpenRouter";
-  if (status === 401 || (google && status === 403)) return { code: "auth", message: `${label}: неверный API-ключ`, retryable: false };
+  // Ключ ПРОВАЙДЕРА, а не вход пользователя — говорим это прямо и передаём ответ провайдера («API key expired» и т. п.).
+  if (status === 401 || (google && status === 403)) return { code: "auth", message: `${label}: ключ сервера отклонён — ${msg || status}. Это ключ провайдера, а не ваш вход: обновите ключ или выберите другую модель`, retryable: false };
   if (status === 402) return /can only afford/i.test(msg)
     ? { code: "billing", message: "OpenRouter: остатка кредитов хватает не на весь ответ (параллельные запросы делят остаток) — пополните баланс на openrouter.ai/settings/credits", retryable: true }
     : { code: "billing", message: "OpenRouter: недостаточно кредитов — пополните баланс на openrouter.ai/settings/credits", retryable: false };

@@ -83,6 +83,10 @@ function showTab(name) {
   if (name === "thresholds") renderThresholds();
 }
 
+// Код ошибки "auth" у фоновых задач означает ключ ПРОВАЙДЕРА (OpenRouter, Google AI Studio, Anthropic, Scrapfly),
+// а не сеанс пользователя: свой 401 уводит на вход внутри api(). Раньше эти задачи на такой код сами звали goLogin(),
+// и просроченный ключ OpenRouter выглядел как «нажал кнопку — приложение разлогинило и просит пароль».
+
 // ---------- учётная запись ----------
 /** Без сеанса приложение не работает: api() сам уводит на /login.html. Модели AI хранятся в аккаунте (одноразово переносим из браузера). */
 async function initUser() {
@@ -450,7 +454,6 @@ async function startAi(resumeJobId = null) {
     toast(ai.adjustedByRules ? "AI-вердикт получен и скорректирован правилами" : "AI-вердикт получен");
   } catch (err) {
     console.error(err);
-    if (err.code === "auth") goLogin();
     if (status) status.textContent = "ошибка: " + err.message; toast("AI: " + err.message, 7000);
   } finally { S.aiBusy = false; $("#btn-ai").disabled = false; R().update(dash, S.a, renderOpts(), ["ai"]); }
 }
@@ -476,7 +479,7 @@ async function startPatentScan(resumeJobId = null) {
     setStatus(`готово: ${{ conflict: "есть красные флаги", unsure: "требует проверки", clear: "явных пересечений нет" }[scan.status] || scan.status}`);
     toast("Патентный скан завершён — критерий 8 получил статус «допущение»");
     document.getElementById("sec-patents")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); setStatus("ошибка: " + e.message); toast("Патентный скан: " + e.message, 7000); }
+  } catch (e) { console.error(e); setStatus("ошибка: " + e.message); toast("Патентный скан: " + e.message, 7000); }
   finally { S.patBusy = false; $("#btn-patents").disabled = false; R().update(dash, S.a, renderOpts(), ["patents"]); }
 }
 
@@ -515,7 +518,7 @@ async function startConfigSchema(resumeJobId = null) {
     mergeListings(done.listings); ensureConfig().schema = done.schema; markDirty(); renderAll(); await persistJobResult("Схема полей");
     toast(`Схема полей: ${done.schema.fields.length} полей по ${done.schema.basedOn} листингам${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""} — проверьте и поправьте перед извлечением`, 7000);
     document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Схема полей: " + e.message, 8000); }
+  } catch (e) { console.error(e); if (S.aggDirty) { markDirty(); autosave(); } toast("Схема полей: " + e.message, 8000); }
   finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
 async function startConfigExtract(resumeJobId = null) {
@@ -534,7 +537,7 @@ async function startConfigExtract(resumeJobId = null) {
     const cov = Object.values(done.table.coverage || {}); const avg = cov.length ? cov.reduce((x, v) => x + v, 0) / cov.length : 0;
     toast(`Извлечено: ${Object.keys(done.table.rows).length} листингов, среднее покрытие ${Math.round(avg * 100)} %${done.table.failed?.length ? `, не загружено ${done.table.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
     document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Извлечение: " + e.message, 8000); }
+  } catch (e) { console.error(e); if (S.aggDirty) { markDirty(); autosave(); } toast("Извлечение: " + e.message, 8000); }
   finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
 /** Дозаполнить пустые клетки прямо из текста листингов: без AI, без кредитов, мгновенно. */
@@ -560,7 +563,7 @@ async function startConfigPromo(resumeJobId = null) {
     const done = await runConfigJob(S.a, "config_promo", "/api/config/promo", { niche: S.a.niche, asins }, { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
     mergeListings(done.listings); markDirty(); renderAll(); await persistJobResult("Промо листингов");
     toast(`Промо обновлены: ${Object.keys(done.listings || {}).length} страниц, с промо ${done.withPromo ?? 0}${done.failed?.length ? `, не загрузилось ${done.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
-  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); if (S.aggDirty) { markDirty(); autosave(); } toast("Промо: " + e.message, 8000); }
+  } catch (e) { console.error(e); if (S.aggDirty) { markDirty(); autosave(); } toast("Промо: " + e.message, 8000); }
   finally { S.cfgBusy = null; R().update(dash, S.a, renderOpts(), ["config", "tz"]); }
 }
 /** Подробный патентный ландшафт одним файлом (дашборд показывает то же самое кратко). */
@@ -587,7 +590,7 @@ async function startConfigTz(resumeJobId = null) {
     const unv = done.tz.rows.filter((r) => r.unverified).length;
     toast(`ТЗ: ${done.tz.rows.length} требований${unv ? `, проверьте числа в ${unv} строках` : ""}`, 7000);
     document.getElementById("sec-tz")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (e) { console.error(e); if (e.code === "auth") goLogin(); toast("ТЗ: " + e.message, 8000); }
+  } catch (e) { console.error(e); toast("ТЗ: " + e.message, 8000); }
   finally { S.tzBusy = null; R().update(dash, S.a, renderOpts(), ["tz"]); }
 }
 async function downloadTzDocx() {
