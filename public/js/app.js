@@ -69,7 +69,7 @@ if (localStorage.getItem("fba_side") === "collapsed") setSide(true, true); // п
 // ---------- tabs ----------
 $$(".topbar nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 // Открытый раздел живёт в адресе (#history) и запоминается в браузере: после F5 открывается тот же раздел, ссылку на раздел можно переслать.
-const TABS = ["analysis", "history", "settings", "thresholds", "help"];
+const TABS = ["analysis", "history", "stats", "settings", "thresholds", "help"];
 const wantedTab = () => { const h = location.hash.slice(1); if (TABS.includes(h)) return h; try { const t = localStorage.getItem("fba_tab"); if (TABS.includes(t)) return t; } catch {} return "analysis"; };
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.includes(h)) showTab(h); });
 function showTab(name) {
@@ -82,6 +82,26 @@ function showTab(name) {
   if (name === "settings") renderSettings();
   if (name === "history") renderHistory();
   if (name === "thresholds") renderThresholds();
+  if (name === "stats") renderStats();
+}
+
+// ---------- статистика по всем анализам (spec 018) ----------
+// Кнопка раздела прячется, когда права нет. Это удобство, а не защита: данные отдаёт только сервер и только по праву.
+function syncStatsTab() { $("#tab-btn-stats").classList.toggle("hidden", S.user?.statsAccess !== true); }
+async function renderStats() {
+  const box = $("#stats-body");
+  box.innerHTML = '<div class="panel section muted">Считаем…</div>';
+  try {
+    const data = await api("GET", "/api/stats");
+    window.FBAStats.render(box, data);
+  } catch (e) {
+    if (/403|no_stats_access/.test(e.message)) { // право сняли, пока вкладка была открыта (FR-004)
+      S.user.statsAccess = false; syncStatsTab();
+      box.innerHTML = '<div class="panel section"><h2>Статистика</h2><p>Раздел вам больше не открыт. Доступ выдаёт администратор поимённо.</p></div>';
+      return;
+    }
+    box.innerHTML = `<div class="panel section"><h2>Статистика</h2><div class="notice fail">Не удалось загрузить: ${esc(e.message)}</div></div>`;
+  }
 }
 
 // Код ошибки "auth" у фоновых задач означает ключ ПРОВАЙДЕРА (OpenRouter, Google AI Studio, Anthropic, Scrapfly),
@@ -94,6 +114,7 @@ async function initUser() {
   const me = await api("GET", "/api/auth/me");
   if (me.mustChangePassword) { goLogin("#change"); throw new Error("password change required"); }
   S.user = me.user; S.sessionPolicy = me.sessionPolicy || { idleMinutes: 0, maxDays: 0 };
+  syncStatsTab();
   // Выход при бездействии (spec 008): правило приходит с сервера и обновляется при каждой сверке — менять его может только администратор.
   if (!S.idleWatch) S.idleWatch = startIdleWatch({ dialog: $("#idle-dlg"), getIdleMinutes: () => S.sessionPolicy?.idleMinutes || 0,
     ping: async () => { const m = await api("GET", "/api/auth/me"); if (m?.sessionPolicy) S.sessionPolicy = m.sessionPolicy; },

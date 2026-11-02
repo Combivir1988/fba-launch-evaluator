@@ -16,6 +16,7 @@
   <nav aria-label="Разделы">
     <button data-tab="analysis" class="active">Анализ</button>
     <button data-tab="history">История <span id="hist-count" class="muted"></span></button>
+    <button data-tab="stats" id="tab-btn-stats" class="hidden">Статистика</button>
     <button data-tab="settings">Настройки</button>
     <button data-tab="thresholds">Пороги</button>
     <button data-tab="help">Справка</button>
@@ -163,6 +164,10 @@
     <div id="migrate-bar" class="notice info hidden" style="margin:.5rem 0"></div>
     <div class="hist" id="histlist"></div>
   </div>
+</section>
+
+<section id="tab-stats" class="layout hidden" style="grid-template-columns:1fr">
+  <div id="stats-body"></div>
 </section>
 
 <section id="tab-settings" class="layout hidden" style="grid-template-columns:1fr">
@@ -325,6 +330,7 @@
 <script src="vendor/chart.umd.js"></script>
 <script src="vendor/papaparse.min.js"></script>
 <script src="js/render.js"></script>
+<script src="js/stats.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

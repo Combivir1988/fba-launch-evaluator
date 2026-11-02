@@ -348,3 +348,14 @@ td.unlisted { font-style: italic; }
 .pfgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .5rem .8rem; margin-top: .4rem; }
 .pf span { display: block; font-size: .78rem; color: var(--text-2); margin-bottom: .15rem; } .pf select { width: 100%; }
 td.promo .chip { font-size: .72rem; padding: 0 .4rem; }
+
+/* ---------- раздел «Статистика» (spec 018) ---------- */
+.stgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; align-items: start; }
+.stblock { min-width: 0; }
+.stblock > h3 { margin: 0 0 .25rem; }
+.stblock > p.muted { margin: 0 0 .5rem; font-size: .85rem; }
+.sttable { margin-top: .5rem; }
+.sttable > summary { cursor: pointer; color: var(--text-2); font-size: .85rem; }
+.sttable table { width: 100%; font-size: .85rem; }
+#tab-stats .notice { margin-top: .6rem; }
+@media (max-width: 760px) { .stgrid { grid-template-columns: 1fr; } }

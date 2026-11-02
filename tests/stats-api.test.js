@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { testDb } from "./helpers/db.js";
+import { startApp } from "./helpers/app.js";
 import { createAnalyses } from "../server/analyses.js";
 import { createStats, computeMethodHash, methodHash } from "../server/stats.js";
 import { fixtureAnalysis, emptyDraftAnalysis, brokenAnalysis } from "./helpers/fixture-analysis.js";
@@ -146,4 +147,24 @@ test("FR-008: расхождение сохранённого и пересчи�
   assert.equal(r.mismatch.count, 1);
   assert.equal(r.rows[0].verdict, "Доработка", "цифра — из пересчёта");
   assert.equal(r.rows[0].was, "No-Go", "а прежний вердикт просто показан рядом");
+});
+
+// Те же ворота, но через HTTP: между функциями и маршрутом стоит ещё и приложение, и пройти их надо обоими путями.
+test("ворота SC-007 через HTTP: десять GET /api/stats не меняют анализы", async () => {
+  const T = await startApp();
+  try {
+    const boss = await T.userWithSession({ login: "boss", name: "Хозяин", role: "admin" });
+    const analyses = createAnalyses(T.db);
+    for (let i = 0; i < 3; i++) await analyses.importDoc(fixtureAnalysis(), boss.user);
+    const fp = async () => (await T.db.query("SELECT md5(string_agg(id::text || version::text || updated_at::text, '|' ORDER BY id)) AS h FROM analyses")).rows[0].h
+      + "/" + (await T.db.query("SELECT count(*)::int AS n FROM analysis_versions")).rows[0].n;
+    const before_ = await fp();
+    for (let i = 0; i < 10; i++) assert.equal((await T.call("GET", "/api/stats", boss.headers)).status, 200);
+    assert.equal(await fp(), before_, "открытие раздела — операция только для чтения в отношении analyses (FR-009)");
+
+    const r = await (await T.call("GET", "/api/stats", boss.headers)).json();
+    assert.equal(r.summary.n, 3);
+    assert.ok(r.freshness && r.mismatch && Array.isArray(r.rows), "ответ по контракту contracts/stats-api.md");
+    for (const row of r.rows) for (const k of ["author", "createdBy", "updatedBy"]) assert.ok(!(k in row), "автора в строках нет (FR-023)");
+  } finally { await T.close(); }
 });
