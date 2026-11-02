@@ -6,3 +6,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 .data/
+
+# рабочие черновики сессий — в публичный репозиторий не едут
+scratchpad/

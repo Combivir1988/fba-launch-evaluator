@@ -21,3 +21,15 @@ export function fixtureAnalysis(overrides = {}) {
   a.results = compute(a);
   return a;
 }
+
+/** Пустой черновик: заведён, но ни одного отчёта не загружено. В статистику такие не входят (spec 018, FR-010). */
+export function emptyDraftAnalysis() {
+  return newAnalysis({ id: randomUUID(), niche: "пустой черновик", coreKeyword: "пустой черновик" });
+}
+
+/** Повреждённые агрегаты: отчёт как будто есть, но разобрать его нельзя — пересчёт обязан упасть (spec 018, FR-012). */
+export function brokenAnalysis() {
+  const a = newAnalysis({ id: randomUUID(), niche: "битый анализ", coreKeyword: "битый анализ" });
+  a.aggregates = { xray: { asins: [null, null, null] }, cerebro: null, poe: null };
+  return a;
+}

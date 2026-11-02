@@ -1,0 +1,355 @@
+{
+ "note": "Эталон локального пайплайна .data/stats/ на живых данных 2026-11-02. Только цифры: названия ниш в публичный репозиторий не едут.",
+ "measuredAt": "2026-11-02",
+ "n": 65,
+ "nLive": 67,
+ "empty": 2,
+ "changed": 17,
+ "verdicts": [
+  {
+   "key": "go",
+   "label": "Go",
+   "status": "good",
+   "count": 1
+  },
+  {
+   "key": "go_conditional",
+   "label": "Go, условно",
+   "status": "warning",
+   "count": 1
+  },
+  {
+   "key": "rework",
+   "label": "Доработка",
+   "status": "serious",
+   "count": 20
+  },
+  {
+   "key": "no_go",
+   "label": "No-Go",
+   "status": "critical",
+   "count": 43
+  }
+ ],
+ "decisiveCat": [
+  {
+   "label": "Экономика",
+   "count": 28
+  },
+  {
+   "label": "Конкуренция",
+   "count": 23
+  },
+  {
+   "label": "Не доведён до конца",
+   "count": 8
+  },
+  {
+   "label": "Бюджет / стоп-вопросы",
+   "count": 4
+  },
+  {
+   "label": "Всё пройдено",
+   "count": 1
+  },
+  {
+   "label": "Патенты / FTO",
+   "count": 1
+  }
+ ],
+ "decisiveDet": [
+  {
+   "label": "Gate 1 — маржа без рекламы",
+   "count": 13
+  },
+  {
+   "label": "Критерий 6 — запас экономики",
+   "count": 12
+  },
+  {
+   "label": "Критерий 1 — рыночный контекст",
+   "count": 12
+  },
+  {
+   "label": "Amazon в нише",
+   "count": 11
+  },
+  {
+   "label": "COGS не введён",
+   "count": 8
+  },
+  {
+   "label": "Стоп-вопросы",
+   "count": 4
+  },
+  {
+   "label": "Gate 2 — после рекламы",
+   "count": 3
+  },
+  {
+   "label": "Всё пройдено",
+   "count": 1
+  },
+  {
+   "label": "Критерий 8 — патент",
+   "count": 1
+  }
+ ],
+ "freqCat": [
+  {
+   "label": "Конкуренция",
+   "count": 63
+  },
+  {
+   "label": "Общая оценка",
+   "count": 60
+  },
+  {
+   "label": "Патенты / FTO",
+   "count": 60
+  },
+  {
+   "label": "Экономика",
+   "count": 47
+  },
+  {
+   "label": "Бюджет / стоп-вопросы",
+   "count": 23
+  },
+  {
+   "label": "Не доведён до конца",
+   "count": 9
+  }
+ ],
+ "freqOne": [
+  {
+   "label": "Критерий 1 ниже порога",
+   "count": 63
+  },
+  {
+   "label": "Scorecard 40–59 %",
+   "count": 45
+  },
+  {
+   "label": "Gate 3 — мало зелёных в 3–8",
+   "count": 40
+  },
+  {
+   "label": "Gate 4 не обсуждён",
+   "count": 37
+  },
+  {
+   "label": "Критерий 6 — нет запаса экономики",
+   "count": 31
+  },
+  {
+   "label": "Экономика на грани",
+   "count": 30
+  },
+  {
+   "label": "Стоп-вопрос — «нет»",
+   "count": 23
+  },
+  {
+   "label": "Gate 4 — только AI-скан",
+   "count": 21
+  },
+  {
+   "label": "Gate 1 провален (маржа)",
+   "count": 16
+  },
+  {
+   "label": "Gate 2 провален (после рекламы)",
+   "count": 16
+  },
+  {
+   "label": "Scorecard < 40 %",
+   "count": 15
+  },
+  {
+   "label": "Amazon продаёт сам",
+   "count": 11
+  },
+  {
+   "label": "COGS не введён",
+   "count": 9
+  },
+  {
+   "label": "Критерий 8 — патентный риск",
+   "count": 2
+  }
+ ],
+ "c1rows": [
+  {
+   "key": "1g",
+   "label": "1g · Сезонность",
+   "fail": 50,
+   "warn": 12,
+   "na": 2,
+   "ok": 1
+  },
+  {
+   "key": "1e",
+   "label": "1e · Доминация бренда / Amazon",
+   "fail": 48,
+   "warn": 3,
+   "na": 0,
+   "ok": 14
+  },
+  {
+   "key": "1f",
+   "label": "1f · Доля топ-5 брендов",
+   "fail": 48,
+   "warn": 16,
+   "na": 0,
+   "ok": 1
+  },
+  {
+   "key": "1d",
+   "label": "1d · Барьер отзывов",
+   "fail": 40,
+   "warn": 15,
+   "na": 0,
+   "ok": 10
+  },
+  {
+   "key": "1b",
+   "label": "1b · Средняя цена",
+   "fail": 31,
+   "warn": 10,
+   "na": 0,
+   "ok": 24
+  },
+  {
+   "key": "1a",
+   "label": "1a · Размер рынка",
+   "fail": 7,
+   "warn": 5,
+   "na": 0,
+   "ok": 53
+  },
+  {
+   "key": "1h",
+   "label": "1h · Успешность запусков",
+   "fail": 5,
+   "warn": 13,
+   "na": 4,
+   "ok": 43
+  },
+  {
+   "key": "1c",
+   "label": "1c · Спрос Adj. SV",
+   "fail": 0,
+   "warn": 3,
+   "na": 0,
+   "ok": 62
+  }
+ ],
+ "c1avg": 3.2,
+ "c1pass": 2,
+ "eco": {
+  "total": 56,
+  "noCogs": 9,
+  "gates": [
+   {
+    "label": "Gate 1 — маржа без рекламы",
+    "no_go": 16,
+    "rework": 26,
+    "pass": 14,
+    "total": 56
+   },
+   {
+    "label": "Gate 2 — после рекламы",
+    "no_go": 16,
+    "rework": 8,
+    "pass": 32,
+    "total": 56
+   }
+  ]
+ },
+ "chrows": [
+  {
+   "key": "1",
+   "label": "1 · Рыночный контекст",
+   "fail": 63,
+   "ok": 2,
+   "na": 0
+  },
+  {
+   "key": "2",
+   "label": "2 · Детальная экономика",
+   "fail": 45,
+   "ok": 11,
+   "na": 9
+  },
+  {
+   "key": "3",
+   "label": "3 · Лояльность к бренду",
+   "fail": 20,
+   "ok": 39,
+   "na": 6
+  },
+  {
+   "key": "4",
+   "label": "4 · Уязвимость лидера",
+   "fail": 12,
+   "ok": 8,
+   "na": 45
+  },
+  {
+   "key": "5",
+   "label": "5 · Многоигровое поле",
+   "fail": 53,
+   "ok": 0,
+   "na": 12
+  },
+  {
+   "key": "6",
+   "label": "6 · Запас экономики на войну",
+   "fail": 45,
+   "ok": 11,
+   "na": 9
+  },
+  {
+   "key": "7",
+   "label": "7 · Реальная дифференциация",
+   "fail": 0,
+   "ok": 0,
+   "na": 65
+  },
+  {
+   "key": "8",
+   "label": "8 · Patent / FTO риск",
+   "fail": 2,
+   "ok": 22,
+   "na": 41
+  }
+ ],
+ "scorecard": {
+  "avg": 47.457051282051275,
+  "bands": [
+   {
+    "key": "go",
+    "count": 5
+   },
+   {
+    "key": "rework",
+    "count": 45
+   },
+   {
+    "key": "no_go",
+    "count": 15
+   }
+  ],
+  "weakest": [
+   {
+    "label": "competition",
+    "count": 62
+   },
+   {
+    "label": "economics",
+    "count": 3
+   }
+  ]
+ }
+}
