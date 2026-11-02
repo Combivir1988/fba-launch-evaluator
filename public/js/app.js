@@ -825,20 +825,22 @@ $("#sp-idle").addEventListener("change", saveSessionPolicy); $("#sp-max").addEve
 async function renderUsers() {
   if (!$("#un-pass").value) $("#un-pass").value = genPassword();
   let list = [];
-  try { list = await api("GET", "/api/users"); } catch (e) { $("#users-list").innerHTML = `<tr><td colspan="8" class="muted">Не удалось загрузить: ${esc(e.message)}</td></tr>`; return; }
+  try { list = await api("GET", "/api/users"); } catch (e) { $("#users-list").innerHTML = `<tr><td colspan="9" class="muted">Не удалось загрузить: ${esc(e.message)}</td></tr>`; return; }
   const fmt = (d) => (d ? new Date(d).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "—");
   $("#users-list").innerHTML = list.map((u) => {
     const self = u.id === S.user.id; const lockedNow = u.lockedUntil && new Date(u.lockedUntil) > new Date();
     const status = !u.active ? '<span class="chip na">отключён</span>' : lockedNow ? '<span class="chip warn">заблокирован до ' + esc(fmt(u.lockedUntil)) + "</span>" : u.mustChangePassword ? '<span class="chip">временный пароль</span>' : '<span class="chip ok">активен</span>';
     const method = u.hasPassword && u.email ? "Google и пароль" : u.email ? (u.googleLinked ? "Google" : "Google · ещё не входил") : "пароль";
-    return `<tr class="${u.active ? "" : "off"}"><td>${esc(u.name)}${self ? ' <span class="muted">(вы)</span>' : ""}</td><td>${u.email ? esc(u.email) + "<br>" : ""}<small class="muted">логин: <code>${esc(u.login)}</code></small></td><td>${esc(method)}</td><td>${u.role === "admin" ? "администратор" : "пользователь"}</td><td>${status}</td><td>${esc(fmt(u.lastLoginAt))}</td><td>${u.analyses ?? 0}</td>
-      <td><div class="acts"><button data-uact="role" data-id="${u.id}" data-role="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Сделать пользователем" : "Сделать админом"}</button><button data-uact="email" data-id="${u.id}" data-email="${esc(u.email || "")}" data-name="${esc(u.name)}">Почта</button><button data-uact="reset" data-id="${u.id}" data-name="${esc(u.name)}">${u.hasPassword ? "Сбросить пароль" : "Задать пароль"}</button><button data-uact="toggle" data-id="${u.id}" data-active="${u.active ? "0" : "1"}" class="${u.active ? "danger" : ""}">${u.active ? "Отключить" : "Включить"}</button></div></td></tr>`;
-  }).join("") || '<tr><td colspan="8" class="muted">Пользователей нет</td></tr>';
+    return `<tr class="${u.active ? "" : "off"}"><td>${esc(u.name)}${self ? ' <span class="muted">(вы)</span>' : ""}</td><td>${u.email ? esc(u.email) + "<br>" : ""}<small class="muted">логин: <code>${esc(u.login)}</code></small></td><td>${esc(method)}</td><td>${u.role === "admin" ? "администратор" : "пользователь"}</td><td>${status}</td><td>${esc(fmt(u.lastLoginAt))}</td><td>${u.analyses ?? 0}</td><td>${u.role === "admin" ? '<span class="chip" title="Администратору раздел открыт всегда">по роли</span>' : u.statsAccess ? '<span class="chip ok">открыт</span>' : '<span class="chip na">закрыт</span>'}</td>
+      <td><div class="acts"><button data-uact="role" data-id="${u.id}" data-role="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Сделать пользователем" : "Сделать админом"}</button><button data-uact="email" data-id="${u.id}" data-email="${esc(u.email || "")}" data-name="${esc(u.name)}">Почта</button><button data-uact="reset" data-id="${u.id}" data-name="${esc(u.name)}">${u.hasPassword ? "Сбросить пароль" : "Задать пароль"}</button>${u.role === "admin" ? "" : `<button data-uact="stats" data-id="${u.id}" data-to="${u.statsAccess ? "0" : "1"}">${u.statsAccess ? "Закрыть статистику" : "Открыть статистику"}</button>`}<button data-uact="toggle" data-id="${u.id}" data-active="${u.active ? "0" : "1"}" class="${u.active ? "danger" : ""}">${u.active ? "Отключить" : "Включить"}</button></div></td></tr>`;
+  }).join("") || '<tr><td colspan="9" class="muted">Пользователей нет</td></tr>';
 }
 $("#users-list").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-uact]"); if (!b) return;
   try {
     if (b.dataset.uact === "role") await api("PATCH", `/api/users/${b.dataset.id}`, { role: b.dataset.role });
+    // Право на раздел «Статистика» (spec 018): выдаёт и снимает только администратор, поимённо.
+    if (b.dataset.uact === "stats") { await api("PATCH", `/api/users/${b.dataset.id}`, { statsAccess: b.dataset.to === "1" }); toast(b.dataset.to === "1" ? "Раздел «Статистика» открыт" : "Раздел «Статистика» закрыт"); }
     if (b.dataset.uact === "email") {
       const v = window.prompt(`Почта аккаунта Google для «${b.dataset.name}» (пусто — убрать вход через Google):`, b.dataset.email); if (v === null) return;
       await api("PATCH", `/api/users/${b.dataset.id}`, { email: v.trim() }); toast(v.trim() ? "Почта сохранена — человек может входить через Google" : "Почта убрана");

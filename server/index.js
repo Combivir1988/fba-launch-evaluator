@@ -12,6 +12,7 @@ import { createGoogleAuth, GoogleAuthError, OAUTH_COOKIE, STATE_TTL_MS } from ".
 import { createUsers, UserError } from "./users.js";
 import { createAnalyses } from "./analyses.js";
 import { createShares } from "./shares.js";
+import { createStats } from "./stats.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
 import { schemaStream, extractStream, tzStream, promoStream } from "./config-jobs.js";
@@ -35,8 +36,9 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const analyses = deps.analyses || createAnalyses(db, deps.analysesOpts || {});
   const google = deps.google || createGoogleAuth(cfg, deps.googleOpts || {});
   const shares = deps.shares || createShares(db, analyses, { publicUrl: cfg.publicUrl, ...(deps.sharesOpts || {}) });
+  const stats = deps.stats || createStats(db, deps.statsOpts || {});
   const app = express();
-  app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses; app.locals.shares = shares;
+  app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses; app.locals.shares = shares; app.locals.stats = stats;
   app.use("/api", (req, res, next) => { if (inflight.draining && req.path !== "/health") { res.set("Retry-After", "5"); return res.status(503).json({ error: "draining", message: "Сервер перезапускается — повторите через несколько секунд" }); } next(); });
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
@@ -66,10 +68,17 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const { requireUser, requireAdmin, requirePasswordChanged } = sessions;
   const authed = [requireUser, requirePasswordChanged];
   const admin = [requireAdmin, requirePasswordChanged];
+  // Право на раздел «Статистика» (spec 018): роль admin или выданный поимённо флаг. Проверка в ОДНОМ месте,
+  // отказ — без единой цифры: ни счёта анализов, ни долей, ни названий ниш (FR-002, SC-001).
+  const canStats = (u) => u?.role === "admin" || u?.statsAccess === true;
+  const requireStats = [requireUser, requirePasswordChanged, (req, res, next) => (canStats(req.user) ? next()
+    : res.status(403).json({ error: "no_stats_access", message: "Раздел «Статистика» вам не открыт" }))];
 
   // ---------- вход и своя учётная запись ----------
   const loginLimiter = rateLimiter({ limit: cfg.loginRateLimit || 10, windowMs: 10 * 60 * 1000 });
-  const me = (u) => ({ user: { id: u.id, login: u.login, name: u.name, role: u.role, settings: u.settings || {}, email: u.email || null, hasPassword: u.hasPassword !== false }, mustChangePassword: Boolean(u.mustChangePassword) });
+  // statsAccess в своей учётной записи — ВЫЧИСЛЕННОЕ право: по нему браузер решает, показывать ли кнопку раздела.
+  // Это удобство, а не защита: кнопку можно дорисовать руками, данные всё равно отдаёт только сервер и только по праву.
+  const me = (u) => ({ user: { id: u.id, login: u.login, name: u.name, role: u.role, settings: u.settings || {}, email: u.email || null, hasPassword: u.hasPassword !== false, statsAccess: canStats(u) }, mustChangePassword: Boolean(u.mustChangePassword) });
   app.post("/api/auth/login", loginLimiter, jsonSmall, async (req, res) => {
     const { login, password } = req.body || {};
     try {
@@ -141,6 +150,8 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   app.patch("/api/users/:id", admin, jsonSmall, async (req, res) => {
     const u = await users.updateUser(req.params.id, req.body || {});
     log("info", "user updated", { login: u.login, role: u.role, active: u.active, by: req.user.login });
+    // Кто, кому и в какую сторону выдал право на раздел — отдельной записью (FR-005).
+    if (req.body && typeof req.body.statsAccess === "boolean") log("info", "stats access changed", { by: req.user.login, user: u.login, to: u.statsAccess });
     res.json({ user: u });
   });
   app.post("/api/users/:id/reset-password", admin, jsonSmall, async (req, res) => {
@@ -148,6 +159,10 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
     log("info", "password reset", { id: req.params.id, by: req.user.login });
     res.status(204).end();
   });
+
+  // ---------- статистика по всем анализам (spec 018) ----------
+  // Чтение: раздел ничего не пишет в analyses (FR-009). Пересчёт никогда не ходит в AI, Scrapfly и патентный поиск.
+  app.get("/api/stats", requireStats, async (req, res) => res.set("Cache-Control", "no-store").json(await stats.get()));
 
   // ---------- общая история анализов ----------
   app.get("/api/analyses", authed, async (req, res) => res.json(await analyses.list({ userId: req.user.id, mine: req.query.mine === "1", q: req.query.q, limit: req.query.limit, offset: req.query.offset })));
