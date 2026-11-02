@@ -81,3 +81,22 @@ test("крайние случаи: пустой набор и набор из о
 test("карты категорий покрывают весь закрытый набор решающих гейтов", () => {
   for (const l of Object.keys(CAT)) assert.ok(DET[l], `«${l}» есть в CAT, но нет в DET`);
 });
+
+test("US5: срез «пороги, которые ничего не различают» ловит 1f, 1g и критерий 7 (FR-024)", () => {
+  const b = S.summary.blind;
+  const by = Object.fromEntries(b.map((x) => [x.key + "/" + x.kind, x]));
+  assert.ok(by["1f/Критерий 1"], "1f зелёный в 1 анализе из 65 — порог его фактически требует вместе со всеми");
+  assert.equal(by["1f/Критерий 1"].greenIn, 1);
+  assert.equal(by["1f/Критерий 1"].of, S.summary.n);
+  assert.ok(by["1g/Критерий 1"], "1g — тот же случай");
+  const seven = by["7/Критерии 1–8"];
+  assert.ok(seven, "критерий 7 не заполнен ни разу");
+  assert.equal(seven.na, S.summary.n);
+  assert.match(seven.why, /почти никто не заполняет/, "диагноз другой: не «порог строг», а «показатель не вводят»");
+
+  // нормально работающий подпункт в список не попадает
+  const working = S.summary.c1rows.find((r) => r.ok > S.summary.n * 0.1 && r.ok < S.summary.n * 0.9);
+  assert.ok(working, "в эталоне есть подпункт, который что-то различает");
+  assert.ok(!b.some((x) => x.key === working.key && x.kind === "Критерий 1"), `${working.key} различает ниши и в список попадать не должен`);
+  for (const x of b) assert.ok(x.greenIn <= S.summary.n * 0.05 || x.greenIn >= S.summary.n * 0.95, `${x.label} попал в список зря`);
+});

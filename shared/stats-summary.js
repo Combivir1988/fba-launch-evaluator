@@ -49,6 +49,15 @@ export const C1_LABELS = { "1a": "1a · Размер рынка", "1b": "1b · �
 export const CH_LABELS = { 1: "Рыночный контекст", 2: "Детальная экономика", 3: "Лояльность к бренду", 4: "Уязвимость лидера",
   5: "Многоигровое поле", 6: "Запас экономики на войну", 7: "Реальная дифференциация", 8: "Patent / FTO риск" };
 
+/** Границы «ничего не различает»: зелёный не чаще чем у 5 % и не реже чем у 95 % анализов. */
+export const BLIND_LOW = 0.05, BLIND_HIGH = 0.95;
+function blindWhy(r, n) {
+  const mostlyNa = r.na > n / 2;
+  if (r.ok / n >= BLIND_HIGH) return `зелёный у ${r.ok} из ${n} — этот признак есть почти у каждой ниши и хорошую от плохой не отличает`;
+  if (mostlyNa) return `нет данных у ${r.na} из ${n} — его почти никто не заполняет, поэтому порог по нему ничего не проверяет: в счёте зелёных это место потеряно заранее`;
+  return `зелёный ${r.ok ? `всего у ${r.ok} из ${n}` : `ни у одной из ${n}`} — выполнить его почти невозможно, и порог фактически требует остальных`;
+}
+
 const cnt = (arr, f) => { const m = new Map(); for (const x of arr) { const k = f(x); if (k == null) continue; m.set(k, (m.get(k) || 0) + 1); } return m; };
 const desc = (m) => [...m].map(([label, count]) => ({ label, count })).sort((x, y) => y.count - x.count || String(x.label).localeCompare(String(y.label)));
 
@@ -83,8 +92,15 @@ export function summarize(items = []) {
     return { key, label: `${key} · ${CH_LABELS[key]}`, ...s };
   });
 
+  // US5: подпункт или критерий, зелёный почти никогда или почти всегда, не отделяет хорошую нишу от плохой.
+  // Это не придирка к оформлению: такой порог занимает место в счёте «сколько зелёных», но ничего не решает.
+  const blind = n ? [...c1rows.map((r) => ({ ...r, kind: "Критерий 1" })), ...chrows.map((r) => ({ ...r, kind: "Критерии 1–8" }))]
+    .filter((r) => r.ok / n <= BLIND_LOW || r.ok / n >= BLIND_HIGH)
+    .map((r) => ({ key: r.key, kind: r.kind, label: r.label, greenIn: r.ok, of: n, na: r.na, why: blindWhy(r, n) }))
+    .sort((x, y) => x.greenIn - y.greenIn) : [];
+
   const summary = {
-    n,
+    n, blind,
     verdicts: ["go", "go_conditional", "rework", "no_go"].map((key) => ({ key, label: VLABEL[key], status: VSTATUS[key], count: A.filter((a) => a.verdict?.ceiling === key).length })),
     decisiveCat: desc(cnt(A, (a) => CAT[a.verdict?.decisiveGate] || "Прочее")),
     decisiveDet: desc(cnt(A, (a) => DET[a.verdict?.decisiveGate] || a.verdict?.decisiveGate)),

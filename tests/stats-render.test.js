@@ -104,3 +104,41 @@ test("без Chart.js цифры всё равно доступны", () => {
   assert.ok(el.querySelectorAll("details.sttable table").length >= 8, "таблицы остались");
   assert.match(el.textContent, /Chart\.js не загрузился/);
 });
+
+test("US4: таблица ниш, фильтр по категории и переход в анализ — и ни слова об авторе (FR-022, FR-023)", () => {
+  const { w } = makeWindow();
+  const el = w.document.getElementById("d");
+  const data = DATA();
+  w.FBAStats.render(el, data);
+
+  const box = el.querySelector("#stats-niches");
+  assert.ok(box, "таблицы ниш нет");
+  const heads = [...box.querySelectorAll("thead th")].map((t) => t.textContent.trim());
+  assert.deepEqual(heads, ["Ниша", "Вердикт", "Решающая причина", "Категория", "Критерий 1", "Scorecard", "COGS", ""]);
+  for (const bad of ["Автор", "Кто", "Пользователь"]) assert.ok(!heads.includes(bad), `колонка «${bad}» — раздел отвечает про ниши, а не оценивает людей`);
+  assert.ok(!/автор/i.test(box.textContent), "слова об авторе в таблице быть не должно");
+
+  const trs = box.querySelectorAll("tbody tr");
+  assert.equal(trs.length, data.rows.length);
+  assert.ok(box.querySelector("button[data-open]"), "из строки нельзя открыть анализ");
+  assert.ok(box.textContent.includes("было:"), "у изменившегося вердикта показан прежний (FR-008)");
+
+  // фильтр работает на месте, без похода на сервер
+  const eco = data.summary.decisiveCat.find((c) => c.label === "Экономика");
+  const btn = [...box.querySelectorAll(".stfilter")].find((b) => b.dataset.cat === "Экономика");
+  assert.ok(btn, "кнопки фильтра «Экономика» нет");
+  btn.dispatchEvent(new w.Event("click", { bubbles: true }));
+  const shown = [...box.querySelectorAll("tbody tr")].filter((t) => !t.classList.contains("hidden"));
+  assert.equal(shown.length, eco.count, `фильтр оставил ${shown.length}, а в сводке ${eco.count}`);
+  assert.match(box.querySelector("#stats-count").textContent, new RegExp(String(eco.count)));
+});
+
+test("US5: блок про неразличающие пороги назван числами (FR-024)", () => {
+  const { w } = makeWindow();
+  const el = w.document.getElementById("d");
+  w.FBAStats.render(el, DATA());
+  const box = el.querySelector("#stats-blind");
+  assert.ok(box, "блока нет");
+  assert.match(box.textContent, /1f · Доля топ-5 брендов/);
+  assert.match(box.textContent, /из 65/);
+});

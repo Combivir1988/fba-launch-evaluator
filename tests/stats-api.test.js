@@ -168,3 +168,63 @@ test("ворота SC-007 через HTTP: десять GET /api/stats не ме
     for (const row of r.rows) for (const k of ["author", "createdBy", "updatedBy"]) assert.ok(!(k in row), "автора в строках нет (FR-023)");
   } finally { await T.close(); }
 });
+
+// FR-025: шесть путей изменения. Ни один из них не трогает статистику напрямую — она догоняет сама,
+// потому что все шесть увеличивают analyses.version, а это и есть единственное правило устаревания (D2).
+test("FR-025: сохранение, отчёты, импорт, копия, удаление и восстановление версии видны без ручного действия", async () => {
+  await fresh();
+  const stats = createStats(db, { budget: 100 });
+  const doc = fixtureAnalysis();
+  const { aggregates, ...core } = doc;
+  await analyses.importDoc(doc, user);
+  assert.equal((await stats.get()).summary.n, 1, "импорт");
+
+  // 1. сохранение ядра
+  let meta = await analyses.getMeta(doc.id);
+  await analyses.saveCore({ id: doc.id, baseVersion: meta.version, core: { ...core, niche: "другое название" } }, user);
+  let r = await stats.get();
+  assert.equal(r.rows[0].niche, "другое название", "сохранение");
+  assert.equal(r.freshness.stale, 0);
+
+  // 2. замена отчётов
+  meta = await analyses.getMeta(doc.id);
+  await analyses.saveAggregates({ id: doc.id, baseVersion: meta.version, aggregates }, user);
+  assert.equal((await stats.get()).freshness.stale, 0, "загрузка отчётов");
+
+  // 3. копия
+  await analyses.copy({ core, aggregates }, user);
+  assert.equal((await stats.get()).summary.n, 2, "копия");
+
+  // 4. восстановление версии
+  const versions = await analyses.listVersions(doc.id);
+  assert.ok(versions.length, "версии сохранились");
+  await analyses.restoreVersion(doc.id, versions[versions.length - 1].id, user);
+  r = await stats.get();
+  assert.equal(r.freshness.stale, 0, "восстановление версии");
+  assert.equal(r.summary.n, 2);
+
+  // 5. удаление
+  await db.query("UPDATE analyses SET deleted_at = now() WHERE id = $1", [doc.id]);
+  assert.equal((await stats.get()).summary.n, 1, "удаление");
+});
+
+test("SC-005: сменилась методика — итоги признаны устаревшими и пересчитаны", async () => {
+  await fresh();
+  await seed(fixtureAnalysis());
+  const stats = createStats(db, { budget: 100 });
+  const first = await stats.get();
+  assert.equal(first.freshness.stale, 0);
+  const at1 = (await db.query("SELECT computed_at FROM analysis_outcome")).rows[0].computed_at;
+
+  // то же самое делает любая правка в shared/: method_hash перестаёт совпадать
+  await db.query("UPDATE analysis_outcome SET method_hash = 'иная-методика'");
+  const stale = createStats(db, { budget: 0 }); // бюджет 0 — досчёта в запросе не будет, видно само устаревание
+  const seen = await stale.get();
+  assert.equal(seen.freshness.stale, 1);
+  assert.equal(seen.freshness.methodChanged, true, "устаревание по методике отличается от устаревания по данным");
+
+  const after = await createStats(db, { budget: 100 }).get();
+  assert.equal(after.freshness.stale, 0, "прежний результат не залип");
+  const at2 = (await db.query("SELECT computed_at FROM analysis_outcome")).rows[0].computed_at;
+  assert.ok(new Date(at2) >= new Date(at1), "момент расчёта обновился");
+});

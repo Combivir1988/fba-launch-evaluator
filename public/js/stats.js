@@ -124,6 +124,52 @@
     return block("Scorecard", `Средний балл по всем анализам — <b>${fmt1(s.scorecard.avg)} %</b>.`, cfg, rowsTable(bands, s.n, "Полоса") + weak, "short");
   }
 
+  // ---------- US5: пороги, которые ничего не различают ----------
+  function blind(s) {
+    if (!s.blind || !s.blind.length) return "";
+    return `<div class="panel section" id="stats-blind">
+      <h2>Пороги, которые ничего не различают</h2>
+      <p class="muted">Подпункт или критерий, который зелёный почти никогда или почти всегда, занимает место в счёте зелёных, но хорошую нишу от плохой не отделяет. Это повод поправить порог или признать, что показатель не заполняется.</p>
+      <ul>${s.blind.map((b) => `<li><b>${esc(b.label)}</b> <span class="muted">(${esc(b.kind)})</span> — ${esc(b.why)}.</li>`).join("")}</ul></div>`;
+  }
+
+  // ---------- US4: от процента к нише ----------
+  function niches(data) {
+    const s = data.summary, rows = data.rows;
+    const cats = [{ label: "все", count: s.n }].concat(s.decisiveCat);
+    const chips = cats.map((c, i) => `<button class="stfilter${i ? "" : " active"}" data-cat="${esc(i ? c.label : "")}">${esc(c.label)} · ${fmtN(c.count)}</button>`).join("");
+    const body = rows.map((r) => `<tr data-cat="${esc(r.cat)}">
+        <td>${esc(r.niche || "без названия")}</td>
+        <td><span class="status ${esc({ good: "ok", warning: "warn", serious: "pending", critical: "fail" }[r.status] || "na")}">${esc(r.verdict)}</span>${r.changed ? ` <span class="chip warn" title="Сохранённый в анализе вердикт остался от прежней методики">было: ${esc(r.was)}</span>` : ""}</td>
+        <td>${esc(r.why || "—")}</td><td>${esc(r.cat)}</td>
+        <td>${r.c1 == null ? "—" : fmtN(r.c1) + " из 8"}</td>
+        <td>${r.score == null ? "—" : fmtN(r.score) + " %"}</td>
+        <td>${r.cogs ? '<span class="chip ok">есть</span>' : '<span class="chip na">нет</span>'}</td>
+        <td><button data-open="${esc(r.id)}">Открыть</button></td></tr>`).join("");
+    return `<div class="panel section" id="stats-niches">
+      <h2>Ниши <span class="muted" style="font-weight:400;font-size:.8rem">вердикт из пересчёта, а не из сохранённого</span></h2>
+      <div class="row stfilters" style="flex-wrap:wrap;gap:.3rem">${chips}</div>
+      <p class="muted" id="stats-count"></p>
+      <div class="tablewrap"><table id="stats-rows"><thead><tr><th>Ниша</th><th>Вердикт</th><th>Решающая причина</th><th>Категория</th><th>Критерий 1</th><th>Scorecard</th><th>COGS</th><th></th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+  }
+
+  /** Фильтр по категории причины — на месте, без похода на сервер: все строки уже здесь. */
+  function bindFilter(root) {
+    const box = root.querySelector("#stats-niches"); if (!box) return;
+    const count = box.querySelector("#stats-count");
+    const apply = (cat) => {
+      let shown = 0;
+      for (const tr of box.querySelectorAll("tbody tr")) { const on = !cat || tr.dataset.cat === cat; tr.classList.toggle("hidden", !on); if (on) shown++; }
+      count.textContent = cat ? `Показано ниш: ${fmtN(shown)} — решающая причина из категории «${cat}»` : `Показаны все ниши: ${fmtN(shown)}`;
+    };
+    box.querySelector(".stfilters").addEventListener("click", (e) => {
+      const b = e.target.closest(".stfilter"); if (!b) return;
+      for (const x of box.querySelectorAll(".stfilter")) x.classList.toggle("active", x === b);
+      apply(b.dataset.cat);
+    });
+    apply("");
+  }
+
   // ---------- сборка ----------
   function empty(f) {
     return `<div class="panel section"><h2>Статистика по всем анализам</h2>
@@ -138,7 +184,9 @@
     if (!s || !s.n) { root.innerHTML = empty((data && data.freshness) || { total: 0 }); return; }
 
     root.innerHTML = head(data.freshness, data.mismatch, s.n)
-      + `<div class="panel section stgrid">${verdicts(s) + decisive(s) + frequency(s) + criterion1(s) + economics(s) + challenger(s) + scorecard(s)}</div>`;
+      + `<div class="panel section stgrid">${verdicts(s) + decisive(s) + frequency(s) + criterion1(s) + economics(s) + challenger(s) + scorecard(s)}</div>`
+      + blind(s) + niches(data);
+    bindFilter(root);
 
     if (!window.Chart) { for (const b of root.querySelectorAll(".chartbox")) b.innerHTML = '<div class="notice fail">Chart.js не загрузился — цифры доступны через «Таблица» под каждым блоком</div>'; pending.length = 0; return; }
     for (const { id, cfg } of pending) {

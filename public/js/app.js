@@ -779,6 +779,15 @@ $("#histlist").addEventListener("click", async (e) => {
     }
   } catch (err) { toast(err.message, 7000); }
 });
+// Переход из строки статистики в сам анализ — тем же путём, что из истории (spec 018, FR-022).
+$("#stats-body").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-open]"); if (!b) return;
+  try {
+    if (b.dataset.open === S.a.id) return showTab("analysis");
+    if (!(await leaveCurrent("Текущий анализ не сохранён. Открыть другой и потерять несохранённые изменения?"))) return;
+    const g = await history.get(b.dataset.open); loadAnalysis(g.doc, g.meta);
+  } catch (err) { toast(err.message, 7000); }
+});
 $("#hist-mine").addEventListener("change", renderHistory);
 $("#hist-search").addEventListener("input", debounce(renderHistory, 300));
 $("#hist-export").addEventListener("click", async () => { try { const all = await history.getAllFull((i, n) => toast(`Готовлю экспорт: ${i} из ${n}…`, 60000)); exportHistoryJson(all); toast(`Экспортировано анализов: ${all.length}`); } catch (e) { toast("Экспорт: " + e.message, 7000); } });

@@ -358,4 +358,9 @@ td.promo .chip { font-size: .72rem; padding: 0 .4rem; }
 .sttable > summary { cursor: pointer; color: var(--text-2); font-size: .85rem; }
 .sttable table { width: 100%; font-size: .85rem; }
 #tab-stats .notice { margin-top: .6rem; }
+.stfilter { font-size: .85rem; padding: .2rem .6rem; }
+.stfilter.active { border-color: var(--accent); color: var(--accent); }
+#stats-rows { width: 100%; font-size: .9rem; }
+#stats-blind ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+#stats-blind li { margin-bottom: .3rem; }
 @media (max-width: 760px) { .stgrid { grid-template-columns: 1fr; } }
