@@ -43,6 +43,11 @@ export function buildTzPayload(analysis) {
     // ВАЖНО: пустые разделы вычищаются ниже (dropEmpty). Пустой массив или null модель пересказывает как
     // «патентный скан не передан (null)» — строка про внутренности приложения вместо требования производителю (2026-10-30).
     patents: analysis?.patents ? { status: analysis.patents.status, summary: analysis.patents.summary, items: (analysis.patents.items || []).slice(0, 5).map((x) => ({ number: x.number, risk: x.risk, overlap: x.overlap, designAround: x.designAround })) } : null,
+    // spec 019: кого в нише проще всего подвинуть. Отзывов у такой марки много, а текущих денег уже мало —
+    // значит её оффер устарел, и ТЗ имеет смысл целить в его слабое место, а не в среднее по нише.
+    vulnerableBrands: (R.competition?.brands || []).filter((b) => b.lethargyLabel === "giant").slice(0, 5)
+      .map((b) => ({ brand: b.brand, revenueSharePct: pct(b.share), reviewsSharePct: pct(b.reviewsShare), lethargy: r2(b.lethargy),
+        meaning: "отзывов собрано больше, чем дают текущие продажи" })),
     differentiation: (analysis?.ai?.differentiation || []).slice(0, 6).map((d) => ({ hypothesis: d.hypothesis, evidence: d.evidence, specRequirement: d.specRequirement })),
     pricing: R.priceConfig && R.priceConfig.market !== null ? { marketPrice: r2(R.priceConfig.market), entryPrice: r2(R.priceConfig.entry), ceilingPrice: r2(R.priceConfig.ceiling), marketPriceWithCoupons: r2(R.priceConfig.marketEff), analogs: R.priceConfig.analogs, matchedFieldsPct: pct(R.priceConfig.tier), cogsCeilingForMinMargin: r2(R.priceConfig.cogsCeiling), minMarginPct: pct(R.priceConfig.marginMin),
       cogsCeilingIsAfter: "комиссия Amazon, FBA-сбор, доставка до склада и реклама на единицу уже вычтены",

@@ -30,7 +30,9 @@ export function buildAiPayload(analysis) {
       dominant: R.competition.dominant, amazonSells: R.competition.amazonSells, amazon: R.amazon ? { mode: R.amazon.mode, scope: R.amazon.scopeLabel, present: R.amazon.present, listings: R.amazon.count, revenueShare: r3(R.amazon.revenueShare), blocksVerdict: R.amazon.blocks, level: R.amazon.level, ownBrands: (R.amazon.ownBrands || []).map((b) => b.brand), vendors: (R.amazon.vendors || []).slice(0, 5).map((v) => ({ brand: v.brand, share: r3(v.share), trend: v.trend ? v.trend.dir : null })) } : null, reviewBarrier: { ...R.competition.reviewBarrier, avg: r2(R.competition.reviewBarrier.avg) }, playersOver100: R.competition.playersOver100, brandsOver10pct: R.competition.brandsOver10pct,
       // spec 019: концентрация ниши и два поясняющих числа. Доля топ-5 листингов без размера выборки обманывает.
       hhi: R.competition.hhi === null ? null : Math.round(R.competition.hhi), top5ListingShare: r3(R.competition.top5ListingShare), listingCount: R.competition.listingCount,
-      topBrands: R.competition.brands.slice(0, 10).map((b) => ({ brand: b.brand, share: r3(b.share), asins: b.asins, reviewsMax: b.reviewsMax, rating: r2(b.rating), priceMedian: r2(b.priceMedian) })),
+      topBrands: R.competition.brands.slice(0, 10).map((b) => ({ brand: b.brand, share: r3(b.share), asins: b.asins, reviewsMax: b.reviewsMax, rating: r2(b.rating), priceMedian: r2(b.priceMedian),
+        reviewsShare: r3(b.reviewsShare), lethargy: r2(b.lethargy), state: b.lethargyLabel })),
+      lethargyRevenueShare: r3(R.competition.lethargyRevenueShare),
       contaminationCandidates: R.competition.contaminationCandidates.slice(0, 8), priceSegments: R.priceSegments },
     // Ценовой диапазон (spec 003): конкуренция выше и topAsins — по листингам коридора; спрос, сегменты цен и размер рынка — по всей нише.
     priceBand: R.priceBand?.active ? { label: R.priceBand.label, min: R.priceBand.min, max: R.priceBand.max, listingsInBand: R.priceBand.inCount, listingsTotal: R.priceBand.totalCount, noPrice: R.priceBand.noPrice,

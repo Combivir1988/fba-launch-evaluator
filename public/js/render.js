@@ -363,11 +363,31 @@
         <div class="tile ${rb.tier === "moat" ? "fail" : rb.tier === "medium" ? "warn" : "ok"}"><div class="k">Отзывов у лидера</div><div class="v">${fmtN(rb.leaderReviews)}</div><div class="s">${rb.tier === "moat" ? "> 2000 — практически непробиваем" : rb.tier === "medium" ? "500–2000 — нужен дифференциатор + Vine" : rb.tier === "breakable" ? "< 500 — пробиваемый ров" : "—"}</div></div>
         <div class="tile"><div class="k">Игроков с ≥100 отзывов</div><div class="v">${fmtN(comp.playersOver100)}</div><div class="s">брендов с долей > 10 %: ${fmtN(comp.brandsOver10pct)}</div></div>
         <div class="tile"><div class="k">Топ-5 / топ-10 / топ-20</div><div class="v">${fmtPct(comp.top5Share)}</div><div class="s">${fmtPct(comp.top10Share)} / ${fmtPct(comp.top20Share)}</div></div>
+        ${isNum(comp.lethargyRevenueShare) ? `<div class="tile"><div class="k">Деньги у летаргичных</div><div class="v">${fmtPct(comp.lethargyRevenueShare)}</div><div class="s">выручки у марок, чьи отзывы обгоняют продажи</div></div>` : ""}
       </div>${cmp}
       <div class="stack" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-brands"></canvas></div>
-      <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${cont}
+      <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${lethargyTable(comp)}${cont}
       ${my.size || myBrand ? `<p class="muted" style="font-size:.8rem">Строки, подсвеченные жёлтым — ваш бренд или ASIN. ${comp.incumbent ? "Галочка «Оценивать как новый вход» снята: в долях брендов, топ-5 и планке отзывов вашего бренда нет — там только чужие. Размер рынка считается по всей нише, включая вашу выручку." : "Галочка «Оценивать как новый вход» стоит: ваш бренд считается обычным конкурентом — это сценарий «как если бы мы заходили с нуля». Снимите её, если оцениваете расширение внутри своей ниши."}</p>` : ""}`;
   }
+  /** Состояние брендов (spec 019): отзывы — накопленный за годы запас, выручка — текущий месяц.
+   *  Расхождение и есть летаргия: марка, которую когда-то покупали все, а теперь нет. Решений не меняет. */
+  const LETH_LABEL = { giant: ["спящий гигант", "ok"], tired: ["подустал", ""], efficient: ["эффективен", "warn"], normal: ["в норме", ""] };
+  function lethargyTable(comp) {
+    const top = (comp.brands || []).filter((b) => b.lethargy !== null && b.lethargy !== undefined).slice(0, 10);
+    if (!top.length) {
+      return comp.source === "xray" && comp.brands?.length
+        ? `<p class="muted" style="font-size:.8rem;margin-top:.6rem">Состояние брендов не посчитано: ни у одного листинга ниши нет отзывов, а без них доли отзывов не существует.</p>`
+        : "";
+    }
+    const rows = top.map((b) => {
+      const [name, cls] = LETH_LABEL[b.lethargyLabel] || ["—", ""];
+      return `<tr><td>${esc(b.brand)}</td><td class="num">${fmtPct(b.share, 1)}</td><td class="num">${fmtPct(b.reviewsShare, 1)}</td><td class="num">${fmtN(b.lethargy, 2)}</td><td><span class="chip ${cls}">${name}</span></td></tr>`;
+    }).join("");
+    return `<h4 style="margin:.9rem 0 .3rem">Состояние брендов</h4>
+      <div class="tablewrap"><table class="lethtable"><thead><tr><th>Бренд</th><th class="num">Доля выручки</th><th class="num">Доля отзывов</th><th class="num">Летаргия</th><th>Состояние</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="muted" style="font-size:.8rem">Зелёным — марки, которые легче подвинуть: отзывов у них много, а текущих денег мало. Жёлтым — те, кто продаёт больше, чем обещает их запас отзывов. На вердикт и на статусы критериев это не влияет: показатель описывает конкурента, а не оценивает нишу.</p>`;
+  }
+
   function drawCompetitors(container, R) {
     const top = R.competition.brands.slice(0, 10); if (!top.length) return;
     const [s1, s2] = series();
@@ -979,6 +999,10 @@
     "Отзывы": "Среднее и медиана числа отзывов у товаров ниши (1d). Среднее искажают гиганты, поэтому смотрите и на медиану. Меньше 300 — барьер низкий.",
     "Top brand": "Доля крупнейшего бренда (1e). От 25 % бренд считается доминирующим, и включаются критерии 3–8.",
     "Концентрация": "Насколько деньги ниши собраны у немногих марок (1f): сумма квадратов долей выручки брендов, шкала 0…10 000. Меньше 1500 — за лидером есть место, 2500 и больше — рынок держат немногие.",
+    "Деньги у летаргичных": "Какая доля выручки ниши приходится на марки, чьи отзывы обгоняют продажи. Ответ на вопрос «сколько здесь плохо охраняемых денег». На вердикт не влияет.",
+    "Состояние брендов": "Отзывы копятся годами, а выручка мерится за месяц. Расхождение показывает марку, которую когда-то покупали все, а теперь нет — её оффер проще всего перебить.",
+    "Доля отзывов": "Сколько из всех отзывов ниши собрал этот бренд. Это запас за всю жизнь листингов, а не за месяц — поэтому он и может обгонять текущую долю выручки.",
+    "Летаргия": "Доля отзывов, делённая на долю выручки. Ровно 1,00 — одно соответствует другому. Больше 2 у крупной марки — спящий гигант. У мелкой марки большое значение ничего не значит: чаще всего это мёртвый листинг.",
     "Топ-5 брендов": "Доля пяти крупнейших брендов вместе (1f). Меньше 45 % — рынок раздроблен, больше 65 % — поделён.",
     "SV ниши T360": "Сколько раз за последние 360 дней покупатели искали запросы этой ниши (данные Amazon POE).",
     "Товары / бренды": "Сколько товаров и брендов Amazon относит к нише.",

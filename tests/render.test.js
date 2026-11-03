@@ -92,6 +92,11 @@ test("снимок публичной ссылки (полный): все сек
   for (const id of ["economics", "budget", "traffic", "competitors", "scorecard", "challenger", "patents", "ai", "conclusion"]) assert.equal(el.querySelector("#sec-" + id).classList.contains("hidden"), false, id);
   assert.match(el.querySelector("#sec-ai").textContent, /AI получает только агрегаты|AI-вердикт/);
   assert.match(el.querySelector("#sec-patents").textContent, /не проверено/);
+  // spec 019: концентрация и состояние брендов — часть конкурентной карты, они обязаны доехать и сюда.
+  const comp = el.querySelector("#sec-competitors").textContent;
+  assert.match(comp, /Состояние брендов/, "таблица летаргии потерялась в публичном снимке");
+  assert.match(comp, /Деньги у летаргичных/);
+  assert.match(el.querySelector("#sec-overview").textContent, /Концентрация/);
 });
 
 test("снимок без закупочной экономики: секции экономики и бюджета скрыты, рендер не падает, чисел нет в HTML", () => {

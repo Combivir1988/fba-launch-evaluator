@@ -22,7 +22,7 @@ export function brandShares(asins, excludedBrands = []) {
   const total = sum([...map.values()].map((b) => b.revenue));
   const brands = [...map.values()].map((b) => ({
     brand: b.brand, revenue: b.revenue, share: safeDiv(b.revenue, total) ?? 0, sales: b.sales, asins: b.asins,
-    reviewsMax: b.reviewsMax, rating: b.ratingN ? b.ratingSum / b.ratingN : null, priceMedian: median(b.prices),
+    reviewsMax: b.reviewsMax, reviewsSum: b.reviewsSum, rating: b.ratingN ? b.ratingSum / b.ratingN : null, priceMedian: median(b.prices),
   })).sort((x, y) => y.revenue - x.revenue);
   return { brands, totalRevenue: total, rows };
 }
@@ -38,6 +38,36 @@ export function poeBrandClickShares(asinMetrics, excludedBrands = []) {
     map.set(a.brand, b);
   }
   return [...map.values()].sort((x, y) => y.share - x.share);
+}
+
+/** Пороги летаргии по умолчанию — на случай, если расчёт позвали с «сырыми» порогами мимо mergeThresholds. */
+const LETHARGY_FALLBACK = { smooth: 0.01, moneyMin: 0.10, giantMin: 2.0, tiredMin: 1.5, efficientMax: 0.8 };
+
+/**
+ * Летаргия бренда: отзывов много, а денег уже мало (spec 019).
+ * Коэффициент ОДИН и прибавляется к обеим долям. Это не стиль, а контракт: только при равенстве слагаемых
+ * бренд с долей отзывов, равной доле выручки, даёт ровно 1 ПРИ ЛЮБОМ размере. Прибавь к числителю и знаменателю
+ * разное — и индекс начнёт мерить «крупный против мелкого»: мелкий сбалансированный бренд выглядел бы
+ * эффективным просто потому, что мелкий. Проверяется воротами SC-007.
+ */
+export function lethargyIndex(reviewsShare, revenueShare, smooth = LETHARGY_FALLBACK.smooth) {
+  if (reviewsShare === null || reviewsShare === undefined || revenueShare === null || revenueShare === undefined) return null;
+  return (reviewsShare + smooth) / (revenueShare + smooth);
+}
+
+/**
+ * Ярлык состояния бренда. Порядок проверки важен: «спящий гигант» и «подустал» требуют порога ПО ДЕНЬГАМ,
+ * а «эффективен» — нет. Без порога по деньгам ярлык достаётся мёртвым листингам: на живых данных у брендов
+ * с выручкой меньше 1 % индекс доходит до 42, и таких брендов сорок шесть (D8).
+ */
+export function lethargyLabelOf(revenueShare, lethargy, th = LETHARGY_FALLBACK) {
+  if (lethargy === null || lethargy === undefined) return null;
+  const t = { ...LETHARGY_FALLBACK, ...(th || {}) };
+  const rich = typeof revenueShare === "number" && revenueShare >= t.moneyMin;
+  if (rich && lethargy >= t.giantMin) return "giant";
+  if (rich && lethargy >= t.tiredMin) return "tired";
+  if (lethargy < t.efficientMax) return "efficient";
+  return "normal";
 }
 
 export function reviewTier(reviews, th) {
@@ -85,7 +115,7 @@ export function competition(p) {
   const incumbent = inputs.evaluateAsNewEntrant === false && Boolean(own);
   const barrierExcluded = incumbent ? [...excluded, ...own.brands] : excluded;
   const out = { source: null, brands: [], topBrand: null, topBrandShare: null, top5Share: null, top10Share: null, top20Share: null,
-    hhi: null, top5ListingShare: null, listingCount: null,
+    hhi: null, top5ListingShare: null, listingCount: null, lethargyRevenueShare: null,
     reviewBarrier: { leaderReviews: null, avg: null, median: null, tier: null }, playersOver100: null, brandsOver10pct: null,
     amazonSells: false, amazonSellsSource: "auto", amazonAsins: [], amazonListings: [], amazonRevenueShare: null, contaminationCandidates: [], poeBrands: [] };
   // Amazon как продавец: явный ответ пользователя побеждает автоопределение по колонке Seller в Xray
@@ -107,7 +137,18 @@ export function competition(p) {
   if (xray?.asins?.length) {
     const { brands, rows } = brandShares(xray.asins, barrierExcluded);
     out.source = "xray";
-    out.brands = brands;
+    // Летаргия (spec 019) считается ЗДЕСЬ ЖЕ, на тех же brands: доля отзывов обязана быть взята из того же
+    // набора листингов, что и доля выручки, иначе две половины дроби будут про разные ниши.
+    const tL = { ...LETHARGY_FALLBACK, ...(th.lethargy || {}) };
+    const totalReviews = sum(brands.map((b) => b.reviewsSum ?? 0));
+    out.brands = brands.map((b) => {
+      const reviewsShare = totalReviews > 0 ? b.reviewsSum / totalReviews : null;
+      const lethargy = lethargyIndex(reviewsShare, b.share, tL.smooth);
+      return { ...b, reviewsShare, lethargy, lethargyLabel: lethargyLabelOf(b.share, lethargy, tL) };
+    });
+    // Доля денег у летаргичных марок: порог по деньгам здесь НЕ применяется — вопрос «сколько в нише
+    // плохо охраняемых денег», а не «кого именно двигать».
+    out.lethargyRevenueShare = totalReviews > 0 ? sum(out.brands.filter((b) => b.lethargy >= tL.tiredMin).map((b) => b.share)) : null;
     out.topBrand = brands[0]?.brand ?? null;
     out.topBrandShare = brands[0]?.share ?? null;
     out.top5Share = sum(brands.slice(0, 5).map((b) => b.share));
@@ -136,7 +177,8 @@ export function competition(p) {
   } else if (out.poeBrands.length) {
     out.source = "poe";
     const pb = out.poeBrands;
-    out.brands = pb.map((b) => ({ brand: b.brand, revenue: null, share: b.share, sales: null, asins: b.asins, reviewsMax: b.reviewsMax, rating: null, priceMedian: null }));
+    out.brands = pb.map((b) => ({ brand: b.brand, revenue: null, share: b.share, sales: null, asins: b.asins, reviewsMax: b.reviewsMax, reviewsSum: null, rating: null, priceMedian: null,
+      reviewsShare: null, lethargy: null, lethargyLabel: null })); // летаргия требует выручки по брендам, которой в POE нет
     out.topBrand = pb[0].brand; out.topBrandShare = pb[0].share;
     out.top5Share = poe.launchPotential?.top5BrandsClickShareT360?.current ?? sum(pb.slice(0, 5).map((b) => b.share));
     out.top10Share = sum(pb.slice(0, 10).map((b) => b.share));
