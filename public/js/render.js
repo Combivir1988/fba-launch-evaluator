@@ -1343,6 +1343,54 @@
     ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)], ["config", secConfig, drawConfig],
     ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["tz", secTz], ["keywords", secKeywords], ["conclusion", secConclusion], ["ai", secAi],
   ];
+  // ---------- сворачивание секций ----------
+  // Открытыми остаются только основные показатели и гейты; остальное разворачивается стрелкой.
+  // Один набор — одна строка правки, если состав нужно поменять.
+  const OPEN_BY_DEFAULT = new Set(["hero", "overview", "criterion1", "economics"]);
+  const OPEN_KEY = "fba_open_sections";
+  const H2_HEAD = /^\s*(<h2\b[^>]*>[\s\S]*?<\/h2>)([\s\S]*)$/;
+
+  function openState(container) {
+    if (container.__open) return container.__open;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(OPEN_KEY) || "null"); } catch {}
+    container.__open = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+    return container.__open;
+  }
+  const isOpen = (container, id) => { const st = openState(container); return id in st ? Boolean(st[id]) : OPEN_BY_DEFAULT.has(id); };
+
+  /** Оборачивает секцию в <details>, если она начинается с заголовка. Нативный элемент, а не кнопка:
+   *  работает с клавиатуры, не требует скрипта и не нарушает обещание «на публичной странице нет элементов управления». */
+  function collapsible(container, id, html, opts) {
+    if (opts?.static) return html; // экспорт и публичная ссылка остаются развёрнутыми: там читают, а не работают
+    const m = H2_HEAD.exec(html);
+    if (!m) return html;           // секция без заголовка — сворачивать не за что
+    return `<details class="seccol"${isOpen(container, id) ? " open" : ""} data-sec="${esc(id)}"><summary>${m[1]}</summary>${m[2]}</details>`;
+  }
+
+  /** Chart.js меряет холст при создании. Внутри закрытого <details> холст нулевой, поэтому при развороте
+   *  графики этой секции надо пересчитать — иначе человек увидит пустое место вместо диаграммы. */
+  function resizeCharts(container, scope) {
+    for (const [id, ch] of Object.entries(container.__charts || {})) {
+      if (!scope.querySelector("#" + id)) continue;
+      try { ch.resize(); } catch {}
+    }
+  }
+
+  function bindCollapse(container) {
+    if (container.__collapseBound) return;
+    container.__collapseBound = true;
+    // toggle не всплывает — слушаем на фазе перехвата.
+    container.addEventListener("toggle", (e) => {
+      const d = e.target;
+      if (!d || typeof d.matches !== "function" || !d.matches("details.seccol")) return;
+      const st = openState(container);
+      st[d.dataset.sec] = d.open;
+      try { localStorage.setItem(OPEN_KEY, JSON.stringify(st)); } catch {}
+      if (d.open) resizeCharts(container, d);
+    }, true);
+  }
+
   const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "cashflow", "entry", "pricing", "borderline", "challenger", "scorecard", "conclusion", "ai"];
 
   function render(container, A, opts = {}) {
@@ -1351,7 +1399,7 @@
     container.classList.add("dash"); container.__A = A; container.dataset.stage = String(stageOf(A, container.__opts));
     container.innerHTML = stageTabsHtml(A, container.__opts) + SECTIONS.map(([id]) => `<section class="panel section" data-section="${id}" id="sec-${id}"></section>`).join("");
     for (const [id] of SECTIONS) fill(container, id, A, R, container.__opts);
-    bindStageTabs(container);
+    bindStageTabs(container); bindCollapse(container);
   }
   function fill(container, id, A, R, opts) {
     const def = SECTIONS.find((s) => s[0] === id); if (!def) return;
@@ -1359,7 +1407,7 @@
     if ((opts.hidden || []).includes(id)) { el.classList.add("hidden"); el.innerHTML = ""; return; } // секция скрыта автором ссылки: данных для неё в снимке нет
     const html = def[1](A, R, opts);
     if (!html) { el.classList.add("hidden"); return; }
-    el.classList.remove("hidden"); el.innerHTML = html;
+    el.classList.remove("hidden"); el.innerHTML = collapsible(container, id, html, opts);
     try { annotate(el, id); if (document.__fbaTipsHide) document.__fbaTipsHide(); } catch (e) { console.error("tips", id, e); }
     // Фото листинга может не открыться (Amazon убрал картинку, нет сети) — тогда убираем рамку. Через addEventListener: inline-обработчики запрещены нашей CSP.
     for (const img of el.querySelectorAll(".herophoto img")) img.addEventListener("error", () => img.closest(".herophoto")?.remove(), { once: true });

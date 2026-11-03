@@ -34,7 +34,7 @@ test("до этапа 2: секция показывает область ASIN �
 test("схема без таблицы: поля чипами, кнопка извлечения активна", () => {
   const a = withConfig(entryFixture(), { tz: false }); delete a.config.table; a.results = compute(a);
   const el = draw(a); const sec = el.querySelector("#sec-config");
-  assert.match(text(el, "#sec-config summary"), /Схема полей \(\d+\)/); assert.ok(sec.querySelectorAll(".chips .chip").length >= 3);
+  assert.match(text(el, "#sec-config details:not(.seccol) > summary"), /Схема полей \(\d+\)/); assert.ok(sec.querySelectorAll(".chips .chip").length >= 3);
   assert.equal(sec.querySelector('[data-action="config-extract"]').disabled, false); assert.equal(sec.querySelector('[data-action="config-edit"]').disabled, false);
   assert.equal(sec.querySelector(".piegrid"), null);
 });

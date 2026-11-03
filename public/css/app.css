@@ -138,6 +138,17 @@ body.booting #boot { display: flex; position: fixed; inset: 0; align-items: cent
 .section { padding: 1rem; }
 .section > h2 { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .section > h2 .chip { font-size: .75rem; }
+/* Сворачиваемые секции дашборда: открыты только основные показатели и гейты, остальное разворачивается стрелкой.
+   Заголовок переезжает внутрь <summary>, поэтому правило `.section > h2` его больше не достаёт — повторяем раскладку здесь. */
+.section > details.seccol > summary { display: flex; align-items: center; gap: .5rem; cursor: pointer; list-style: none; margin: 0; user-select: none; }
+.section > details.seccol > summary::-webkit-details-marker { display: none; }
+.section > details.seccol > summary::before { content: "\25B8"; flex: 0 0 auto; color: var(--muted); font-size: .9em; line-height: 1; }
+.section > details.seccol[open] > summary::before { content: "\25BE"; }
+.section > details.seccol > summary:hover::before { color: var(--text); }
+.section > details.seccol > summary > h2 { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 0; }
+.section > details.seccol > summary > h2 .chip { font-size: .75rem; }
+.section > details.seccol[open] > summary { margin-bottom: .7rem; }
+.section > details.seccol:not([open]) > summary > h2 { color: var(--text-2); font-weight: 600; }
 .hero { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }
 .hero .meta { color: var(--text-2); font-size: .9rem; }
 .heromain { display: flex; gap: .9rem; align-items: flex-start; }

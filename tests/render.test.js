@@ -57,6 +57,41 @@ test("render: все секции присутствуют, графики со�
   assert.ok(el.querySelector("#sec-traffic table"), "трафик остался");
 });
 
+test("сворачивание секций: открыты только основные показатели и гейты", () => {
+  const { w } = makeWindow(); const a = fullAnalysis();
+  const el = w.document.getElementById("d");
+  w.FBARender.render(el, a, {});
+
+  const open = [...el.querySelectorAll("details.seccol[open]")].map((d) => d.dataset.sec).sort();
+  assert.deepEqual(open, ["criterion1", "economics", "overview"], "открытыми остаются обзор, гейты Критерия 1 и экономика");
+
+  const closed = [...el.querySelectorAll("details.seccol:not([open])")].map((d) => d.dataset.sec);
+  for (const id of ["competitors", "traffic", "scorecard", "challenger", "checklist", "conclusion"]) {
+    assert.ok(closed.includes(id), `секция «${id}» обязана быть свёрнутой`);
+  }
+  assert.ok(closed.length > 10, `свёрнутых всего ${closed.length} — похоже, обёртка не сработала`);
+
+  // Содержимое никуда не делось: оно в DOM, просто закрыто.
+  assert.match(el.querySelector("#sec-competitors").textContent, /Конкурентная карта/);
+  assert.match(el.querySelector("#sec-competitors").textContent, /Состояние брендов/);
+
+  // Заголовок переехал внутрь summary, но остался заголовком — от этого зависят подсказки.
+  const h = el.querySelector("#sec-competitors details.seccol > summary > h2");
+  assert.ok(h, "заголовок обязан быть внутри summary");
+  assert.match(h.textContent, /Конкурентная карта/);
+
+  // Ни одной кнопки не добавлено: сворачивание сделано нативным <details>, а не элементом управления.
+  assert.equal(el.querySelectorAll("details.seccol summary button, details.seccol summary [data-action]").length, 0);
+});
+
+test("сворачивание не трогает экспорт и публичную ссылку", () => {
+  const { w } = makeWindow(); const a = fullAnalysis();
+  const el = w.document.getElementById("d");
+  w.FBARender.render(el, a, { static: true });
+  assert.equal(el.querySelectorAll("details.seccol").length, 0, "там читают, а не работают — всё остаётся развёрнутым");
+  assert.ok(el.querySelector("#sec-competitors > h2"), "заголовок остаётся прямым потомком секции");
+});
+
 test("render static (экспорт): без ползунков и кнопок; pending-экономика без COGS", () => {
   const { w } = makeWindow();
   const a = fullAnalysis();
