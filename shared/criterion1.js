@@ -80,16 +80,21 @@ export function criterion1(p) {
     // spec 016: сам факт «Amazon продаёт» больше не валит 1e — валит своя марка Amazon или доминация вендора.
     items["1e"] = finalize(it, mo["1e"], (v) => v < t.topBrandShare && !azHard && !azWatch, (v) => v >= t.topBrandShare || azHard);
   }
-  // 1f — Top-5 брендов
+  // 1f — Концентрация ниши (spec 019). Прежняя мера, доля топ-5 БРЕНДОВ, была зелёной в 1 нише из 65:
+  // пять брендов почти всегда держат почти всё, и подпункт не различал ничего. Концентрация — сумма квадратов
+  // долей брендов — различает: на тех же 65 нишах разброс 616…6427 при медиане 1835.
+  // Единица — число шкалы 0…10 000, не процент. Рядом обязаны стоять ДВА поясняющих числа: доля топ-5
+  // ЛИСТИНГОВ (её читают глазом) и размер выборки, без которого первая вводит в заблуждение (D3).
   {
-    const it = item({ unit: "%", threshold: `< ${Math.round(t.top5Ok * 100)} % OK · > ${Math.round(t.top5Fail * 100)} % НЕ OK`, pct: true });
-    if (comp?.top5Share !== null && comp?.top5Share !== undefined) {
-      it.value = comp.top5Share; it.source = comp.source;
-      it.note = comp.source === "xray" ? "доля выручки топ-5 БРЕНДОВ (не продуктов)" + (comp.incumbent ? ", без вашего бренда" : "") : "top5BrandsClickShareT360 (POE, бренды — не путать с продуктами)";
-      const poeTop5 = poe?.launchPotential?.top5BrandsClickShareT360?.current;
-      if (comp.source === "xray" && typeof poeTop5 === "number") { it.proxyValue = poeTop5; it.proxyDelta = relDelta(it.value, poeTop5); }
+    const it = item({ unit: "", threshold: `< ${t.hhiOk} раздроблена · ≥ ${t.hhiFail} концентрирована`, extra: null });
+    if (comp?.hhi !== null && comp?.hhi !== undefined) {
+      it.value = comp.hhi; it.source = comp.source;
+      it.extra = { top5ListingShare: comp.top5ListingShare, listingCount: comp.listingCount };
+      const share = typeof comp.top5ListingShare === "number" ? `${(comp.top5ListingShare * 100).toFixed(0)} %` : "—";
+      it.note = `пять крупнейших листингов держат ${share} выручки; листингов в выборке ${comp.listingCount}`
+        + (comp.incumbent ? "; ваш бренд не считается барьером (вы уже в нише)" : "");
     }
-    items["1f"] = finalize(it, mo["1f"], (v) => v < t.top5Ok, (v) => v > t.top5Fail);
+    items["1f"] = finalize(it, mo["1f"], (v) => v < t.hhiOk, (v) => v >= t.hhiFail);
   }
   // 1g — Сезонность (просадка SV по неделям)
   {

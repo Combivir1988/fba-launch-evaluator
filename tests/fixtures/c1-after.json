@@ -1,0 +1,611 @@
+{
+ "meta": {
+  "takenAt": "2026-11-03",
+  "note": "Замер ПОСЛЕ замены подпункта 1f (spec 019). Только чтение живой базы; названий ниш нет.",
+  "total": 67,
+  "counted": 65,
+  "empty": 2,
+  "failed": 0,
+  "c1f": {
+   "ok": 28,
+   "warn": 21,
+   "fail": 16,
+   "na": 0
+  },
+  "c1Pass": 7,
+  "c1AvgOk": 3.62,
+  "verdicts": {
+   "no_go": 43,
+   "rework": 18,
+   "go": 1,
+   "go_conditional": 3
+  }
+ },
+ "items": [
+  {
+   "id": "c04c78c19ab8",
+   "c1f": "ok",
+   "ok": 7,
+   "pass": true,
+   "verdict": "go_conditional",
+   "gate": "Gate 1",
+   "hhi": 1083
+  },
+  {
+   "id": "a302bfaf31a1",
+   "c1f": "warn",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 2130
+  },
+  {
+   "id": "e42a53cba7d3",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 2169
+  },
+  {
+   "id": "385dda8c8541",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 5764
+  },
+  {
+   "id": "c4a839dbafbd",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 1901
+  },
+  {
+   "id": "4d295f51d92a",
+   "c1f": "ok",
+   "ok": 7,
+   "pass": true,
+   "verdict": "go",
+   "gate": "все гейты пройдены",
+   "hhi": 843
+  },
+  {
+   "id": "93131ad6234a",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 1322
+  },
+  {
+   "id": "fe0a6e46fe89",
+   "c1f": "ok",
+   "ok": 6,
+   "pass": true,
+   "verdict": "no_go",
+   "gate": "Критерий 8",
+   "hhi": 915
+  },
+  {
+   "id": "828060b28192",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 1366
+  },
+  {
+   "id": "914d5f788772",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 1613
+  },
+  {
+   "id": "8a9f841878ec",
+   "c1f": "warn",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 1835
+  },
+  {
+   "id": "dfa1e7ec5147",
+   "c1f": "ok",
+   "ok": 5,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 814
+  },
+  {
+   "id": "86abc138809f",
+   "c1f": "ok",
+   "ok": 5,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 918
+  },
+  {
+   "id": "25baea4a46d5",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 4348
+  },
+  {
+   "id": "32c59192fb74",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 1873
+  },
+  {
+   "id": "67ef20874403",
+   "c1f": "ok",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 1468
+  },
+  {
+   "id": "0227685da091",
+   "c1f": "fail",
+   "ok": 4,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 3745
+  },
+  {
+   "id": "4ea8ef7c68fd",
+   "c1f": "warn",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 2055
+  },
+  {
+   "id": "c335809db711",
+   "c1f": "warn",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 1500
+  },
+  {
+   "id": "6ac03ee23d8b",
+   "c1f": "ok",
+   "ok": 5,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Стоп-вопросы",
+   "hhi": 1245
+  },
+  {
+   "id": "27560f76b18f",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Стоп-вопросы",
+   "hhi": 2610
+  },
+  {
+   "id": "f21e24effa8b",
+   "c1f": "fail",
+   "ok": 4,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 3275
+  },
+  {
+   "id": "e79b213cf54c",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 1182
+  },
+  {
+   "id": "950af79dbcbf",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 1237
+  },
+  {
+   "id": "6e7b81a79e17",
+   "c1f": "ok",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 1262
+  },
+  {
+   "id": "ba1d9171c2a6",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 745
+  },
+  {
+   "id": "468488bc62a1",
+   "c1f": "ok",
+   "ok": 5,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Стоп-вопросы",
+   "hhi": 824
+  },
+  {
+   "id": "0fe831413f3d",
+   "c1f": "fail",
+   "ok": 2,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 2523
+  },
+  {
+   "id": "1df72b961347",
+   "c1f": "fail",
+   "ok": 1,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 6427
+  },
+  {
+   "id": "c7970c47c2da",
+   "c1f": "fail",
+   "ok": 1,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 3020
+  },
+  {
+   "id": "39dbbb2e73c3",
+   "c1f": "ok",
+   "ok": 6,
+   "pass": true,
+   "verdict": "no_go",
+   "gate": "Стоп-вопросы",
+   "hhi": 1242
+  },
+  {
+   "id": "ecb26cd86166",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 888
+  },
+  {
+   "id": "6b0582cfc66c",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 2",
+   "hhi": 2202
+  },
+  {
+   "id": "62bb2bd8d7ab",
+   "c1f": "fail",
+   "ok": 2,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 3451
+  },
+  {
+   "id": "130d9614822c",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 2804
+  },
+  {
+   "id": "47c5c1fd05bc",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 1946
+  },
+  {
+   "id": "63e8ba5094b0",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 2629
+  },
+  {
+   "id": "28d506f77afe",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 2834
+  },
+  {
+   "id": "b85fa7d85b66",
+   "c1f": "ok",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 1352
+  },
+  {
+   "id": "acf39e4d6328",
+   "c1f": "warn",
+   "ok": 4,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 1828
+  },
+  {
+   "id": "fe18e9107f93",
+   "c1f": "fail",
+   "ok": 1,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 2",
+   "hhi": 3157
+  },
+  {
+   "id": "310e6db40af4",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 1974
+  },
+  {
+   "id": "63f6a100fb72",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 1966
+  },
+  {
+   "id": "36d3e446df04",
+   "c1f": "fail",
+   "ok": 1,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 3770
+  },
+  {
+   "id": "dd5452311720",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 2364
+  },
+  {
+   "id": "0983f8f94269",
+   "c1f": "warn",
+   "ok": 2,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 2",
+   "hhi": 2474
+  },
+  {
+   "id": "26037485b324",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 1935
+  },
+  {
+   "id": "cd8608a3b7d0",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 1133
+  },
+  {
+   "id": "ee30971b8a45",
+   "c1f": "ok",
+   "ok": 6,
+   "pass": true,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 616
+  },
+  {
+   "id": "3106861301fb",
+   "c1f": "warn",
+   "ok": 2,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hhi": 1845
+  },
+  {
+   "id": "6e059db3f045",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 1699
+  },
+  {
+   "id": "ddca384dcc4d",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 656
+  },
+  {
+   "id": "87053021656d",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 3056
+  },
+  {
+   "id": "650268e5fd32",
+   "c1f": "ok",
+   "ok": 5,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 1360
+  },
+  {
+   "id": "f51204dcc70f",
+   "c1f": "ok",
+   "ok": 6,
+   "pass": true,
+   "verdict": "go_conditional",
+   "gate": "Gate 4",
+   "hhi": 1124
+  },
+  {
+   "id": "fb4e5fcd1529",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 798
+  },
+  {
+   "id": "a0b6e83c139f",
+   "c1f": "ok",
+   "ok": 6,
+   "pass": true,
+   "verdict": "go_conditional",
+   "gate": "Gate 1",
+   "hhi": 648
+  },
+  {
+   "id": "425d379c4cb0",
+   "c1f": "ok",
+   "ok": 4,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 1132
+  },
+  {
+   "id": "e819f062e0e8",
+   "c1f": "fail",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 5062
+  },
+  {
+   "id": "84d52c2c28d2",
+   "c1f": "ok",
+   "ok": 5,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hhi": 634
+  },
+  {
+   "id": "d28e13dc7412",
+   "c1f": "warn",
+   "ok": 2,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 1885
+  },
+  {
+   "id": "25f1f73e977a",
+   "c1f": "ok",
+   "ok": 3,
+   "pass": false,
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hhi": 1461
+  },
+  {
+   "id": "71652c22670e",
+   "c1f": "ok",
+   "ok": 5,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 672
+  },
+  {
+   "id": "1b527e821e99",
+   "c1f": "warn",
+   "ok": 3,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hhi": 2167
+  },
+  {
+   "id": "af4e1ea572c2",
+   "c1f": "warn",
+   "ok": 2,
+   "pass": false,
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hhi": 1923
+  }
+ ]
+}

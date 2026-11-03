@@ -1,0 +1,21 @@
+{
+ "note": "Таблица-образец из contracts/metrics.md: восемь брендов ниши цепей. Доли даны НАПРЯМУЮ, в сумме они меньше единицы — это показанная часть ниши, а не вся она. Поэтому фикстура кормит чистую формулу, а не brandShares: та нормировала бы доли к единице и сломала контрольные значения.",
+ "smooth": 0.01,
+ "thresholds": { "moneyMin": 0.1, "giantMin": 2, "tiredMin": 1.5, "efficientMax": 0.8 },
+ "hhi": 1701.83,
+ "brands": [
+  { "brand": "SHIMANO", "reviewsShare": 0.2, "revenueShare": 0.355, "lethargy": 0.5753, "label": "efficient" },
+  { "brand": "SRAM", "reviewsShare": 0.106, "revenueShare": 0.147, "lethargy": 0.7389, "label": "efficient" },
+  { "brand": "KMC", "reviewsShare": 0.265, "revenueShare": 0.109, "lethargy": 2.3109, "label": "giant" },
+  { "brand": "Zonkie", "reviewsShare": 0.176, "revenueShare": 0.059, "lethargy": 2.6957, "label": "normal" },
+  { "brand": "Ruby.Q", "reviewsShare": 0.04, "revenueShare": 0.06, "lethargy": 0.7143, "label": "efficient" },
+  { "brand": "Schwinn", "reviewsShare": 0.088, "revenueShare": 0.035, "lethargy": 2.1778, "label": "normal" },
+  { "brand": "Xiaotingzi", "reviewsShare": 0.006, "revenueShare": 0.039, "lethargy": 0.3265, "label": "efficient" },
+  { "brand": "Silca", "reviewsShare": 0.001, "revenueShare": 0.029, "lethargy": 0.2821, "label": "efficient" }
+ ],
+ "keyRows": {
+  "Zonkie": "Индекс 2,6957 выше, чем у KMC, но ярлыка гиганта нет: доля выручки 5,9 % не дотягивает до порога по деньгам. Если здесь окажется giant — порог по деньгам не работает, и ярлык начнёт доставаться мёртвым листингам.",
+  "Schwinn": "То же самое при доле 3,5 %: высокий индекс сам по себе ничего не даёт.",
+  "KMC": "Единственный giant в таблице: 10,9 % выручки проходит порог по деньгам, индекс 2,31 проходит порог летаргии."
+ }
+}

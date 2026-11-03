@@ -29,7 +29,7 @@ const analysisOf = (poe, parts) => { const a = newAnalysis({ id: "m", niche: "n"
 
 test("FR-006/SC-004: одна ниша возвращается как есть — расчёты прежние", () => {
   const a = A(); assert.equal(mergePoe([a]), a); assert.equal(mergePoe([]), null); assert.equal(mergePoe(null), null); assert.equal(a.merged, undefined);
-  assert.equal(baselineHash(mergePoe([a])), "baab2bb0a4b0603a"); assert.deepEqual(mergedPoeNotes(a), []);
+  assert.equal(baselineHash(mergePoe([a])), "0d1778ce8ed8dfe7"); assert.deepEqual(mergedPoeNotes(a), []);
 });
 
 test("SC-001/SC-002: товары и запросы без дублей, клики сложены, доли — от общих кликов (сверка ручным расчётом)", () => {
@@ -71,7 +71,7 @@ test("FR-001/FR-005: добавить, обновить, удалить нишу
   const b2 = B({ sharedAsins: 5 }); r = upsertPoePart(r.parts, b2); assert.equal(r.action, "updated"); assert.equal(r.parts.length, 2); assert.equal(r.parts[1], b2); assert.equal(poePartKey(b2), "niche-b");
   const noId = A(); noId.meta = { ...noId.meta, nicheId: null, nicheTitle: "  Some   Niche " }; assert.equal(poePartKey(noId), "some niche");
   const many = Array.from({ length: MAX_POE_PARTS }, (_, i) => { const p = A(); p.meta = { ...p.meta, nicheId: "n" + i }; return p; }); assert.throws(() => upsertPoePart(many, b), /не больше 8 ниш/);
-  const back = mergePoe(r.parts.filter((p) => poePartKey(p) !== "niche-b")); assert.equal(back, a); assert.equal(baselineHash(back), "baab2bb0a4b0603a");
+  const back = mergePoe(r.parts.filter((p) => poePartKey(p) !== "niche-b")); assert.equal(back, a); assert.equal(baselineHash(back), "0d1778ce8ed8dfe7");
 });
 
 test("в расчёте: конверсия клика, новички и цена по кликам считаются по общему рынку; пометки, AI и снимок ссылки", () => {

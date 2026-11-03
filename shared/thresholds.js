@@ -11,7 +11,7 @@ export const DEFAULT_THRESHOLDS = {
     adjSv: 3000,                        // 1c, /мес
     reviewsOk: 300, reviewsFail: 1000,  // 1d
     topBrandShare: 0.25,                // 1e
-    top5Ok: 0.45, top5Fail: 0.65,       // 1f
+    hhiOk: 1500, hhiFail: 2500,         // 1f — концентрация ниши, шкала 0…10 000 (spec 019)
     seasonOk: 0.30, seasonFail: 0.50,   // 1g, просадка
     launchOk: 0.30, launchFail: 0.10,   // 1h, успешность запусков
     provenReviews: 100,                 // «проверенный» конкурент для медианы цены
@@ -35,6 +35,12 @@ export const DEFAULT_THRESHOLDS = {
     playersMin: 3, playerShareMin: 0.10, top5Ok: 0.30, top5Fail: 0.65, // критерий 5
   },
   reviewsMoat: { breakable: 500, medium: 2000 },   // ров отзывов лидера
+  // Летаргия брендов (spec 019). Показатель ОПИСАТЕЛЬНЫЙ: ни на вердикт, ни на статусы критериев не влияет.
+  // smooth — ОДИН коэффициент на числитель и знаменатель. Второго поля здесь нет намеренно: только при равенстве
+  // слагаемых бренд с долей отзывов, равной доле выручки, даёт ровно 1,00 при любом размере; при неравенстве
+  // индекс начинает мерить «крупный против мелкого». moneyMin — порог ПО ДЕНЬГАМ: без него ярлык гиганта
+  // достаётся мёртвым листингам (замер: у брендов с выручкой <1 % индекс доходит до 42).
+  lethargy: { smooth: 0.01, moneyMin: 0.10, giantMin: 2.0, tiredMin: 1.5, efficientMax: 0.8 },
   scorecard: {
     weights: { market: 0.25, competition: 0.25, economics: 0.25, brandFit: 0.15, opRisk: 0.10 },
     bands: { goPriority: 80, go: 60, rework: 40 },

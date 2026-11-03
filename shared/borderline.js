@@ -22,8 +22,10 @@ function candidates(R, th) {
   add({ id: "1d", label: "1d — среднее число отзывов в нише", value: v1("1d"), threshold: t1.reviewsOk, unit: "num", better: "lower", fail: "погранично" });
   add({ id: "1d-high", label: "1d — среднее число отзывов (верхняя граница)", value: v1("1d"), threshold: t1.reviewsFail, unit: "num", better: "lower", pass: "погранично" });
   add({ id: "1e", label: "1e — доля бренда-лидера", value: v1("1e"), threshold: t1.topBrandShare, unit: "pct", better: "lower" });
-  add({ id: "1f", label: "1f — доля топ-5 брендов", value: v1("1f"), threshold: t1.top5Ok, unit: "pct", better: "lower", fail: "погранично" });
-  add({ id: "1f-high", label: "1f — доля топ-5 брендов (верхняя граница)", value: v1("1f"), threshold: t1.top5Fail, unit: "pct", better: "lower", pass: "погранично" });
+  // spec 019: подпункт меряет концентрацию ниши — число шкалы 0…10 000, не долю. Единица "num" в этом модуле
+  // уже есть (ею пользуются 1c и 1d), новую заводить не нужно; направление «меньше — лучше» не меняется.
+  add({ id: "1f", label: "1f — концентрация ниши", value: v1("1f"), threshold: t1.hhiOk, unit: "num", better: "lower", fail: "погранично" });
+  add({ id: "1f-high", label: "1f — концентрация ниши (верхняя граница)", value: v1("1f"), threshold: t1.hhiFail, unit: "num", better: "lower", pass: "погранично" });
   add({ id: "1g", label: "1g — сезонная просадка", value: v1("1g"), threshold: t1.seasonOk, unit: "pct", better: "lower", fail: "погранично" });
   add({ id: "1g-high", label: "1g — сезонная просадка (верхняя граница)", value: v1("1g"), threshold: t1.seasonFail, unit: "pct", better: "lower", pass: "погранично" });
   add({ id: "1h", label: "1h — успешность запусков", value: v1("1h"), threshold: t1.launchOk, unit: "pct", better: "higher", fail: "погранично" });

@@ -85,6 +85,7 @@ export function competition(p) {
   const incumbent = inputs.evaluateAsNewEntrant === false && Boolean(own);
   const barrierExcluded = incumbent ? [...excluded, ...own.brands] : excluded;
   const out = { source: null, brands: [], topBrand: null, topBrandShare: null, top5Share: null, top10Share: null, top20Share: null,
+    hhi: null, top5ListingShare: null, listingCount: null,
     reviewBarrier: { leaderReviews: null, avg: null, median: null, tier: null }, playersOver100: null, brandsOver10pct: null,
     amazonSells: false, amazonSellsSource: "auto", amazonAsins: [], amazonListings: [], amazonRevenueShare: null, contaminationCandidates: [], poeBrands: [] };
   // Amazon как продавец: явный ответ пользователя побеждает автоопределение по колонке Seller в Xray
@@ -112,6 +113,15 @@ export function competition(p) {
     out.top5Share = sum(brands.slice(0, 5).map((b) => b.share));
     out.top10Share = sum(brands.slice(0, 10).map((b) => b.share));
     out.top20Share = sum(brands.slice(0, 20).map((b) => b.share));
+    // Концентрация ниши (spec 019, D1): доли БРЕНДОВ в процентах, возведённые в квадрат. Шкала 0…10 000.
+    // Считается здесь же, на тех же rows: отдельный проход по листингам рано или поздно разойдётся с видом (SC-008).
+    out.hhi = sum(brands.map((b) => (b.share * 100) ** 2));
+    // Поясняющие числа (D3): доля топ-5 ЛИСТИНГОВ читается глазом, но без размера выборки обманывает —
+    // в нише из 11 листингов пять крупнейших держат 92 % арифметически. Поэтому оба числа ходят парой.
+    out.listingCount = rows.length;
+    const listingRev = rows.map((a) => a.asinRevenue ?? 0).sort((x, y) => y - x);
+    const totalListingRev = sum(listingRev);
+    out.top5ListingShare = totalListingRev > 0 ? sum(listingRev.slice(0, 5)) / totalListingRev : null;
     const revs = rows.map((a) => a.reviews);
     out.reviewBarrier = { leaderReviews: brands[0]?.reviewsMax ?? null, avg: mean(revs), median: median(revs), tier: reviewTier(brands[0]?.reviewsMax ?? null, th.reviewsMoat) };
     out.playersOver100 = brands.filter((b) => b.reviewsMax >= 100).length;

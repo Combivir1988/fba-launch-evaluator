@@ -161,6 +161,6 @@ test("US5: блок про неразличающие пороги назван 
   w.FBAStats.render(el, DATA());
   const box = el.querySelector("#stats-blind");
   assert.ok(box, "блока нет");
-  assert.match(box.textContent, /1f · Доля топ-5 брендов/);
+  assert.match(box.textContent, /1f · Концентрация ниши/);
   assert.match(box.textContent, /из 65/);
 });

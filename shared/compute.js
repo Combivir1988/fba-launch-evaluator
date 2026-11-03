@@ -128,7 +128,10 @@ function reconciliation(p) {
   };
   const c1 = p.criterion1.items;
   if (c1["1a"].source === "xray" && typeof c1["1a"].proxyValue === "number") push("Выручка ниши, $/мес", { src: "Xray", value: c1["1a"].value }, { src: "POE прокси", value: c1["1a"].proxyValue });
-  if (c1["1f"].source === "xray" && typeof c1["1f"].proxyValue === "number") push("Top-5 брендов, доля", { src: "Xray revenue", value: c1["1f"].value }, { src: "POE click share", value: c1["1f"].proxyValue });
+  // Сверка берёт долю топ-5 брендов напрямую из конкуренции, а не из подпункта 1f: с spec 019 подпункт меряет
+  // концентрацию (число шкалы 0…10 000), и сравнивать его с долей кликов POE было бы сравнением разных величин.
+  { const poeTop5 = p.poe?.launchPotential?.top5BrandsClickShareT360?.current;
+    if (p.competition.source === "xray" && typeof poeTop5 === "number") push("Top-5 брендов, доля", { src: "Xray revenue", value: p.competition.top5Share }, { src: "POE click share", value: poeTop5 }); }
   if (c1["1b"].source === "xray" && typeof p.poe?.nicheSummary?.avgPrice === "number") push("Средняя цена, $", { src: "Xray медиана", value: c1["1b"].value }, { src: "POE avgPrice", value: p.poe.nicheSummary.avgPrice });
   if (p.traffic.source === "cerebro" && p.poe?.searchTermMetrics?.length) push("SV главного ключа, /мес", { src: "Cerebro", value: p.traffic.svCore }, { src: "POE T360/12", value: (p.poe.searchTermMetrics[0].svT360 ?? 0) / 12 });
   if (p.competition.source === "xray" && typeof p.poe?.launchPotential?.avgReviewCount?.current === "number") push("Среднее отзывов", { src: "Xray", value: p.competition.reviewBarrier.avg }, { src: "POE", value: p.poe.launchPotential.avgReviewCount.current });

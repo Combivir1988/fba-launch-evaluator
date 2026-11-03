@@ -452,7 +452,7 @@ function renderBrandChips() {
   $("#brandchips").innerHTML = all.map((b) => `<label class="chip ${excluded.has(b) ? "fail" : cont.has(b) ? "warn" : ""}"><input type="checkbox" data-brand="${esc(b)}" ${excluded.has(b) ? "checked" : ""}> ${esc(b)}${cont.has(b) ? " ?" : ""}</label>`).join("");
 }
 function renderOverrides() {
-  const names = { "1a": "Niche Revenue, $/мес", "1b": "Средняя цена, $", "1c": "Adj. SV, /мес", "1d": "Отзывы по нише, шт", "1e": "Top brand share, доля (0.25)", "1f": "Top-5 брендов, доля", "1g": "Сезонная просадка, доля", "1h": "Успешность запусков, доля" };
+  const names = { "1a": "Niche Revenue, $/мес", "1b": "Средняя цена, $", "1c": "Adj. SV, /мес", "1d": "Отзывы по нише, шт", "1e": "Top brand share, доля (0.25)", "1f": "Концентрация ниши (HHI)", "1g": "Сезонная просадка, доля", "1h": "Успешность запусков, доля" };
   const ov = S.a.inputs.manualOverrides || {};
   $("#overrides").innerHTML = Object.entries(names).map(([k, n]) => `<div class="row" style="margin-bottom:.4rem"><div style="flex:2 1 160px"><label>${k} — ${n}</label><input type="number" step="any" data-ov="${k}:value" value="${ov[k]?.value ?? ""}" placeholder="авто: ${fmtAuto(k)}"></div><div style="flex:2 1 120px"><label>источник/заметка</label><input data-ov="${k}:note" value="${esc(ov[k]?.note ?? "")}" placeholder="скрин Cerebro…"></div></div>`).join("");
 }
@@ -1071,7 +1071,7 @@ const THR_LABELS = {
   "criterion1.adjSv": ["1c — Adj. SV главного ключа, минимум", "запросов/мес"],
   "criterion1.reviewsOk": ["1d — отзывов по нише, OK если меньше", "шт"], "criterion1.reviewsFail": ["1d — НЕ OK если больше", "шт"],
   "criterion1.topBrandShare": ["1e — доля топ-бренда, НЕ OK от", "доля (0.25 = 25 %)"],
-  "criterion1.top5Ok": ["1f — топ-5 брендов OK если меньше", "доля"], "criterion1.top5Fail": ["1f — НЕ OK если больше", "доля"],
+  "criterion1.hhiOk": ["1f — концентрация ниши: раздроблена, если меньше", "0…10 000"], "criterion1.hhiFail": ["1f — концентрирована, если не меньше", "0…10 000"],
   "criterion1.seasonOk": ["1g — сезонная просадка OK если меньше", "доля"], "criterion1.seasonFail": ["1g — НЕ OK если больше", "доля"],
   "criterion1.launchOk": ["1h — успешность запусков OK от", "доля"], "criterion1.launchFail": ["1h — НЕ OK если меньше", "доля"],
   "criterion1.provenReviews": ["«Проверенный» конкурент — отзывов от", "шт (для медианы цены)"], "criterion1.minTrendWeeks": ["Минимум недель POE для сезонности", "нед."],

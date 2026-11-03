@@ -65,9 +65,14 @@ test("Критерий 1 только по POE: прокси-пометки, с�
   assert.equal(c["1h"].source, "poe");
   assert.ok(Math.abs(c["1h"].value - 9 / 24) < 1e-9);
   assert.equal(c["1h"].status, "ok", "37.5 % ≥ 30 %");
-  assert.equal(c["1f"].source, "poe");
-  assert.ok(Math.abs(c["1f"].value - 0.60166553) < 1e-6, "top5BrandsClickShareT360, не products");
-  assert.equal(c["1f"].status, "warn");
+  // spec 019: подпункт 1f меряет концентрацию ниши — сумму квадратов долей ВЫРУЧКИ брендов, которой в POE нет.
+  // Прокси по долям кликов сознательно не заводим (решение господаря: HHI по POE — вне зоны), поэтому в режиме
+  // «только POE» подпункт честно говорит «нет данных» вместо правдоподобного, но другого по смыслу числа.
+  assert.equal(c["1f"].source, null);
+  assert.equal(c["1f"].value, null);
+  assert.equal(c["1f"].status, "na");
+  // Сама доля топ-5 брендов по кликам никуда не делась: её по-прежнему считает конкуренция, её читает критерий 5.
+  assert.ok(Math.abs(R.competition.top5Share - 0.60166553) < 1e-6, "top5BrandsClickShareT360, не products");
   assert.equal(R.criterion1.proxyCount, 2);
   assert.ok(R.verdict.reasons.some((r) => r.includes("Gate 0")));
   assert.equal(R.traffic.poeConcentration.flags.adWar, false);
