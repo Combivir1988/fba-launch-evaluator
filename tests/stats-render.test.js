@@ -96,6 +96,28 @@ test("крайний случай: считать нечего — объясн�
   assert.match(el.textContent, /наполнится сам/);
 });
 
+test("первое открытие после развёртывания: «идёт первый расчёт», а не «нет отчётов»", () => {
+  // Состояние прода 2026-11-03 сразу после миграции 006: кэш итогов пуст, устарели все 67, догон уже в фоне.
+  const { w, created } = makeWindow();
+  const el = w.document.getElementById("d");
+  w.FBAStats.render(el, { freshness: { total: 67, counted: 0, empty: 0, failed: 0, failures: [], stale: 67, recomputing: true, methodChanged: false, recomputeError: null },
+    mismatch: { count: 0 }, summary: { n: 0 }, rows: [] });
+  assert.equal(created.length, 0, "нулевых графиков не рисуем");
+  assert.match(el.textContent, /первый расчёт/);
+  assert.match(el.textContent, /67/);
+  assert.ok(!/нет загруженных отчётов/.test(el.textContent), "это неправда: отчёты есть, их просто ещё не пересчитали");
+});
+
+test("считать нечего и пересчёт упал — честная причина, а не «нет отчётов»", () => {
+  const { w } = makeWindow();
+  const el = w.document.getElementById("d");
+  w.FBAStats.render(el, { freshness: { total: 67, counted: 0, empty: 0, failed: 0, failures: [], stale: 67, recomputing: false, methodChanged: false, recomputeError: "база отвалилась" },
+    mismatch: { count: 0 }, summary: { n: 0 }, rows: [] });
+  assert.match(el.textContent, /Пересчёт не прошёл/);
+  assert.match(el.textContent, /база отвалилась/);
+  assert.ok(!/нет загруженных отчётов/.test(el.textContent));
+});
+
 test("без Chart.js цифры всё равно доступны", () => {
   const { w } = makeWindow();
   delete w.Chart;
