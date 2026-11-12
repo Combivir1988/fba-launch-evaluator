@@ -1,0 +1,426 @@
+{
+ "projects": [
+  {
+   "id": 402161823,
+   "name": "HIYD: Add Health Tracking to the Watch You Love",
+   "blurb": "A 2.7mm thin waterproof sensor that adds health tracking to your favorite watch. No magnets. No glue. No monthly fees.",
+   "goal": 10000,
+   "pledged": 677501,
+   "state": "live",
+   "slug": "hiyd-add-health-tracking-to-the-watch-you-love",
+   "country": "US",
+   "country_displayable_name": "the United States",
+   "currency": "USD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1796975940,
+   "state_changed_at": 1794326480,
+   "created_at": 1785959448,
+   "launched_at": 1794326477,
+   "staff_pick": true,
+   "backers_count": 3983,
+   "usd_pledged": "677501.0",
+   "converted_pledged_amount": 677501,
+   "current_currency": "USD",
+   "category": {
+    "id": 341,
+    "name": "Wearables",
+    "slug": "technology/wearables"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/salahb/hiyd-add-health-tracking-to-the-watch-you-love"
+    }
+   },
+   "percent_funded": 6775.01,
+   "is_launched": true
+  },
+  {
+   "id": 736359379,
+   "name": "Altar II — Electronic Materials Office®",
+   "blurb": "Remarkably thin. Fully mechanical. Sustainably made.",
+   "goal": 10000,
+   "pledged": 507702,
+   "state": "live",
+   "slug": "altar-ii",
+   "country": "GB",
+   "country_displayable_name": "the United Kingdom",
+   "currency": "GBP",
+   "currency_symbol": "£",
+   "currency_trailing_code": false,
+   "deadline": 1796911200,
+   "state_changed_at": 1794319094,
+   "created_at": 1666088021,
+   "launched_at": 1794319091,
+   "staff_pick": true,
+   "backers_count": 2410,
+   "usd_pledged": "679206.36041934",
+   "converted_pledged_amount": 673212,
+   "current_currency": "USD",
+   "category": {
+    "id": 52,
+    "name": "Hardware",
+    "slug": "technology/hardware"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/electronicamaterials/altar-ii"
+    }
+   },
+   "percent_funded": 5077.02,
+   "is_launched": true
+  },
+  {
+   "id": 1114943611,
+   "name": "Interface Ring: Your Agents, Memory, Health and Sleep.",
+   "blurb": "Your AI agents on your finger. 24/7 Health & Sleep Tracking | Voice AI Agents | Record Ideas & Meetings | 7-Day Battery | IP68",
+   "goal": 20000,
+   "pledged": 350503,
+   "state": "live",
+   "slug": "interface-ai-smart-ring-for-voice-notes-agents-and-health",
+   "country": "US",
+   "country_displayable_name": "the United States",
+   "currency": "USD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1797786338,
+   "state_changed_at": 1794330342,
+   "created_at": 1793941892,
+   "launched_at": 1794330338,
+   "staff_pick": true,
+   "backers_count": 2277,
+   "usd_pledged": "350503.0",
+   "converted_pledged_amount": 350503,
+   "current_currency": "USD",
+   "category": {
+    "id": 341,
+    "name": "Wearables",
+    "slug": "technology/wearables"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/rollingsquare/interface-ai-smart-ring-for-voice-notes-agents-and-health"
+    }
+   },
+   "percent_funded": 1752.515,
+   "is_launched": true
+  },
+  {
+   "id": 1302468646,
+   "name": "InfiMech MX 3D Printer: 8X More Efficient. 8X Less Waste.",
+   "blurb": "8 Tools | Wireless Heating | Blob Detection | Smart Calibration | Active Chamber Heating",
+   "goal": 400000,
+   "pledged": 16332523,
+   "state": "live",
+   "slug": "infimech-mx-3d-printer-8x-more-efficiency-8x-less-waste",
+   "country": "HK",
+   "country_displayable_name": "Hong Kong",
+   "currency": "HKD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1796914306,
+   "state_changed_at": 1794322310,
+   "created_at": 1768907507,
+   "launched_at": 1794322306,
+   "staff_pick": false,
+   "backers_count": 2827,
+   "usd_pledged": "2083310.48716185",
+   "converted_pledged_amount": 2082121,
+   "current_currency": "USD",
+   "category": {
+    "id": 331,
+    "name": "3D Printing",
+    "slug": "technology/3d printing"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/infimech-mx-series/infimech-mx-3d-printer-8x-more-efficiency-8x-less-waste"
+    }
+   },
+   "percent_funded": 4083.1307500000003,
+   "is_launched": true
+  },
+  {
+   "id": 1102376000,
+   "name": "Moera Smart Climate Mattress Cover: Fast Cooling. Zero Fees.",
+   "blurb": "Noticeable Cooling in 5 Min | 50–120°F Range | Dual-Zone Control | Adjusts Automatically Overnight | $0 Subscription for Core Features",
+   "goal": 392282,
+   "pledged": 10517093,
+   "state": "live",
+   "slug": "moera-smart-climate-mattress-cover",
+   "country": "HK",
+   "country_displayable_name": "Hong Kong",
+   "currency": "HKD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1795960568,
+   "state_changed_at": 1794318972,
+   "created_at": 1787120171,
+   "launched_at": 1794318968,
+   "staff_pick": true,
+   "backers_count": 1406,
+   "usd_pledged": "1341517.78885335",
+   "converted_pledged_amount": 1340752,
+   "current_currency": "USD",
+   "category": {
+    "id": 337,
+    "name": "Gadgets",
+    "slug": "technology/gadgets"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/moerasleep/moera-smart-climate-mattress-cover"
+    }
+   },
+   "percent_funded": 2681.0032068766855,
+   "is_launched": true
+  },
+  {
+   "id": 10019076,
+   "name": "AXILOOP MC8 — 8 Independent Tool Head Multi-Color 3D Printer",
+   "blurb": "4s Tool Changes | No-Wipe Alignment | 600mm/s Speed | 300³ Build Volume | 2500-Point Eddy Current Leveling | AI Smart Monitoring",
+   "goal": 392210,
+   "pledged": 3308623,
+   "state": "live",
+   "slug": "axiloop-mc8-8-independent-tool-head-multi-color-3d-printer",
+   "country": "HK",
+   "country_displayable_name": "Hong Kong",
+   "currency": "HKD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1798383606,
+   "state_changed_at": 1794495609,
+   "created_at": 1790699402,
+   "launched_at": 1794495606,
+   "staff_pick": true,
+   "backers_count": 280,
+   "usd_pledged": "421699.91582663",
+   "converted_pledged_amount": 421793,
+   "current_currency": "USD",
+   "category": {
+    "id": 331,
+    "name": "3D Printing",
+    "slug": "technology/3d printing"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/axiloop/axiloop-mc8-8-independent-tool-head-multi-color-3d-printer"
+    }
+   },
+   "percent_funded": 843.584559292216,
+   "is_launched": true
+  },
+  {
+   "id": 103730378,
+   "name": "SilkyWave — Hands-Free Barista Microfoamer",
+   "blurb": "Flowix™ Flow Diverter · Hands-free · Latte-art microfoam · 1–100 speed levels · Repeatable — no steam wand, no barista skills",
+   "goal": 7000,
+   "pledged": 108540,
+   "state": "live",
+   "slug": "abslow-milkyway-absolutely-hands-free-barista-microfoam",
+   "country": "HK",
+   "country_displayable_name": "Hong Kong",
+   "currency": "HKD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1796994000,
+   "state_changed_at": 1794402004,
+   "created_at": 1785461184,
+   "launched_at": 1794402000,
+   "staff_pick": false,
+   "backers_count": 267,
+   "usd_pledged": "13838.7132396",
+   "converted_pledged_amount": 13837,
+   "current_currency": "USD",
+   "category": {
+    "id": 337,
+    "name": "Gadgets",
+    "slug": "technology/gadgets"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/2115481410/abslow-milkyway-absolutely-hands-free-barista-microfoam"
+    }
+   },
+   "percent_funded": 1550.5714285714284,
+   "is_launched": true
+  },
+  {
+   "id": 1938908866,
+   "name": "SlashVibe: Your AI Workspace by Your Side /open-source",
+   "blurb": "An always-on display and detachable controller with voice input. Manage AI agents, to-dos, meetings, and more with a flick or a word.",
+   "goal": 10000,
+   "pledged": 89435,
+   "state": "live",
+   "slug": "slashvibe",
+   "country": "US",
+   "country_displayable_name": "the United States",
+   "currency": "USD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1796918062,
+   "state_changed_at": 1794326066,
+   "created_at": 1788024639,
+   "launched_at": 1794326062,
+   "staff_pick": false,
+   "backers_count": 399,
+   "usd_pledged": "89435.0",
+   "converted_pledged_amount": 89435,
+   "current_currency": "USD",
+   "category": {
+    "id": 337,
+    "name": "Gadgets",
+    "slug": "technology/gadgets"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/loda/slashvibe"
+    }
+   },
+   "percent_funded": 894.35,
+   "is_launched": true
+  },
+  {
+   "id": 1339594147,
+   "name": "ClearX: Fully Automated Shoe Care: Wash, Dry & Sanitize",
+   "blurb": "All-in-One Care | 90-Min Cycle | Inside-Out Cleaning | Gentle on Shoes | Micro-Nano Bubbles | No-Tumble Wash | Low-Heat Drying",
+   "goal": 200000,
+   "pledged": 1785468,
+   "state": "live",
+   "slug": "brolan-clearx-automated-shoe-care-wash-dry-and-sanitize",
+   "country": "HK",
+   "country_displayable_name": "Hong Kong",
+   "currency": "HKD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1799501400,
+   "state_changed_at": 1794321153,
+   "created_at": 1788334838,
+   "launched_at": 1794321150,
+   "staff_pick": true,
+   "backers_count": 384,
+   "usd_pledged": "227747.0669346",
+   "converted_pledged_amount": 227617,
+   "current_currency": "USD",
+   "category": {
+    "id": 337,
+    "name": "Gadgets",
+    "slug": "technology/gadgets"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/clearx/brolan-clearx-automated-shoe-care-wash-dry-and-sanitize"
+    }
+   },
+   "percent_funded": 892.7339999999999,
+   "is_launched": true
+  },
+  {
+   "id": 306758339,
+   "name": "Photora: Most Affordable 15.6\" FHD Wireless Touch Monitor",
+   "blurb": "Low-Latency Wireless Cast｜Reverse Touch｜Wide Compatibility｜Ultra-Light 777g｜Auto-Rotation｜Plug & Play｜Kickstand design｜Portable",
+   "goal": 5000,
+   "pledged": 48674,
+   "state": "live",
+   "slug": "photora-most-affordable-156-fhd-wireless-touch-monitor",
+   "country": "US",
+   "country_displayable_name": "the United States",
+   "currency": "USD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1796392794,
+   "state_changed_at": 1794232798,
+   "created_at": 1789440070,
+   "launched_at": 1794232794,
+   "staff_pick": false,
+   "backers_count": 229,
+   "usd_pledged": "48674.0",
+   "converted_pledged_amount": 48674,
+   "current_currency": "USD",
+   "category": {
+    "id": 52,
+    "name": "Hardware",
+    "slug": "technology/hardware"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/photoratech/photora-most-affordable-156-fhd-wireless-touch-monitor"
+    }
+   },
+   "percent_funded": 973.48,
+   "is_launched": true
+  },
+  {
+   "id": 1799006350,
+   "name": "Co Print Quadro | Independent 4-Toolhead Color 3D Printer",
+   "blurb": "4 Colors & Materials | ~1s Color Change | No Swapping | Near Zero Waste | 300mm Large Volume | 2 Color Prints at Once",
+   "goal": 7492,
+   "pledged": 89918,
+   "state": "live",
+   "slug": "co-print-quadro-independent-4-toolhead-color-3d-printer",
+   "country": "GB",
+   "country_displayable_name": "the United Kingdom",
+   "currency": "GBP",
+   "currency_symbol": "£",
+   "currency_trailing_code": false,
+   "deadline": 1796659201,
+   "state_changed_at": 1794499204,
+   "created_at": 1786019257,
+   "launched_at": 1794499201,
+   "staff_pick": true,
+   "backers_count": 159,
+   "usd_pledged": "120031.34307794",
+   "converted_pledged_amount": 119231,
+   "current_currency": "USD",
+   "category": {
+    "id": 331,
+    "name": "3D Printing",
+    "slug": "technology/3d printing"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/coprint3d/co-print-quadro-independent-4-toolhead-color-3d-printer"
+    }
+   },
+   "percent_funded": 1200.1868659903896,
+   "is_launched": true
+  },
+  {
+   "id": 1668593440,
+   "name": "Flic Cue: The AI Voice Button that keeps your phone away",
+   "blurb": "Push-to-talk, reinvented for AI. What you say lands in your list, calendar, inbox or AI agent. Wear it or mount it. No need to charge.",
+   "goal": 10000,
+   "pledged": 173965,
+   "state": "live",
+   "slug": "flic-cue",
+   "country": "US",
+   "country_displayable_name": "the United States",
+   "currency": "USD",
+   "currency_symbol": "$",
+   "currency_trailing_code": true,
+   "deadline": 1796479162,
+   "state_changed_at": 1793887165,
+   "created_at": 1791226391,
+   "launched_at": 1793887162,
+   "staff_pick": true,
+   "backers_count": 1388,
+   "usd_pledged": "173965.0",
+   "converted_pledged_amount": 173965,
+   "current_currency": "USD",
+   "category": {
+    "id": 341,
+    "name": "Wearables",
+    "slug": "technology/wearables"
+   },
+   "urls": {
+    "web": {
+     "project": "https://www.kickstarter.com/projects/shortcutlabs/flic-cue"
+    }
+   },
+   "percent_funded": 1739.6499999999999,
+   "is_launched": true
+  }
+ ],
+ "total_hits": 398,
+ "has_more": true
+}
