@@ -10,14 +10,44 @@ export function economics(inputs, th, ctx = {}) {
     referral = num(inputs.referralPct) ?? 0.15, fba = num(inputs.fbaFee) ?? 0, cpc = num(inputs.cpc),
     cvr = num(inputs.cvr) ?? 0.10, ppc = num(inputs.ppcShare) ?? 0.70, unitsPerDay = num(inputs.unitsPerDay) ?? 0;
   const pending = price === null || price <= 0 || cogs === null;
-  const out = { pending, price, cogs, gate1: null, gate2: null, roi: null, criterion2: null, marginNoAds: null, marginWithAds: null, breakEvenCvr: null, cheapSegment: price !== null && price < e.cheapPrice };
+  const out = { pending, price, cogs, gate1: null, gate2: null, roi: null, criterion2: null, marginNoAds: null, marginWithAds: null, breakEvenCvr: null, cheapSegment: price !== null && price < e.cheapPrice,
+    // Возвраты (spec 020). returnsCounted ложно, пока доля неизвестна: это НЕ то же самое, что ноль.
+    returnRate: null, returnSource: null, returnCost: null, netGross: null, returnsCounted: false, returnRateSuspicious: false };
   if (pending) {
     out.criterion2 = Object.fromEntries(["2a","2b","2c","2d","2e","2f","2g","2h","2i","2j","2k"].map((k) => [k, { status: "pending", value: null }]));
     out.gate1 = { status: "pending" }; out.gate2 = { status: "pending", byCvr: [] };
     return out;
   }
   const landed = cogs + ship;
-  const net0 = price - cogs - ship - price * referral - fba;
+
+  // ---------- возвраты (spec 020) ----------
+  // Доля приходит из отчёта контекстом или вводится вручную; ручной ввод побеждает.
+  // НЕИЗВЕСТНО — это НЕ ноль. Запись вида `?? 0` молча превратила бы незнание в утверждение
+  // «возвратов нет», которого приложение делать не вправе. Именно это закрывают ворота SC-004.
+  const rManual = num(inputs.returnRate), rCtx = num(ctx.returnRate);
+  const returnRate = rManual !== null ? rManual : rCtx;
+  out.returnRate = returnRate;
+  out.returnSource = returnRate === null ? null : rManual !== null ? "manual" : ctx.returnSource || "poe";
+  out.returnsCounted = returnRate !== null;
+  out.returnRateSuspicious = returnRate !== null && returnRate > e.returnRateSuspicious;
+
+  // Прибыль ДО возвратов — то, что считалось здесь раньше.
+  const netGross = price - cogs - ship - price * referral - fba;
+  out.netGross = netGross;
+
+  // Стоимость возвратов на отгруженную единицу. Модель самая строгая по умолчанию:
+  // возвращённый товар списывается целиком (resalableShare = 0), сбор за обработку не закладывается.
+  // При этих умолчаниях скобка равна price x (1 - referral), то есть каждый возврат стоит ровно той
+  // чистой выручки, которую продажа должна была принести: деньги ушли покупателю, товар списан,
+  // сбор за отправку не вернулся. Тождество проверяется тестом на нескольких наборах чисел.
+  const returnCost = returnRate === null ? null
+    : returnRate * (netGross + fba + e.returnFee + (1 - e.resalableShare) * landed);
+  out.returnCost = returnCost;
+
+  // Дальше ВСЁ считается от прибыли ПОСЛЕ возвратов: маржа, ROI, Gate 1, сетка Gate 2,
+  // безубыточный CVR, ось экономики в scorecard.js и пограничные значения в borderline.js.
+  // Одно место (D1) — чинить семь мест по отдельности значит однажды забыть одно из них.
+  const net0 = returnCost === null ? netGross : netGross - returnCost;
   const margin0 = net0 / price;
   const roi = safeDiv(net0, landed);
   out.marginNoAds = margin0; out.roi = roi;

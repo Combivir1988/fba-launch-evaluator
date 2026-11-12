@@ -24,6 +24,11 @@ export const DEFAULT_THRESHOLDS = {
     c2PassCount: 8, roiAdsMin: 0.20, marginAdsMin: 0.25,                    // 2j / 2k
     cvrRealistic: [0.08, 0.15], ppcShareRealistic: [0.5, 0.9],             // 2c / 2e
     periodDays: 90,                                                         // горизонт 2g–2k
+    // Возвраты (spec 020). Модель САМАЯ СТРОГАЯ: возвращённый товар списывается целиком.
+    // При resalableShare = 0 и returnFee = 0 стоимость возвратов сводится к r x price x (1 - referral) —
+    // каждый возврат стоит ровно той чистой выручки, которую продажа должна была принести.
+    // Менять умолчания нельзя молча: на них держится тождество формулы и цифры всех прежних анализов.
+    resalableShare: 0, returnFee: 0, returnRateSuspicious: 0.5,
   },
   budget: { receivingDays: 15, batches: 2 },                                // бюджет первой закупки
   traffic: { top2ShareMax: 0.80, relevantMin: 30, minSv: 100, groupsMin: 3, minCompetitors: 3, minPerfScore: 8, clusterWant: 15, clusterLimit: 40 }, // трафик по ключам + Cerebro multi-ASIN
@@ -49,7 +54,15 @@ export const DEFAULT_THRESHOLDS = {
   checklist: { designTestMin: 30, lifecycleMonthsMin: 25, listingsHigh: 3000 },
   // Вход в нишу (spec 005). Пороги достижимости — предварительные, на вердикт не влияют.
   entry: { minOverlap: 5, cohortMinAgeMonths: 2, cohortMaxAgeMonths: 24, minCohort: 3, inheritedReviewRate: 0.10, reachOkPct: 75, reachWarnPct: 90, reachOkProducts: 5, dateGapDays: 90, clickPriceGap: 0.15 },
-  cashflow: { horizonMonths: 12, rampMonths: 6, reviewRate: 0.02, vineReviews: 30, newListingCvrFactor: 0.7 },
+  // Сценарии продаж (spec 020): отличается только скорость выхода на цель, сама цель общая.
+  // Замер 2026-11-12: самый глубокий пик вложений — у БЫСТРОГО роста, а не у медленного
+  // (медленные продажи = более редкие и меньшие дозаказы). Денег не хватает, когда всё получается.
+  cashflow: { horizonMonths: 12, rampMonths: 6, reviewRate: 0.02, vineReviews: 30, newListingCvrFactor: 0.7,
+    slowFactor: 1.5, fastFactor: 0.6, safetyDays: 14 },
+  // План измерений (spec 020). Эти два числа НЕ выводятся из экономики ниши: первое — вопрос
+  // статистической достоверности, второе — сколько терпеть, прежде чем вмешиваться. Остальные
+  // пороги плана вычисляются из расчёта и в настройках не хранятся.
+  launchPlan: { minSessions: 300, acosDaysInRow: 7 },
   borderline: { pct: 0.15 },
   priceBand: { smallSample: 15, minSample: 5 },
   // Этап 2 — конфигурация продукта (spec 010): область страниц, кэш, пачки AI, числовые поля как дискретные

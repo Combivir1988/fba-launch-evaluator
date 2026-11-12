@@ -54,3 +54,33 @@ test("T004 · доля топ-5 брендов ушла из Критерия 1"
   assert.equal(DEFAULT_THRESHOLDS.criterion1.top5Ok, undefined);
   assert.equal(DEFAULT_THRESHOLDS.criterion1.top5Fail, undefined);
 });
+
+test("T005 · набор, сохранённый до spec 020, загружается и получает новые пороги из умолчаний", () => {
+  const saved = { economics: { marginMin: 0.35 }, cashflow: { rampMonths: 8 } };
+  const kept = thresholdOverrides(saved);
+  assert.equal(kept.economics.marginMin, 0.35, "своя подкрутка обязана сохраниться");
+  assert.equal(kept.cashflow.rampMonths, 8);
+
+  const th = mergeThresholds(kept);
+  assert.equal(th.economics.marginMin, 0.35);
+  assert.equal(th.economics.resalableShare, 0, "новый порог приходит из умолчаний");
+  assert.equal(th.cashflow.slowFactor, 1.5);
+  assert.deepEqual(th.launchPlan, { minSessions: 300, acosDaysInRow: 7 }, "новая группа целиком из умолчаний");
+});
+
+test("T006 · модель возврата по умолчанию — самая строгая", () => {
+  // На этих значениях держится тождество формулы и цифры всех прежних анализов.
+  // Молчаливая смена умолчания изменила бы экономику везде, где есть возвраты.
+  const e = DEFAULT_THRESHOLDS.economics;
+  assert.equal(e.resalableShare, 0, "возвращённый товар списывается целиком");
+  assert.equal(e.returnFee, 0, "сбор за обработку не закладываем: он есть не во всех категориях");
+  assert.equal(e.returnRateSuspicious, 0.5);
+});
+
+test("T004 · сценарии продаж и страховой запас заведены", () => {
+  const c = DEFAULT_THRESHOLDS.cashflow;
+  assert.equal(c.slowFactor, 1.5);
+  assert.equal(c.fastFactor, 0.6);
+  assert.equal(c.safetyDays, 14);
+  assert.ok(c.fastFactor < 1 && c.slowFactor > 1, "быстрый разгоняется быстрее, медленный дольше");
+});

@@ -104,7 +104,7 @@ test("amazonPresence: без Xray — не найден; пороги-строк
 });
 
 test("отпечатки прежних расчётов не меняются (вердикт в отпечаток не входит; в фикстуре Amazon есть — и это блокирует)", () => {
-  const a = fixtureAnalysis(); assert.equal(typeof a.results.amazon.present, "boolean"); assert.equal(resultsHash(a.results), "a8575a08c0b3a1c0");
+  const a = fixtureAnalysis(); assert.equal(typeof a.results.amazon.present, "boolean"); assert.equal(resultsHash(a.results), "8c8fb00a99b54fdb");
   if (a.results.amazon.present) { assert.ok(["own", "dominant", "watch", "normal"].includes(a.results.amazon.level)); assert.ok(a.results.competition.amazonAsins.length > 0);
     if (a.results.amazon.blocks) assert.equal(a.results.verdict.decisiveGate, "Amazon в нише"); }
 });

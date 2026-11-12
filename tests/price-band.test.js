@@ -48,15 +48,18 @@ test("applyPriceBand: счётчики, выручка и доля, исходн
   const off = applyPriceBand({ ...p, inputs: {} }); assert.equal(off.view.xray, p.xray); assert.equal(off.view.poe, p.poe); assert.equal(off.summary.active, false);
 });
 
+// Отпечатки обновлены в spec 020: возвраты НАМЕРЕННО меняют прибыль там, где они есть
+// (в этих фикстурах доля возвратов 0,32 % из отчёта POE). Отпечаток ниши БЕЗ возвратов не сдвинулся —
+// это проверяется воротами SC-002 в tests/returns.test.js.
 // Отпечатки обновлены в spec 019: подпункт 1f НАМЕРЕННО сменил меру — с доли топ-5 брендов на концентрацию ниши.
 // Добавочные поля концентрации и летаргии из отпечатка исключены (tests/helpers/results-hash.js), поэтому
 // изменение отпечатка целиком объясняется именно сменой меры в 1f, а не появлением новых величин.
 test("SC-002 совместимость: без диапазона результаты те же, что до появления фильтра", () => {
-  assert.equal(resultsHash(fixtureAnalysis().results), "a8575a08c0b3a1c0");
+  assert.equal(resultsHash(fixtureAnalysis().results), "8c8fb00a99b54fdb");
   const poeOnly = newAnalysis({ niche: "u", coreKeyword: "urinal screen deodorizer" }); poeOnly.aggregates = { poe: parsePoe(readJson(POE)) }; Object.assign(poeOnly.inputs, { price: 24.99, cogs: 4.37 });
-  assert.equal(resultsHash(compute(poeOnly)), "0d1778ce8ed8dfe7");
+  assert.equal(resultsHash(compute(poeOnly)), "7f7e706f236a112a");
   assert.equal(resultsHash(compute(newAnalysis({ niche: "e" }))), "f0ef040ef6e247ce");
-  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "a8575a08c0b3a1c0", "некорректный диапазон не применяется");
+  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "8c8fb00a99b54fdb", "некорректный диапазон не применяется");
   assert.equal(bad.results.priceBand.valid, false); assert.equal(bad.results.priceBand.active, false);
   const old = migrate({ schemaVersion: 1, id: "x", niche: "старый", inputs: { cogs: 3 } }); assert.equal(old.inputs.priceMin, null); assert.equal(old.inputs.priceMax, null);
 });

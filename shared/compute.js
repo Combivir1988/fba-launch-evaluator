@@ -66,7 +66,10 @@ export function compute(analysis) {
   const price = inputs.price ?? p.criterion1.items["1b"].value ?? null;
   const cpcFromCerebro = inputs.cpc === null || inputs.cpc === undefined || inputs.cpc === "";
   const cpc = cpcFromCerebro ? p.traffic.cpcCore : inputs.cpc;
-  p.economics = economics({ ...inputs, price, cpc }, th, { priceMedian: p.criterion1.items["1b"].value, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, dataCvr, dataCvrLabel });
+  // spec 020: доля возвратов заходит контекстом — трафик считается РАНЬШЕ экономики, значение уже готово.
+  // Если её нет, в контекст уходит null, и экономика честно говорит «возвраты не учтены» (а не «их нет»).
+  p.economics = economics({ ...inputs, price, cpc }, th, { priceMedian: p.criterion1.items["1b"].value, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, dataCvr, dataCvrLabel,
+    returnRate: p.traffic?.poeConcentration?.returnRate ?? null, returnSource: "poe" });
   // Вход в нишу (spec 005): трафик, новички и отзывы — по ВСЕЙ нише. Опорная дата возраста листингов — дата снятия POE (анализ, открытый через год, покажет те же возрасты).
   const compWhole = band.active ? compAll : p.competition;
   const refDate = new Date(whole.poe?.meta?.capturedAt || analysis.createdAt || Date.now());

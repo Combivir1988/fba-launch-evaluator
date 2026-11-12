@@ -19,6 +19,8 @@ export function buildAiPayload(analysis) {
       price: r2(eco.price), cogs: r2(eco.cogs), gate1: { status: eco.gate1.status, net0: r2(eco.gate1.net0), margin0: r3(eco.gate1.margin0), roi: r3(eco.roi) },
       gate2: { status: eco.gate2.status, cpc: r2(eco.gate2.cpc), ppcShare: eco.gate2.ppcShare, byCvr: eco.gate2.byCvr.map((x) => ({ cvr: x.cvr, net: r2(x.net) })), breakEvenCvr: r3(eco.breakEvenCvr) },
       marginNoAds: r3(eco.marginNoAds), marginWithAds: r3(eco.marginWithAds), cheapSegment: eco.cheapSegment, roiHint: eco.roiHint,
+      // spec 020: прибыль ДО возвратов и их стоимость — чтобы модель не пересказывала маржу как «до всех расходов»
+      returns: { rate: r3(eco.returnRate), source: eco.returnSource, cost: r2(eco.returnCost), netBefore: r2(eco.netGross), counted: eco.returnsCounted },
       criterion2: Object.fromEntries(Object.entries(eco.criterion2).map(([k, v]) => [k, { status: v.status, value: r2(v.value) }])), criterion2Summary: eco.criterion2Summary && { okCount: eco.criterion2Summary.okCount, mandatoryOk: eco.criterion2Summary.mandatoryOk, pass: eco.criterion2Summary.pass },
     },
     pricing: R.priceConfig && R.priceConfig.market !== null ? { market: r2(R.priceConfig.market), entry: r2(R.priceConfig.entry), ceiling: r2(R.priceConfig.ceiling), withCoupons: r2(R.priceConfig.marketEff), analogs: R.priceConfig.analogs, matchTier: R.priceConfig.tier } : null, // spec 013

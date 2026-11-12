@@ -199,6 +199,9 @@
       ${sliders}
       <div class="cards">
         <div class="card ${g1.status === "pass" ? "ok" : g1.status === "rework" ? "warn" : "fail"}"><h4>Gate 1 — без рекламы</h4><div class="big">${fmtMoney(g1.net0, 2)}/юнит</div>
+          ${e.returnsCounted
+            ? `<div class="muted">возвраты <b>${fmtPct(e.returnRate, 1)}</b> (${e.returnSource === "manual" ? "введено вручную" : "из отчёта"}) съели <b>${fmtMoney(e.returnCost, 2)}</b> из ${fmtMoney(e.netGross, 2)}${e.returnRateSuspicious ? ` <span class="chip warn">проверьте значение</span>` : ""}</div>`
+            : `<div class="muted">Возвраты не учтены: доля неизвестна. Загрузите отчёт ниши или введите её вручную — прибыль здесь без них.</div>`}
           <div>маржа <b>${fmtPct(g1.margin0, 1)}</b> ${g1.condMargin ? "✓" : "✗"} · профит ${g1.condProfit ? "✓" : "✗"}</div><div class="muted">${esc(g1.note || `порог: маржа > 30 % и профит > $15`)}</div></div>
         <div class="card ${e.roiHint === "ok" ? "ok" : e.roiHint === "suspicious" || e.roiHint === "low" ? "warn" : "fail"}"><h4>ROI без рекламы</h4><div class="big">${fmtPct(e.roi)}</div><div>прибыль без рекламы ÷ полная себестоимость${isNum(e.criterion2?.["2j"]?.value) ? ` · с рекламой: <b>${fmtPct(e.criterion2["2j"].value, 1)}</b> (2j)` : ""}</div>
           <div class="muted">${{ ok: "≥ 150 % — норма", low: "100–150 % — ниже порога 150 %", loss: "< 100 % — убыток", suspicious: "> 200 % — перепроверь данные" }[e.roiHint] || ""}</div></div>
@@ -1160,6 +1163,7 @@
     shippingPerUnit: "Доставка от поставщика до склада Amazon в пересчёте на одну штуку.",
     fbaFee: "Сбор Amazon за хранение, сборку и доставку одной штуки. Возьмите из калькулятора FBA или колонки Fees в Xray.",
     referralPct: "Комиссия Amazon с продажи. В большинстве категорий 15 %.",
+    returnRate: "Доля возвратов в нише. Берётся из отчёта POE, если он загружен; введённое вручную побеждает. Каждый возврат стоит всей чистой выручки продажи: деньги вернулись покупателю, товар списан, сбор за отправку не вернулся.",
     cpc: "Цена одного клика в рекламе. Пусто — берётся рекомендованная ставка главного ключа из Cerebro.",
     cogsConfirmed: "Отметьте, когда цена получена от поставщика письменно. До этого себестоимость считается оценкой.",
     cvr: "Какая доля кликов превратится в покупки. 10 % — допущение; подсказка под ползунком показывает конверсию по данным ниши.",

@@ -68,5 +68,5 @@ test("диапазон живёт в общей истории; старый д�
   assert.equal(opened.inputs.priceMin, 20); assert.equal(opened.inputs.priceMax, 60);
   assert.equal(compute(opened).priceBand.inCount, a.results.priceBand.inCount);
   const legacy = JSON.parse(JSON.stringify(fixtureAnalysis())); delete legacy.inputs.priceMin; delete legacy.inputs.priceMax; delete legacy.results;
-  const m = migrate(legacy); assert.equal(m.inputs.priceMin, null); assert.equal(resultsHash(compute(m)), "a8575a08c0b3a1c0");
+  const m = migrate(legacy); assert.equal(m.inputs.priceMin, null); assert.equal(resultsHash(compute(m)), "8c8fb00a99b54fdb");
 });

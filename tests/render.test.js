@@ -144,7 +144,10 @@ test("снимок без закупочной экономики: секции 
   assert.match(el.querySelector("#sec-hero").textContent, /закупочная экономика скрыта автором/);
   assert.match(el.querySelector("#sec-challenger").textContent, /экономика скрыта автором/);
   // Ищем только в секциях, построенных из расчётов: в рыночных секциях (POE/Xray) встречаются свои проценты, напр. «+41 %» роста запусков.
-  const html = ["hero", "criterion1", "challenger", "scorecard", "conclusion", "ai", "checklist", "reconciliation"].map((id) => el.querySelector("#sec-" + id).innerHTML).join(" | "); const e = a.results.economics;
+  // data-tip вырезаем: это статичные пояснения («плюс 40 % остальных ключей кластера»), а не посчитанные числа.
+  // Без этого проверка ловит совпадение, когда округлённая маржа случайно совпадает со словом из подсказки.
+  const html = ["hero", "criterion1", "challenger", "scorecard", "conclusion", "ai", "checklist", "reconciliation"]
+    .map((id) => el.querySelector("#sec-" + id).innerHTML.replace(/data-tip="[^"]*"/g, "")).join(" | "); const e = a.results.economics;
   for (const needle of ["12.00", "20000", "20 000", e.gate1.net0.toFixed(2), String(Math.round(e.gate1.margin0 * 100)) + " %"]) assert.equal(html.includes(needle), false, `в HTML осталось «${needle}»`);
   assert.equal(el.querySelectorAll("button, input, select, [data-action]").length, 0);
 });

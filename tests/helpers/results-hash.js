@@ -2,6 +2,11 @@
 //  • spec 003 (ценовой диапазон), подсказка CVR: при пустом диапазоне результаты те же, что до появления фильтра;
 //  • spec 005 (вход в нишу): стоп-вопрос о бюджете НАМЕРЕННО переведён на помесячный сценарий, поэтому `budget` и зависящий от него `verdict`
 //    из отпечатка исключены (их поведение проверяют budget.test.js и cashflow.test.js). Всё остальное обязано совпадать с расчётом до spec 005.
+//  • spec 020 (возвраты в экономике): НАМЕРЕННО меняет прибыль на единицу ТАМ, ГДЕ ВОЗВРАТЫ ЕСТЬ,
+//    и через неё маржу, ROI, Gate 1, сетку Gate 2, безубыточный CVR, ось экономики и пограничные значения.
+//    Там, где доля возвратов равна нулю или НЕИЗВЕСТНА, отпечаток обязан остаться прежним — это ворота SC-002.
+//    Добавочные поля (returnCost, netGross, признаки) из отпечатка исключены: иначе совпадение означало бы
+//    «сравниваем не то», а не «расчёт не тронут».
 //  • spec 019 (концентрация ниши): НАМЕРЕННО меняет подпункт 1f — он мерил долю топ-5 БРЕНДОВ (зелёный в 1 нише из 65)
 //    и стал мерить концентрацию ниши. Меняется value/status/source/unit/threshold у 1f и, как следствие, okCount Критерия 1.
 //    Новые ПОЛЯ концентрации и летаргии из отпечатка исключены — они добавочные и на прежний расчёт не влияют.
@@ -17,6 +22,9 @@ export function stripNew(results) {
   for (const s of r.priceSegments?.segments || []) delete s.selected;
   delete r.budget; delete r.verdict;
   for (const k of ["entry", "cashflow", "clickPrice", "borderline", "regulatory", "dataNotes", "config", "configScope", "amazon", "priceConfig", "sourceOverlap", "hero", "patentsToChecklist", "stage3"]) delete r[k];
+  if (r.economics) { // spec 020: добавочные поля возвратов — на прежний расчёт не влияют
+    delete r.economics.returnRate; delete r.economics.returnSource; delete r.economics.returnCost;
+    delete r.economics.netGross; delete r.economics.returnsCounted; delete r.economics.returnRateSuspicious; }
   if (r.competition) { delete r.competition.amazonAsins; delete r.competition.amazonListings; delete r.competition.amazonRevenueShare; delete r.competition.own; delete r.competition.incumbent;
     // spec 019: добавочные поля — концентрация, поясняющие числа и летаргия. На то, что ядро считало раньше, они не влияют.
     delete r.competition.hhi; delete r.competition.top5ListingShare; delete r.competition.listingCount; delete r.competition.lethargyRevenueShare;
