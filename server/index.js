@@ -213,6 +213,14 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
     res.json({ candidate: ideas.feedRow(row) });
   });
 
+  // Связь односторонняя: из идеи можно создать анализ, но анализ про идею ничего не знает
+  // и на расчёт ниши она не влияет ни в одном месте (ворота SC-009).
+  app.post("/api/ideas/candidates/:id/analysis", requireIdeas, jsonSmall, async (req, res) => {
+    const row = await ideasStore.linkAnalysis(req.params.id, req.body?.analysisId ?? null);
+    if (!row) return res.status(404).json({ error: "not_found", message: "Идея не найдена" });
+    res.json({ candidate: ideas.feedRow(row) });
+  });
+
   app.get("/api/ideas/dismissed", requireIdeas, async (req, res) => res.json({ items: (await ideasStore.dismissed()).map(ideas.feedRow) }));
 
   app.post("/api/ideas/sweep", requireIdeas, async (req, res) => res.json(await ideas.sweepAll()));

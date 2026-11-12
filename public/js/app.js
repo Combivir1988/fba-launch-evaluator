@@ -141,6 +141,20 @@ async function renderStats() {
 // а не сеанс пользователя: свой 401 уводит на вход внутри api(). Раньше эти задачи на такой код сами звали goLogin(),
 // и просроченный ключ OpenRouter выглядел как «нажал кнопку — приложение разлогинило и просит пароль».
 
+/** Из идеи создаётся ПУСТОЙ анализ с перенесённым названием. Ни одной цифры радара в него
+ *  не попадает: проверка ниши начинается с отчётов, а не с того, что что-то где-то взлетело.
+ *  Связь односторонняя — на расчёт ниши идея не влияет ни в одном месте (ворота SC-009). */
+async function ideaToAnalysis(c) {
+  if (!(await leaveCurrent("Текущий анализ не сохранён. Создать новый из идеи?"))) return;
+  const a = newAnalysis();
+  a.niche = String(c.title || "").slice(0, 120);
+  loadAnalysis(a, null);
+  try { await saveNow(); await api("POST", `/api/ideas/candidates/${c.id}/analysis`, { analysisId: S.a.id }); }
+  catch (e) { toast("Анализ создан, но связь с идеей не записана: " + e.message); }
+  showTab("analysis");
+  toast("Анализ создан. Дальше — загрузить отчёты: радар про пригодность к продаже ничего не знает");
+}
+
 // ---------- учётная запись ----------
 /** Без сеанса приложение не работает: api() сам уводит на /login.html. Модели AI хранятся в аккаунте (одноразово переносим из браузера). */
 async function initUser() {
@@ -895,7 +909,8 @@ async function renderUsers() {
     const status = !u.active ? '<span class="chip na">отключён</span>' : lockedNow ? '<span class="chip warn">заблокирован до ' + esc(fmt(u.lockedUntil)) + "</span>" : u.mustChangePassword ? '<span class="chip">временный пароль</span>' : '<span class="chip ok">активен</span>';
     const method = u.hasPassword && u.email ? "Google и пароль" : u.email ? (u.googleLinked ? "Google" : "Google · ещё не входил") : "пароль";
     return `<tr class="${u.active ? "" : "off"}"><td>${esc(u.name)}${self ? ' <span class="muted">(вы)</span>' : ""}</td><td>${u.email ? esc(u.email) + "<br>" : ""}<small class="muted">логин: <code>${esc(u.login)}</code></small></td><td>${esc(method)}</td><td>${u.role === "admin" ? "администратор" : "пользователь"}</td><td>${status}</td><td>${esc(fmt(u.lastLoginAt))}</td><td>${u.analyses ?? 0}</td><td>${u.role === "admin" ? '<span class="chip" title="Администратору раздел открыт всегда">по роли</span>' : u.statsAccess ? '<span class="chip ok">открыт</span>' : '<span class="chip na">закрыт</span>'}</td>
-      <td><div class="acts"><button data-uact="role" data-id="${u.id}" data-role="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Сделать пользователем" : "Сделать админом"}</button><button data-uact="email" data-id="${u.id}" data-email="${esc(u.email || "")}" data-name="${esc(u.name)}">Почта</button><button data-uact="reset" data-id="${u.id}" data-name="${esc(u.name)}">${u.hasPassword ? "Сбросить пароль" : "Задать пароль"}</button>${u.role === "admin" ? "" : `<button data-uact="stats" data-id="${u.id}" data-to="${u.statsAccess ? "0" : "1"}">${u.statsAccess ? "Закрыть статистику" : "Открыть статистику"}</button>`}<button data-uact="toggle" data-id="${u.id}" data-active="${u.active ? "0" : "1"}" class="${u.active ? "danger" : ""}">${u.active ? "Отключить" : "Включить"}</button></div></td></tr>`;
+      <td>${u.role === "admin" ? '<span class="chip" title="Администратору раздел открыт всегда">по роли</span>' : u.ideasAccess ? '<span class="chip ok">открыт</span>' : '<span class="chip na">закрыт</span>'}</td>
+      <td><div class="acts"><button data-uact="role" data-id="${u.id}" data-role="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Сделать пользователем" : "Сделать админом"}</button><button data-uact="email" data-id="${u.id}" data-email="${esc(u.email || "")}" data-name="${esc(u.name)}">Почта</button><button data-uact="reset" data-id="${u.id}" data-name="${esc(u.name)}">${u.hasPassword ? "Сбросить пароль" : "Задать пароль"}</button>${u.role === "admin" ? "" : `<button data-uact="stats" data-id="${u.id}" data-to="${u.statsAccess ? "0" : "1"}">${u.statsAccess ? "Закрыть статистику" : "Открыть статистику"}</button>`}${u.role === "admin" ? "" : `<button data-uact="ideas" data-id="${u.id}" data-to="${u.ideasAccess ? "0" : "1"}">${u.ideasAccess ? "Закрыть идеи" : "Открыть идеи"}</button>`}<button data-uact="toggle" data-id="${u.id}" data-active="${u.active ? "0" : "1"}" class="${u.active ? "danger" : ""}">${u.active ? "Отключить" : "Включить"}</button></div></td></tr>`;
   }).join("") || '<tr><td colspan="9" class="muted">Пользователей нет</td></tr>';
 }
 $("#users-list").addEventListener("click", async (e) => {
@@ -904,6 +919,7 @@ $("#users-list").addEventListener("click", async (e) => {
     if (b.dataset.uact === "role") await api("PATCH", `/api/users/${b.dataset.id}`, { role: b.dataset.role });
     // Право на раздел «Статистика» (spec 018): выдаёт и снимает только администратор, поимённо.
     if (b.dataset.uact === "stats") { await api("PATCH", `/api/users/${b.dataset.id}`, { statsAccess: b.dataset.to === "1" }); toast(b.dataset.to === "1" ? "Раздел «Статистика» открыт" : "Раздел «Статистика» закрыт"); }
+    if (b.dataset.uact === "ideas") { await api("PATCH", `/api/users/${b.dataset.id}`, { ideasAccess: b.dataset.to === "1" }); toast(b.dataset.to === "1" ? "Раздел «Идеи» открыт" : "Раздел «Идеи» закрыт"); }
     if (b.dataset.uact === "email") {
       const v = window.prompt(`Почта аккаунта Google для «${b.dataset.name}» (пусто — убрать вход через Google):`, b.dataset.email); if (v === null) return;
       await api("PATCH", `/api/users/${b.dataset.id}`, { email: v.trim() }); toast(v.trim() ? "Почта сохранена — человек может входить через Google" : "Почта убрана");

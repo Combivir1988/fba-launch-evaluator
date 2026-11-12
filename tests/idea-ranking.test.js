@@ -165,3 +165,34 @@ test("доля от цели к возрасту НЕ приводится — �
   assert.equal(b.goalRatio, 2, "возраст доли от цели не касается");
   assert.ok(a.metric > b.metric, "а скорость — касается");
 });
+
+// ---------- T047: пояснение словами ----------
+
+import { explainCandidate } from "../shared/idea-ranking.js";
+
+test("пояснение называет, на чём основано, и не оценивает пригодность к продаже", () => {
+  const e = explainCandidate({
+    ratio: 7.4, background: 120, metric: 888, daysHeld: 3, platforms: ["video", "crowdfunding"],
+    snippet: "Складной стол для кемпинга с алюминиевой рамой, выдерживает 30 кг, складывается в чехол",
+  });
+  assert.ok(e.lines.join(" ").includes("7.4"), "названо отношение к фону");
+  assert.ok(e.lines.some((l) => l.includes("3-е сутки")), "названа устойчивость");
+  assert.ok(e.lines.some((l) => l.includes("Собранный текст")), "названо, что текст есть");
+  assert.equal(e.thin, false);
+  assert.ok(/замерено|построено/i.test(e.basis), "основание названо");
+  assert.ok(/не вывод о пригодности/i.test(e.disclaimer));
+  assert.ok(!/перспектив|хорош|стоит прод|выгодн/i.test(JSON.stringify(e)), "оценочных слов нет");
+});
+
+test("материала мало — система ГОВОРИТ об этом, а не сочиняет уверенный вывод", () => {
+  const e = explainCandidate({ ratio: 5, background: 10, metric: 50, daysHeld: 1, snippet: "" });
+  assert.equal(e.thin, true);
+  assert.ok(/только название и числа/i.test(e.basis));
+  assert.ok(!e.lines.some((l) => l.includes("Собранный текст")), "пустого текста в пояснении нет");
+});
+
+test("нет чисел — пояснение не выдумывает их", () => {
+  const e = explainCandidate({ snippet: "" });
+  assert.deepEqual(e.lines, []);
+  assert.ok(e.basis, "но основание всё равно названо");
+});

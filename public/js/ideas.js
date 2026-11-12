@@ -14,6 +14,25 @@
   const fmt1 = (v) => (Number.isFinite(Number(v)) ? Number(v).toLocaleString("ru-RU", { maximumFractionDigits: 1 }) : "—");
   const dt = (iso) => (iso ? new Date(iso).toLocaleDateString("ru-RU", { dateStyle: "medium" }) : "—");
 
+  /* Словарь пояснений СВОЙ, а не в render.js — и это решено осознанно, а не по недосмотру.
+     render.js целиком уезжает в публичные ссылки и в скачанный файл; положи термины радара туда —
+     и слова про раздел поехали бы наружу текстом, хотя самого раздела там нет.
+     Всплывающую подсказку рисует общий механизм (window.FBARender.initTips) — он слушает документ
+     и работает с любым элементом, у которого есть data-tip. */
+  const IDEA_TIPS = {
+    "Фон раздела": "Медиана приведённого к возрасту показателя среди элементов того же обхода. Медиана, а не среднее: один виральный элемент не должен выключать отбор на весь раздел.",
+    "Приведённый показатель": "Просмотры или собранные деньги, делённые на возраст в сутках. Без приведения сравнение систематически топит свежее — то, ради чего раздел и существует.",
+    "Кратность порога": "Во сколько раз показатель должен превышать фон своего раздела, чтобы элемент попал в ленту. Меняется во вкладке «Пороги»; у раздела может быть своя.",
+    "Без показателя": "Площадка не дала числа. Это НЕ ноль: ноль означал бы «вещь никому не интересна», а тут мы просто не знаем.",
+    "Не собрано": "К площадке не удалось сходить или ответ не разобрался. Это не «ничего не нашлось» — цифр за эти сутки просто нет.",
+    "Держится": "Сколько суток подряд элемент продолжает выделяться. Однодневный всплеск и то, что держится неделю, — разные вещи.",
+    "Отклонение от фона": "Во сколько раз показатель выше середины своего раздела. Это мера отклонения, а не оценка товара.",
+    "Расход": "Сколько потрачено на загрузку страниц. Оценка на будущее считается по числу разделов и помечена как оценка: предварительной цены без выполнения запроса служба не даёт.",
+    "За последний обход": "Числа последнего УДАЧНОГО обхода этого раздела. Если обход не удался, чисел нет вовсе — и это видно отдельно.",
+    "Обход защиты": "Площадка отклоняет прямой запрос, и страница берётся через посредника. Замер: это один кредит, не двадцать пять.",
+  };
+  const tip = (label) => (IDEA_TIPS[label] ? ` data-tip="${esc(IDEA_TIPS[label])}" tabindex="0" class="has-tip"` : "");
+
   const PLATFORM = {
     channel: { name: "Канал мессенджера", hint: "Поиска по площадке не существует: радар видит только названные каналы" },
     video: { name: "Тема в видео", hint: "Запрос идёт с закреплённым языком и фильтром по дате" },
@@ -43,14 +62,14 @@
       // Счётчики показываются ТОЛЬКО когда обход был удачным. Ноль вместо «не собрано»
       // читался бы как «посмотрели и ничего нет» — противоположный вывод.
       const numbers = r && r.status === "ok"
-        ? `${fmtN(r.seen)} обработано · ${fmtN(r.passed)} прошло · ${fmtN(r.noMetric)} без показателя`
-        : `<span class="muted">не собрано — цифр за эти сутки нет</span>`;
+        ? `${fmtN(r.seen)} обработано · ${fmtN(r.passed)} прошло · ${fmtN(r.noMetric)} <span${tip("Без показателя")}>без показателя</span>`
+        : `<span class="muted"${tip("Не собрано")}>не собрано — цифр за эти сутки нет</span>`;
       const why = s.pausedReason || (r && r.status === "failed" ? r.failMessage : "");
       return `<tr>
         <td><b>${esc(s.title)}</b><div class="muted">${esc(pname(s.platform))} · ${esc(s.handle)}</div></td>
         <td>${state}${why ? `<div class="muted">${esc(why)}</div>` : ""}</td>
         <td>${numbers}</td>
-        <td>${r ? esc(r.date) : "—"}${r?.via ? `<div class="muted">${r.via === "direct" ? "прямым запросом" : "через обход защиты"}</div>` : ""}</td>
+        <td>${r ? esc(r.date) : "—"}${r?.via ? `<div class="muted">${r.via === "direct" ? "прямым запросом" : `<span${tip("Обход защиты")}>через обход защиты</span>`}</div>` : ""}</td>
         <td class="nowrap">
           <button data-ideas="toggle" data-id="${s.id}" data-active="${s.active ? "0" : "1"}">${s.active ? "Приостановить" : "Запустить"}</button>
           <button data-ideas="remove" data-id="${s.id}">Удалить</button>
@@ -65,7 +84,7 @@
     return `<div class="panel section">
       <h3>Откуда смотрим</h3>
       ${missing}
-      <div class="tablewrap"><table><thead><tr><th>Раздел</th><th>Состояние</th><th>За последний обход</th><th>Когда</th><th></th></tr></thead>
+      <div class="tablewrap"><table><thead><tr><th>Раздел</th><th>Состояние</th><th><span${tip("За последний обход")}>За последний обход</span></th><th>Когда</th><th></th></tr></thead>
         <tbody>${rows || `<tr><td colspan="5" class="muted">Ни одного раздела не заведено.</td></tr>`}</tbody></table></div>
       ${addForm()}
     </div>`;
@@ -88,9 +107,9 @@
     const c = d.counters;
     const known = c.seen != null;
     return `<div class="panel section">
-      <h3>Порог отбора</h3>
-      <p>Кандидатом становится элемент, у которого показатель <b>в ${fmt1(d.thresholds.thresholdMult)} раза и более</b>
-      выше медианы своего же раздела. Медиана, а не среднее: один виральный элемент не должен выключать отбор на весь раздел.</p>
+      <h3><span${tip("Кратность порога")}>Порог отбора</span></h3>
+      <p>Кандидатом становится элемент, у которого <span${tip("Приведённый показатель")}>показатель</span> <b>в ${fmt1(d.thresholds.thresholdMult)} раза и более</b>
+      выше <span${tip("Фон раздела")}>медианы своего же раздела</span>. Медиана, а не среднее: один виральный элемент не должен выключать отбор на весь раздел.</p>
       <p class="${known ? "" : "muted"}">${known
         ? `За последний обход: <b>${fmtN(c.seen)}</b> обработано, <b>${fmtN(c.passed)}</b> прошло,
            <b>${fmtN(c.noMetric)}</b> без показателя${c.collected < c.sources
@@ -113,16 +132,21 @@
         <span class="chip">${esc(pname(c.platform))}</span>
       </div>
       ${c.snippet ? `<p class="muted">${esc(c.snippet.slice(0, 300))}</p>` : ""}
+      ${c.explain ? `<details class="mt"><summary>Почему это здесь</summary>
+        <ul>${c.explain.lines.map((l) => `<li>${esc(l)}</li>`).join("") || '<li class="muted">Чисел площадка не дала.</li>'}</ul>
+        <p class="muted">${esc(c.explain.basis)} ${esc(c.explain.disclaimer)}</p></details>` : ""}
       <div class="muted">
-        Выше медианы своего раздела в <b>${fmt1(c.ratio)}</b> раза
+        <span${tip("Отклонение от фона")}>Выше медианы своего раздела</span> в <b>${fmt1(c.ratio)}</b> раза
         (${fmtN(Math.round(c.metric))} против ${fmtN(Math.round(c.background))} в сутки) ·
-        ${c.daysHeld > 1 ? `держится ${fmtN(c.daysHeld)}-е сутки` : "замечено впервые"} ·
+        ${c.daysHeld > 1 ? `<span${tip("Держится")}>держится ${fmtN(c.daysHeld)}-е сутки</span>` : "замечено впервые"} ·
         ${esc(c.sourceTitle || "")} · появилось ${dt(c.publishedAt)}
       </div>
       <div class="mt">
         <button data-ideas="decide" data-id="${c.id}" data-decision="${c.decision === "kept" ? "none" : "kept"}">${c.decision === "kept" ? "Снять отметку" : "Интересно"}</button>
         <button data-ideas="decide" data-id="${c.id}" data-decision="${c.decision === "dismissed" ? "none" : "dismissed"}">${c.decision === "dismissed" ? "Вернуть" : "Неинтересно"}</button>
-        ${c.analysisId ? `<span class="chip ok">Анализ создан</span>` : ""}
+        ${c.analysisId
+          ? `<span class="chip ok">Анализ создан</span>`
+          : `<button data-ideas="analyse" data-id="${c.id}" data-title="${esc(c.title)}">Проверить как нишу</button>`}
       </div>
     </div>`).join("");
     return `<div class="panel section"><h3>Лента</h3>
@@ -133,7 +157,7 @@
 
   // ---------- расход ----------
   const spendBlock = (d) => `<div class="panel section">
-    <h3>Расход</h3>
+    <h3><span${tip("Расход")}>Расход</span></h3>
     <p>За сегодня израсходовано <b>${fmtN(d.spend.today)}</b>${d.spend.cap ? ` из потолка <b>${fmtN(d.spend.cap)}</b>` : " (потолок не задан)"}.</p>
     <p class="muted">Оценка на сутки вперёд — <b>${fmtN(d.spend.estimate.perDay)}</b>, на месяц — <b>${fmtN(d.spend.estimate.perMonth)}</b>.
     Это <b>оценка</b> по числу разделов, а не факт: предварительной цены без выполнения запроса служба не даёт.
@@ -141,6 +165,7 @@
   </div>`;
 
   function render(root, d, action) {
+    try { window.FBARender?.initTips?.(); } catch {}
     root.innerHTML = preamble() + sourcesBlock(d) + thresholdBlock(d) + feedBlock(d) + spendBlock(d)
       + `<div class="panel section"><button data-ideas="sweep">Обойти сейчас</button>
          <span class="muted">Обход и так идёт раз в сутки сам; кнопка — чтобы не ждать.</span></div>`;
@@ -152,6 +177,7 @@
         if (k === "toggle") return action("source", { id: b.dataset.id, patch: { active: b.dataset.active === "1" } });
         if (k === "remove") return confirm("Удалить раздел? Собранные идеи останутся.") && action("remove", { id: b.dataset.id });
         if (k === "decide") return action("decision", { id: b.dataset.id, decision: b.dataset.decision });
+        if (k === "analyse") return action("analyse", { id: b.dataset.id, title: b.dataset.title });
         if (k === "sweep") return action("sweep", {});
       }
       if (e.target.id === "idea-add") {
@@ -166,5 +192,5 @@
     };
   }
 
-  window.FBAIdeas = { render };
+  window.FBAIdeas = { render, tips: IDEA_TIPS };
 })();

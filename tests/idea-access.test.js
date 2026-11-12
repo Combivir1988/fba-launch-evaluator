@@ -88,3 +88,45 @@ test("тип права проверяется: строку вместо при
   assert.equal(r.status, 400);
   assert.equal((await r.json()).error, "bad_ideas_access");
 });
+
+// ---------- T046: ПОВТОРНЫЕ ворота SC-009 — уже с маршрутом создания анализа ----------
+
+test("ВОРОТА SC-009: связь идеи с анализом не трогает ни одного анализа", async () => {
+  await patch(anna.user.id, { ideasAccess: true });
+
+  // Свой анализ и снимок всего, что о нём знает база.
+  const id = crypto.randomUUID();
+  await T.call("PUT", `/api/analyses/${id}`, anna.headers,
+    { core: { id, niche: "контрольная ниша", inputs: { price: 24.99, cogs: 4.37 }, results: {} } });
+  const snapshot = async () => (await T.db.query(
+    "SELECT id, version, core, updated_at FROM analyses ORDER BY id")).rows.map((r) => JSON.stringify(r)).join("|");
+  const before = await snapshot();
+  const versionsBefore = (await T.db.query("SELECT count(*)::int AS n FROM analysis_versions")).rows[0].n;
+
+  // Заводим идею вручную и связываем её с этим анализом.
+  await T.db.query(
+    `INSERT INTO idea_source (id, platform, handle, title) VALUES ($1, 'video', 'тема', 'Раздел')`, [crypto.randomUUID()]);
+  const src = (await T.db.query("SELECT id FROM idea_source LIMIT 1")).rows[0].id;
+  const cid = crypto.randomUUID();
+  await T.db.query(
+    `INSERT INTO idea_candidate (id, source_id, platform, external_id, title, url, first_seen_on, last_seen_on, metric, background, ratio)
+     VALUES ($1, $2, 'video', 'x1', 'Что-то взлетело', 'https://example.invalid/x1', current_date, current_date, 100, 10, 10)`,
+    [cid, src]);
+
+  const r = await T.call("POST", `/api/ideas/candidates/${cid}/analysis`, anna.headers, { analysisId: id });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).candidate.analysisId, id);
+
+  assert.equal(await snapshot(), before, "ни один анализ не изменился ни на символ");
+  assert.equal((await T.db.query("SELECT count(*)::int AS n FROM analysis_versions")).rows[0].n, versionsBefore,
+    "и новой версии не появилось: связь односторонняя");
+});
+
+test("лента не содержит ни одной величины расчёта ниши", async () => {
+  await patch(anna.user.id, { ideasAccess: true });
+  const d = await (await T.call("GET", "/api/ideas", anna.headers)).json();
+  const text = JSON.stringify(d);
+  for (const k of ["verdict", "scorecard", "criterion1", "economics", "gate1", "hhi", "breakEvenCvr"]) {
+    assert.ok(!text.includes(k), `в ленте есть «${k}» — радар не должен знать о расчёте ниши`);
+  }
+});

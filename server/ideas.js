@@ -12,7 +12,8 @@
 // ЗАМОК (образец server/stats.js:36): одно обещание на процесс — второй вызов ЖДЁТ первый,
 // а не запускает свой. Площадки обходятся ПО ОДНОЙ: все сразу — это те самые 329 МБ при 0,5 ГБ.
 import { mergeThresholds } from "../shared/thresholds.js";
-import { rankSample } from "../shared/idea-ranking.js";
+import { rankSample, explainCandidate } from "../shared/idea-ranking.js";
+import { groupCandidates } from "../shared/idea-dedupe.js";
 import { fetchPage } from "./scrapfly.js";
 import * as channels from "./sources/channels.js";
 import * as video from "./sources/video.js";
@@ -201,7 +202,10 @@ export function createIdeas(db, store, { getCap = async () => 0, cfg = {}, thres
       // Раздел называет, какого источника в ленте не хватает и почему.
       notCollected: notCollected.map((s) => ({ id: s.id, title: s.title, platform: s.platform, reason: s.lastRun?.failMessage ?? "Ещё ни разу не собирался" })),
       complete: notCollected.length === 0,
-      feed: items.map(feedRow),
+      // Склейка КОНСЕРВАТИВНАЯ (D10): ложная склейка прячет одну из двух вещей, и человек не узнает,
+      // что она была; дубль он просто отмахнёт.
+      // Пояснение считается ПОСЛЕ склейки: число площадок — часть основания.
+      feed: groupCandidates(items.map(feedRow)).map((c) => ({ ...c, explain: explainCandidate(c) })),
       counters: {
         seen: sumOrNull(sourceRows, "seen"), passed: sumOrNull(sourceRows, "passed"), noMetric: sumOrNull(sourceRows, "noMetric"),
         sources: sourceRows.length, collected: sourceRows.length - notCollected.length,

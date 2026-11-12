@@ -119,3 +119,44 @@ export function rankSample(items, { now, thresholds, thresholdMult, requireGoalR
 
   return { ...out(null, background), passed, background };
 }
+
+// ---------- пояснение словами (FR, US5) ----------
+
+/**
+ * Почему элемент попал в ленту — СЛОВАМИ, строго по собранному. Никакой оценки пригодности
+ * к продаже: только что замерено, с чем сравнивалось и на чём это основано.
+ *
+ * Когда материала мало, функция ГОВОРИТ об этом, а не сочиняет уверенный вывод.
+ * Это и есть разница между «мы знаем» и «похоже на».
+ */
+export function explainCandidate(c, { minSnippet = 40 } = {}) {
+  const parts = [];
+  const ratio = Number(c?.ratio);
+  const bg = Number(c?.background);
+  const metric = Number(c?.metric);
+
+  if (Number.isFinite(ratio) && Number.isFinite(bg) && Number.isFinite(metric)) {
+    parts.push(`Показатель — ${Math.round(metric)} в сутки против ${Math.round(bg)} у середины этого же раздела, это в ${ratio.toFixed(1)} раза больше.`);
+  }
+  if (Number.isFinite(Number(c?.daysHeld)) && Number(c.daysHeld) > 1) {
+    parts.push(`Держится ${c.daysHeld}-е сутки подряд.`);
+  }
+  if (Array.isArray(c?.platforms) && c.platforms.length > 1) {
+    parts.push(`Найдено на нескольких площадках: ${c.platforms.length}.`);
+  }
+
+  const text = String(c?.snippet ?? "").trim();
+  const thin = text.length < minSnippet;
+  if (!thin) parts.push(`Собранный текст: «${text.slice(0, 280)}».`);
+
+  return {
+    lines: parts,
+    // Основание называется всегда: человек должен видеть, на чём это построено.
+    basis: thin
+      ? "Площадка дала только название и числа — по ним о сути судить нельзя. Ссылка рядом."
+      : "Построено по названию, собранному тексту и замеренным числам. Ничего, кроме них, тут нет.",
+    thin,
+    // Чего здесь НЕТ и почему — говорится прямо, а не умалчивается.
+    disclaimer: "Это описание того, что замерено, а не вывод о пригодности к продаже.",
+  };
+}

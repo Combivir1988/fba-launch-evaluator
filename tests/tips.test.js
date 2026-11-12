@@ -90,3 +90,30 @@ test("FR-006/SC-003: в снимке публичной ссылки подск�
   const dynamic = [...el.querySelectorAll("[data-tip]")].map((x) => x.getAttribute("data-tip")).filter((t) => !glossary.has(t));
   for (const t of dynamic) assert.doesNotMatch(t, /4[.,]37|18[\s  ]?750|1[\s  ]?850/, "в бывших title нет закупочных чисел: " + t);
 });
+
+// ---------- spec 021: словарь радара живёт ОТДЕЛЬНО, и у него свой сторож ----------
+
+test("spec 021: термины радара НЕ попали в render.js — он уезжает в публичные ссылки", () => {
+  // Положи их туда — и слова про раздел поехали бы наружу текстом, хотя самого раздела там нет.
+  for (const term of ["Фон раздела", "Кратность порога", "Приведённый показатель", "Обход защиты"]) {
+    assert.ok(!RENDER.includes(term), `«${term}» оказался в render.js — он уедет в скачанный файл и публичную ссылку`);
+  }
+});
+
+test("spec 021: в словаре радара нет ни осиротевших пояснений, ни вызовов без пояснения", () => {
+  const IDEAS = readFileSync(new URL("../public/js/ideas.js", import.meta.url), "utf8");
+  const keys = [...IDEAS.matchAll(/^ {4}"([^"]+)":/gm)].map((m) => m[1]);
+  const used = [...IDEAS.matchAll(/\$\{tip\("([^"]+)"\)\}/g)].map((m) => m[1]);
+
+  assert.ok(keys.length >= 8, "пояснений в словаре: " + keys.length);
+  // Вызов без ключа опаснее осиротевшего пояснения: подсказка молча не появляется,
+  // и в интерфейсе это выглядит как «её тут и не задумывали».
+  assert.deepEqual(used.filter((u) => !keys.includes(u)), [], "вызов tip() без пояснения в словаре");
+  assert.deepEqual(keys.filter((k) => !used.includes(k)), [], "пояснение без места в интерфейсе");
+
+  for (const k of keys) {
+    const v = IDEAS.split("\n").find((l) => l.trim().startsWith('"' + k + '": "'))
+      ?.match(/": "([^"]+)"/)?.[1] ?? "";
+    assert.ok(v.length >= 20 && v.length <= 330, k + ": " + v.length + " знаков");
+  }
+});
