@@ -90,3 +90,60 @@ export function mockListing(asin, title = "") {
     aplus: "", price: 10 + (n % 50), rating: 4 + (n % 10) / 10, ratingCount: 50 + n, variants: n % 2 ? [color, "Green"] : [], imageCount: 5 + (n % 5),
     promo: n % 3 === 0 ? { v: PROMO_VERSION, price: 10 + (n % 50), listPrice: Math.round((10 + (n % 50)) * 1.25 * 100) / 100, discountPct: 20, coupon: { text: "Save 10% with coupon", value: 10, unit: "%" }, deal: n % 6 === 0 ? "Limited time deal" : null, sns: n % 9 === 0 ? { min: 5, max: 15 } : null, promotions: [], hasPromo: true } : { v: PROMO_VERSION, price: 10 + (n % 50), listPrice: null, discountPct: null, coupon: null, deal: null, sns: null, promotions: [], hasPromo: false } };
 }
+
+// ---------- загрузка произвольной страницы (spec 021, радар товарных идей) ----------
+// Строитель URL под Amazon выше НЕ ТРОГАЕТСЯ: он работает и к радару отношения не имеет.
+// Переносятся как есть classifyScrapfly и форма цикла ретраев.
+
+/** Обычный браузерный признак клиента: без него прямой запрос отклоняют и те площадки, что пускают. */
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+export function scrapflyPageUrl(url, key, { country = "us", renderJs = false } = {}) {
+  const q = new URLSearchParams({ key, url, asp: "true", country, render_js: String(renderJs), cost_budget: String(COST_BUDGET) });
+  return `${SCRAPFLY_URL}?${q}`;
+}
+
+/**
+ * Прямой запрос ПЕРВЫМ, обход защиты ЗАПАСНЫМ (D7).
+ * Замер 2026-11-12: две площадки из трёх ответили прямо и бесплатно; третья отвечает только через обход,
+ * и он обошёлся в 1 кредит — то есть «самой дорогой» она не оказалась.
+ *
+ * Возвращает ВСЕГДА запись, а не бросает: отказ источника — это состояние, которое надо показать,
+ * а не исключение, которое гасит обход целиком. Каким путём пришёл ответ — в поле via.
+ */
+export async function fetchPage(url, cfg, { headers = {}, forceBypass = false, fetchImpl = fetch, signal, retries = 1 } = {}) {
+  if (!forceBypass) {
+    try {
+      const res = await fetchImpl(url, { headers: { "user-agent": UA, ...headers }, signal });
+      if (res.ok) return { ok: true, body: await res.text(), via: "direct", cost: 0, error: null };
+    } catch (e) { if (signal?.aborted) throw e; /* к обходу защиты */ }
+  }
+  if (!cfg?.scrapflyKey) {
+    return { ok: false, body: null, via: "direct", cost: 0,
+      error: { code: "no_key", message: "Площадка отклонила прямой запрос, а обход защиты не настроен" } };
+  }
+
+  let last = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt) await sleep(1500 * attempt);
+    let res;
+    try { res = await fetchImpl(scrapflyPageUrl(url, cfg.scrapflyKey), { signal }); }
+    catch (e) { if (signal?.aborted) throw e; last = { code: "network", message: e?.message || "сеть", retryable: true }; continue; }
+    if (!res.ok) {
+      last = classifyScrapfly(res.status, await res.text().catch(() => ""));
+      if (!last.retryable) break;
+      continue;
+    }
+    const j = await res.json().catch(() => null);
+    const cost = j?.context?.cost?.total ?? j?.result?.cost?.total ?? 0;
+    const upstream = j?.result?.status_code;
+    if (upstream && upstream >= 400) {
+      last = { code: "upstream", message: `Площадка ответила ${upstream}`, retryable: upstream >= 500, cost };
+      if (!last.retryable) break;
+      continue;
+    }
+    return { ok: true, body: j?.result?.content ?? "", via: "bypass", cost, error: null };
+  }
+  return { ok: false, body: null, via: "bypass", cost: last?.cost ?? 0,
+    error: { code: last?.code || "unknown", message: last?.message || "не удалось загрузить" } };
+}

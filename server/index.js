@@ -13,6 +13,8 @@ import { createUsers, UserError } from "./users.js";
 import { createAnalyses } from "./analyses.js";
 import { createShares } from "./shares.js";
 import { createStats } from "./stats.js";
+import { createIdeasStore } from "./ideas-store.js";
+import { createIdeas, PLATFORMS } from "./ideas.js";
 import { analyzeStream, configFromEnv } from "./claude.js";
 import { patentScanStream } from "./patents.js";
 import { schemaStream, extractStream, tzStream, promoStream } from "./config-jobs.js";
@@ -37,8 +39,10 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const google = deps.google || createGoogleAuth(cfg, deps.googleOpts || {});
   const shares = deps.shares || createShares(db, analyses, { publicUrl: cfg.publicUrl, ...(deps.sharesOpts || {}) });
   const stats = deps.stats || createStats(db, deps.statsOpts || {});
+  const ideasStore = deps.ideasStore || createIdeasStore(db);
+  const ideas = deps.ideas || createIdeas(db, ideasStore, { getCap: appSettings.getIdeasCap, cfg, ...(deps.ideasOpts || {}) });
   const app = express();
-  app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses; app.locals.shares = shares; app.locals.stats = stats;
+  app.locals.sessions = sessions; app.locals.users = users; app.locals.analyses = analyses; app.locals.shares = shares; app.locals.stats = stats; app.locals.ideas = ideas;
   app.use("/api", (req, res, next) => { if (inflight.draining && req.path !== "/health") { res.set("Retry-After", "5"); return res.status(503).json({ error: "draining", message: "Сервер перезапускается — повторите через несколько секунд" }); } next(); });
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
@@ -73,12 +77,17 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const canStats = (u) => u?.role === "admin" || u?.statsAccess === true;
   const requireStats = [requireUser, requirePasswordChanged, (req, res, next) => (canStats(req.user) ? next()
     : res.status(403).json({ error: "no_stats_access", message: "Раздел «Статистика» вам не открыт" }))];
+  // Право на раздел «Идеи» (spec 021) — дословно тот же образец. Тело отказа РОВНО {error, message}:
+  // ни одного числа раздела. 403 с лентой в теле — это провал, который по коду выглядит успехом (ворота SC-011a).
+  const canIdeas = (u) => u?.role === "admin" || u?.ideasAccess === true;
+  const requireIdeas = [requireUser, requirePasswordChanged, (req, res, next) => (canIdeas(req.user) ? next()
+    : res.status(403).json({ error: "no_ideas_access", message: "Раздел «Идеи» вам не открыт" }))];
 
   // ---------- вход и своя учётная запись ----------
   const loginLimiter = rateLimiter({ limit: cfg.loginRateLimit || 10, windowMs: 10 * 60 * 1000 });
   // statsAccess в своей учётной записи — ВЫЧИСЛЕННОЕ право: по нему браузер решает, показывать ли кнопку раздела.
   // Это удобство, а не защита: кнопку можно дорисовать руками, данные всё равно отдаёт только сервер и только по праву.
-  const me = (u) => ({ user: { id: u.id, login: u.login, name: u.name, role: u.role, settings: u.settings || {}, email: u.email || null, hasPassword: u.hasPassword !== false, statsAccess: canStats(u) }, mustChangePassword: Boolean(u.mustChangePassword) });
+  const me = (u) => ({ user: { id: u.id, login: u.login, name: u.name, role: u.role, settings: u.settings || {}, email: u.email || null, hasPassword: u.hasPassword !== false, statsAccess: canStats(u), ideasAccess: canIdeas(u) }, mustChangePassword: Boolean(u.mustChangePassword) });
   app.post("/api/auth/login", loginLimiter, jsonSmall, async (req, res) => {
     const { login, password } = req.body || {};
     try {
@@ -152,6 +161,7 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
     log("info", "user updated", { login: u.login, role: u.role, active: u.active, by: req.user.login });
     // Кто, кому и в какую сторону выдал право на раздел — отдельной записью (FR-005).
     if (req.body && typeof req.body.statsAccess === "boolean") log("info", "stats access changed", { by: req.user.login, user: u.login, to: u.statsAccess });
+    if (req.body && typeof req.body.ideasAccess === "boolean") log("info", "ideas access changed", { by: req.user.login, user: u.login, to: u.ideasAccess });
     res.json({ user: u });
   });
   app.post("/api/users/:id/reset-password", admin, jsonSmall, async (req, res) => {
@@ -163,6 +173,55 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   // ---------- статистика по всем анализам (spec 018) ----------
   // Чтение: раздел ничего не пишет в analyses (FR-009). Пересчёт никогда не ходит в AI, Scrapfly и патентный поиск.
   app.get("/api/stats", requireStats, async (req, res) => res.set("Cache-Control", "no-store").json(await stats.get()));
+
+  // ---------- радар товарных идей (spec 021) ----------
+  // Раздел НЕ оценивает пригодность к продаже: ни числом, ни словом, ни порядком сортировки (FR-017).
+  // Он показывает, что выбилось из фона собственного раздела, и честно называет, чего не собрал.
+  app.get("/api/ideas", requireIdeas, async (req, res) =>
+    res.set("Cache-Control", "no-store").json(await ideas.get({ sinceDays: Number(req.query.days) || 7 })));
+
+  app.post("/api/ideas/sources", requireIdeas, jsonSmall, async (req, res) => {
+    const { platform, handle, title, thresholdMult } = req.body || {};
+    if (!PLATFORMS.includes(platform)) return res.status(400).json({ error: "bad_platform", message: "Площадка не из списка" });
+    const h = String(handle ?? "").trim(), t = String(title ?? "").trim();
+    if (!h || !t) return res.status(400).json({ error: "bad_source", message: "Нужны адрес раздела и название" });
+    // Совпадение ловится ДО сохранения: молча создать второй раздел за двойной расход нельзя (FR-009).
+    const dup = await ideasStore.findSource(platform, h);
+    if (dup) return res.status(409).json({ error: "duplicate", message: "Такой раздел уже заведён: «" + dup.title + "»", existing: { id: dup.id, title: dup.title } });
+    const row = await ideasStore.createSource({ platform, handle: h, title: t, thresholdMult: thresholdMult ?? null, createdBy: req.user.id });
+    log("info", "idea source added", { by: req.user.login, platform, handle: h });
+    res.status(201).json({ source: row });
+  });
+
+  app.patch("/api/ideas/sources/:id", requireIdeas, jsonSmall, async (req, res) => {
+    const { active, thresholdMult } = req.body || {};
+    let row = null;
+    if (typeof active === "boolean") row = await ideasStore.setSourceActive(req.params.id, active);
+    if (thresholdMult !== undefined) row = await ideasStore.setSourceThreshold(req.params.id, thresholdMult);
+    if (!row) return res.status(404).json({ error: "not_found", message: "Раздел не найден" });
+    res.json({ source: row });
+  });
+
+  app.delete("/api/ideas/sources/:id", requireIdeas, async (req, res) => { await ideasStore.deleteSource(req.params.id); res.json({ ok: true }); });
+
+  app.post("/api/ideas/candidates/:id/decision", requireIdeas, jsonSmall, async (req, res) => {
+    const d = req.body?.decision;
+    if (!["none", "kept", "dismissed"].includes(d)) return res.status(400).json({ error: "bad_decision", message: "Решение: интересно, неинтересно или снять отметку" });
+    // Отклонённое НЕ удаляется — иначе следующий же обход вернул бы его в ленту как новое.
+    const row = await ideasStore.decide(req.params.id, d, req.user.id);
+    if (!row) return res.status(404).json({ error: "not_found", message: "Идея не найдена" });
+    res.json({ candidate: ideas.feedRow(row) });
+  });
+
+  app.get("/api/ideas/dismissed", requireIdeas, async (req, res) => res.json({ items: (await ideasStore.dismissed()).map(ideas.feedRow) }));
+
+  app.post("/api/ideas/sweep", requireIdeas, async (req, res) => res.json(await ideas.sweepAll()));
+
+  app.get("/api/admin/ideas-cap", admin, async (req, res) => res.json({ cap: await appSettings.getIdeasCap() }));
+  app.put("/api/admin/ideas-cap", admin, jsonSmall, async (req, res) => {
+    try { res.json({ cap: await appSettings.setIdeasCap(req.body?.cap, req.user.id) }); }
+    catch (e) { res.status(e.status || 400).json({ error: e.code || "invalid", message: e.message }); }
+  });
 
   // ---------- общая история анализов ----------
   app.get("/api/analyses", authed, async (req, res) => res.json(await analyses.list({ userId: req.user.id, mine: req.query.mine === "1", q: req.query.q, limit: req.query.limit, offset: req.query.offset })));

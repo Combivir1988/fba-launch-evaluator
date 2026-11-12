@@ -69,7 +69,7 @@ if (localStorage.getItem("fba_side") === "collapsed") setSide(true, true); // п
 // ---------- tabs ----------
 $$(".topbar nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 // Открытый раздел живёт в адресе (#history) и запоминается в браузере: после F5 открывается тот же раздел, ссылку на раздел можно переслать.
-const TABS = ["analysis", "history", "stats", "settings", "thresholds", "help"];
+const TABS = ["analysis", "history", "stats", "ideas", "settings", "thresholds", "help"];
 const wantedTab = () => { const h = location.hash.slice(1); if (TABS.includes(h)) return h; try { const t = localStorage.getItem("fba_tab"); if (TABS.includes(t)) return t; } catch {} return "analysis"; };
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.includes(h)) showTab(h); });
 function showTab(name) {
@@ -83,11 +83,44 @@ function showTab(name) {
   if (name === "history") renderHistory();
   if (name === "thresholds") renderThresholds();
   if (name === "stats") renderStats();
+  if (name === "ideas") renderIdeas();
 }
 
 // ---------- статистика по всем анализам (spec 018) ----------
 // Кнопка раздела прячется, когда права нет. Это удобство, а не защита: данные отдаёт только сервер и только по праву.
 function syncStatsTab() { $("#tab-btn-stats").classList.toggle("hidden", S.user?.statsAccess !== true); }
+
+// ---------- радар товарных идей (spec 021) ----------
+// Кнопка прячется без права — ровно как у статистики. Это удобство, а не защита.
+function syncIdeasTab() { $("#tab-btn-ideas").classList.toggle("hidden", S.user?.ideasAccess !== true); }
+async function renderIdeas() {
+  const box = $("#ideas-body");
+  box.innerHTML = '<div class="panel section muted">Загружаем…</div>';
+  try {
+    window.FBAIdeas.render(box, await api("GET", "/api/ideas"), ideasAction);
+  } catch (e) {
+    if (/403|no_ideas_access/.test(e.message)) { // право сняли, пока вкладка была открыта
+      S.user.ideasAccess = false; syncIdeasTab();
+      box.innerHTML = '<div class="panel section"><h2>Идеи</h2><p>Раздел вам больше не открыт. Доступ выдаёт администратор поимённо.</p></div>';
+      return;
+    }
+    box.innerHTML = `<div class="panel section"><h2>Идеи</h2><div class="notice fail">Не удалось загрузить: ${esc(e.message)}</div></div>`;
+  }
+}
+/** Действия раздела идут через один вход: так ошибка права снимает вкладку в одном месте. */
+async function ideasAction(kind, payload) {
+  try {
+    if (kind === "add") await api("POST", "/api/ideas/sources", payload);
+    if (kind === "source") await api("PATCH", "/api/ideas/sources/" + payload.id, payload.patch);
+    if (kind === "remove") await api("DELETE", "/api/ideas/sources/" + payload.id);
+    if (kind === "decision") await api("POST", `/api/ideas/candidates/${payload.id}/decision`, { decision: payload.decision });
+    if (kind === "sweep") { toast("Обходим площадки…"); await api("POST", "/api/ideas/sweep"); }
+  } catch (e) {
+    if (/409|duplicate/.test(e.message)) return toast(e.message);
+    return toast("Не получилось: " + e.message);
+  }
+  renderIdeas();
+}
 async function renderStats() {
   const box = $("#stats-body");
   box.innerHTML = '<div class="panel section muted">Считаем…</div>';
@@ -114,7 +147,7 @@ async function initUser() {
   const me = await api("GET", "/api/auth/me");
   if (me.mustChangePassword) { goLogin("#change"); throw new Error("password change required"); }
   S.user = me.user; S.sessionPolicy = me.sessionPolicy || { idleMinutes: 0, maxDays: 0 };
-  syncStatsTab();
+  syncStatsTab(); syncIdeasTab();
   // Выход при бездействии (spec 008): правило приходит с сервера и обновляется при каждой сверке — менять его может только администратор.
   if (!S.idleWatch) S.idleWatch = startIdleWatch({ dialog: $("#idle-dlg"), getIdleMinutes: () => S.sessionPolicy?.idleMinutes || 0,
     ping: async () => { const m = await api("GET", "/api/auth/me"); if (m?.sessionPolicy) S.sessionPolicy = m.sessionPolicy; },

@@ -26,8 +26,8 @@ export function normEmail(email) {
 const localPart = (email) => email.split("@")[0];
 const pub = (r) => ({ id: r.id, login: r.login, name: r.name, role: r.role, active: r.active, mustChangePassword: r.must_change_password, settings: r.settings || {},
   email: r.email || null, hasPassword: r.password_hash !== NO_PASSWORD, googleLinked: Boolean(r.google_sub),
-  lastLoginAt: r.last_login_at || null, createdAt: r.created_at || null, lockedUntil: r.locked_until || null, statsAccess: r.stats_access === true, ...(r.analyses !== undefined ? { analyses: Number(r.analyses) } : {}) });
-// statsAccess здесь — ВЫДАННЫЙ флаг, а не вычисленное право: в списке пользователей админ должен видеть, кому он его дал.
+  lastLoginAt: r.last_login_at || null, createdAt: r.created_at || null, lockedUntil: r.locked_until || null, statsAccess: r.stats_access === true, ideasAccess: r.ideas_access === true, ...(r.analyses !== undefined ? { analyses: Number(r.analyses) } : {}) });
+// statsAccess и ideasAccess здесь — ВЫДАННЫЕ флаги, а не вычисленные права: в списке пользователей админ должен видеть, кому он их дал.
 // Вычисленное право (роль admin или флаг) собирается в server/index.js — там, где решается доступ.
 
 export function normLogin(login) { return String(login ?? "").trim().toLowerCase(); }
@@ -73,9 +73,11 @@ export function createUsers(db, sessions, opts = {}) {
 
   /** Изменение имени, роли, активности. Нельзя оставить систему без активного администратора (FR-009). */
   async function updateUser(id, patch = {}) {
-    const { name, role, active, statsAccess } = patch; checkFields({ name, role });
+    const { name, role, active, statsAccess, ideasAccess } = patch; checkFields({ name, role });
     // Право на раздел «Статистика» (spec 018) — отдельная колонка, а не ключ settings: settings пишет сам пользователь.
     if (statsAccess !== undefined && typeof statsAccess !== "boolean") throw new UserError("bad_stats_access", "statsAccess: true или false");
+    // Право на раздел «Идеи» (spec 021) — отдельная колонка по той же причине, дословно как у статистики.
+    if (ideasAccess !== undefined && typeof ideasAccess !== "boolean") throw new UserError("bad_ideas_access", "ideasAccess: true или false");
     const setEmail = "email" in patch; const email = setEmail ? normEmail(patch.email) : undefined;
     if (active !== undefined && typeof active !== "boolean") throw new UserError("bad_active", "active: true или false");
     const out = await db.tx(async (t) => {
@@ -88,8 +90,8 @@ export function createUsers(db, sessions, opts = {}) {
         if (others === 0) throw new UserError("last_admin", "Нужен хотя бы один активный администратор", 409);
       }
       if (setEmail && !email && cur.password_hash === NO_PASSWORD) throw new UserError("email_required", "У пользователя нет пароля — без почты он не сможет войти. Сначала задайте пароль", 409);
-      return (await t.query("UPDATE users SET name = $2, role = $3, active = $4, email = $5, stats_access = $6 WHERE id = $1 RETURNING *",
-        [id, next.name, next.role, next.active, setEmail ? email : cur.email, statsAccess ?? cur.stats_access])).rows[0];
+      return (await t.query("UPDATE users SET name = $2, role = $3, active = $4, email = $5, stats_access = $6, ideas_access = $7 WHERE id = $1 RETURNING *",
+        [id, next.name, next.role, next.active, setEmail ? email : cur.email, statsAccess ?? cur.stats_access, ideasAccess ?? cur.ideas_access])).rows[0];
     }).catch((e) => { if (isUnique(e, "email")) throw new UserError("email_taken", "Эта почта уже назначена другому пользователю", 409); throw e; });
     if (active === false) await sessions.destroyUserSessions(id); else sessions.forgetUser(id);
     return pub(out);

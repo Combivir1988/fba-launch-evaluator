@@ -41,5 +41,25 @@ export function createAppSettings(db, { now = () => Date.now() } = {}) {
     return sessionPolicyInfo();
   }
 
-  return { getSessionPolicy, sessionPolicyInfo, setSessionPolicy, _forget: () => { cached = null; } };
+  // Суточный потолок расхода радара (spec 021, D13). Лежит здесь же, потому что это правило
+  // для всех, а не настройка человека. 0 — потолка нет. Расход, выясняющийся потом по счёту,
+  // не годится: поэтому потолок проверяется ПЕРЕД каждым источником.
+  const CAP_KEY = "ideas_daily_cap";
+  async function getIdeasCap() {
+    try {
+      const r = (await db.query("SELECT value FROM app_settings WHERE key = $1", [CAP_KEY])).rows[0];
+      const n = Number(r?.value?.cap);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    } catch { return 0; }
+  }
+  async function setIdeasCap(cap, userId) {
+    const n = Number(cap);
+    if (!Number.isFinite(n) || n < 0) throw new UserError("invalid", "Потолок расхода: целое число, 0 — без потолка", 400);
+    await db.query(`INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ($1, $2, $3, $4)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`,
+      [CAP_KEY, JSON.stringify({ cap: Math.round(n) }), new Date(now()), userId || null]);
+    return Math.round(n);
+  }
+
+  return { getSessionPolicy, sessionPolicyInfo, setSessionPolicy, getIdeasCap, setIdeasCap, _forget: () => { cached = null; } };
 }
