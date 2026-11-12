@@ -360,7 +360,7 @@
         <div class="tile ok"><div class="k">Мои отзывы</div><div class="v">${fmtN(comp.own.reviewsMax)}</div><div class="s">медиана ${fmtN(comp.own.reviewsMedian)} · это мой актив, а не барьер</div></div>
         <div class="tile ok"><div class="k">Моя цена</div><div class="v">${fmtMoney(comp.own.priceMedian, 2)}</div><div class="s">медиана моих листингов</div></div>
       </div>`;
-    return `<h2>Конкурентная карта${bandChip(R, "band")} <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${azChip}${inc}</h2>${azBlock}${ownBlock}
+    return `<h2>Конкурентная карта${bandChip(R, "band")} <span class="chip ${comp.dominant ? "fail" : "ok"}">${comp.dominant ? "доминирующий бренд" : "без доминации"}</span>${azChip}${inc}</h2>${marketStructureBlock(R)}${azBlock}${ownBlock}
       <div class="tiles">
         <div class="tile ${comp.dominant ? "fail" : "ok"}"><div class="k">Лидер${comp.incumbent ? " (без меня)" : ""}</div><div class="v">${esc(comp.topBrand || "—")}</div><div class="s">${fmtPct(comp.topBrandShare, 1)} ${comp.source === "xray" ? "выручки" : "кликов"}</div></div>
         <div class="tile ${rb.tier === "moat" ? "fail" : rb.tier === "medium" ? "warn" : "ok"}"><div class="k">Отзывов у лидера</div><div class="v">${fmtN(rb.leaderReviews)}</div><div class="s">${rb.tier === "moat" ? "> 2000 — практически непробиваем" : rb.tier === "medium" ? "500–2000 — нужен дифференциатор + Vine" : rb.tier === "breakable" ? "< 500 — пробиваемый ров" : "—"}</div></div>
@@ -369,7 +369,7 @@
         ${isNum(comp.lethargyRevenueShare) ? `<div class="tile"><div class="k">Деньги у летаргичных</div><div class="v">${fmtPct(comp.lethargyRevenueShare)}</div><div class="s">выручки у марок, чьи отзывы обгоняют продажи</div></div>` : ""}
       </div>${cmp}
       <div class="stack" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-brands"></canvas></div>
-      <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${marketStructureBlock(R)}${lethargyTable(comp)}${cont}
+      <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${lethargyTable(comp)}${cont}
       ${my.size || myBrand ? `<p class="muted" style="font-size:.8rem">Строки, подсвеченные жёлтым — ваш бренд или ASIN. ${comp.incumbent ? "Галочка «Оценивать как новый вход» снята: в долях брендов, топ-5 и планке отзывов вашего бренда нет — там только чужие. Размер рынка считается по всей нише, включая вашу выручку." : "Галочка «Оценивать как новый вход» стоит: ваш бренд считается обычным конкурентом — это сценарий «как если бы мы заходили с нуля». Снимите её, если оцениваете расширение внутри своей ниши."}</p>` : ""}`;
   }
   /** Один вывод о структуре рынка (spec 020) и числа под ним. Без отчёта с историей вывода нет. */
