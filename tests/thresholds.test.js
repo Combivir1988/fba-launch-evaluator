@@ -84,3 +84,21 @@ test("T004 · сценарии продаж и страховой запас з�
   assert.equal(c.safetyDays, 14);
   assert.ok(c.fastFactor < 1 && c.slowFactor > 1, "быстрый разгоняется быстрее, медленный дольше");
 });
+
+test("spec 021 · группа ideas заведена, старые личные наборы деградируют мягко", () => {
+  const i = DEFAULT_THRESHOLDS.ideas;
+  assert.equal(i.thresholdMult, 3, "во сколько раз выше фона СВОЕГО раздела");
+  assert.equal(i.goalRatioMin, 1.0);
+  assert.equal(i.compareWindowDays, 90);
+  assert.equal(i.minAgeDays, 1, "пол возраста: вышедшее час назад не получает бесконечную скорость");
+  assert.equal(i.minSample, 5, "меньше — отбор не делается вовсе");
+  assert.equal(i.keepItemDays, 7);
+  assert.equal(i.failsBeforePause, 5);
+  assert.equal(i.freshShareMin, 0.5, "сторож: выборка почти без свежего = фильтр не применился");
+
+  // Набор, сохранённый ДО появления группы, грузится без ошибки и получает умолчания целиком.
+  const old = { criterion1: { passCount: 5 }, economics: { marginMin: 0.35 } };
+  const th = mergeThresholds(old);
+  assert.deepEqual(th.ideas, DEFAULT_THRESHOLDS.ideas, "новая группа целиком из умолчаний");
+  assert.equal(th.criterion1.passCount, 5, "а чужая подкрутка сохранилась");
+});

@@ -64,6 +64,12 @@ export const DEFAULT_THRESHOLDS = {
   // пороги плана вычисляются из расчёта и в настройках не хранятся.
   launchPlan: { minSessions: 300, acosDaysInRow: 7 },
   borderline: { pct: 0.15 },
+  // Радар товарных идей (spec 021). На расчёт ниши и вердикт НЕ влияет: compute() этих порогов не читает.
+  // thresholdMult — во сколько раз выше фона СВОЕГО раздела; фон — медиана, поэтому один виральный
+  // элемент его не сдвигает. minAgeDays — пол возраста: без него вышедшее час назад получило бы
+  // бесконечную скорость и заняло ленту собой. minSample — меньше элементов в окне, и отбор не делается
+  // вовсе: без фона «выделяется» не определено, а показывать всё подряд запрещено.
+  ideas: { thresholdMult: 3, goalRatioMin: 1.0, compareWindowDays: 90, minAgeDays: 1, minSample: 5, keepItemDays: 7, failsBeforePause: 5, freshShareMin: 0.5 },
   priceBand: { smallSample: 15, minSample: 5 },
   // Этап 2 — конфигурация продукта (spec 010): область страниц, кэш, пачки AI, числовые поля как дискретные
   config: { topForSchema: 40, maxAsins: 150, cacheDays: 30, batchSize: 6, numericDistinctMax: 12, minAnalogs: 5 },
