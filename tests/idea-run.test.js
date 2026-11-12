@@ -132,3 +132,36 @@ test("повторное появление поднимает счётчик с
   const held = (await db.query("SELECT max(days_held)::int AS d FROM idea_candidate")).rows[0].d;
   assert.equal(held, 2, "держится вторые сутки");
 });
+
+// ---------- сторож: таймер обхода ДОЛЖЕН запускаться живым сервером ----------
+
+test("СТОРОЖ: суточный обход запускается при старте сервера, а не только по кнопке", async () => {
+  // Это не придирка к стилю. Таймер можно написать и не вызвать: тогда он существует,
+  // раздел молча остаётся пустым, и «ещё не собирался» читается как «ничего не выделилось».
+  // Ровно это и было пропущено при первом развёртывании.
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../server/index.js", import.meta.url), "utf8");
+  // Ищем ЖИВОЙ вызов, а не упоминание: закомментированная строка совпала бы с простым поиском,
+  // и сторож дал бы ложную уверенность. Первая версия этого теста именно так и промахнулась.
+  const live = src.split("\n").some((l) => /^\s*app\.locals\.ideas\.start\(\);/.test(l));
+  assert.ok(live, "в server/index.js нет ЖИВОГО вызова ideas.start() — обход никогда не пойдёт сам");
+
+  // И сам таймер обязан быть «ненавязчивым»: иначе процесс не завершится после SIGTERM.
+  const ideasSrc = readFileSync(new URL("../server/ideas.js", import.meta.url), "utf8");
+  assert.ok(/timer\.unref\?\.\(\)/.test(ideasSrc), "таймер обхода обязан не держать процесс");
+});
+
+test("таймер не ходит в сеть, пока сутки уже обойдены", async () => {
+  const s = await addSource("Раздел");
+  const ideas = make();
+  await ideas.sweepAll();
+  const was = calls.length;
+
+  assert.equal(await ideas.dueToday(), false, "все разделы обойдены — делать нечего");
+  await ideas.sweepAll();
+  assert.equal(calls.length, was, "и повторный проход ничего не тратит");
+
+  // А как только появился новый раздел — обход снова нужен.
+  await addSource("Второй", "другая тема");
+  assert.equal(await ideas.dueToday(), true);
+});

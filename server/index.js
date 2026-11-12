@@ -411,6 +411,10 @@ if (isMain) {
     await app.locals.sessions.purgeExpired();
   } catch (e) { log("error", "bootstrap failed", { message: e.message }); process.exit(1); }
   setInterval(() => app.locals.sessions.purgeExpired().catch(() => {}), 24 * 60 * 60 * 1000).unref();
+  // Суточный обход радара (spec 021, D9). Без этой строки таймер существует, но НИКОГДА не запускается,
+  // и раздел молча остаётся пустым: «ещё не собирался» выглядело бы как «ничего не выделилось».
+  // Запускается ТОЛЬКО здесь, в живом сервере: в тестах обход вызывается явно и в сеть не ходит.
+  app.locals.ideas.start();
   const server = app.listen(cfg.port, () => log("info", "listening", { port: cfg.port, storage: db.kind, provider: cfg.mock ? "mock" : cfg.provider, model: cfg.mock ? "mock" : cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model, effort: cfg.effort }));
   server.keepAliveTimeout = 65_000;
   // Graceful shutdown: при SIGTERM (редеплой) не рвём активные AI-стримы — ждём их до DRAIN_SECONDS
