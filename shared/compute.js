@@ -24,6 +24,7 @@ import { heroListing } from "./hero-image.js";
 import { targetKeywords } from "./keywords-target.js";
 import { coverage as listingCoverage } from "./listing-coverage.js";
 import { scoreListing, listingBans } from "./listing-score.js";
+import { launchPlan } from "./launch-plan.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -88,10 +89,12 @@ export function compute(analysis) {
   if (patentsToChecklist) p.inputs = { ...p.inputs, checklist: { ...p.inputs.checklist, patentSearch: patentStatus, patentSearchFromScan: true } };
   p.challenger = challenger(p);
   p.scorecard = scorecard(p);
+  // spec 020: план измерений считается последним — ему нужны и экономика, и помесячные деньги, и вход в нишу
+  p.launchPlan = launchPlan(p, th);
   const g0 = gate0(whole);
   const results = {
     gate0: g0, criterion1: p.criterion1, economics: p.economics, budget: p.budget, traffic: p.traffic, competition: p.competition,
-    priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard,
+    priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard, launchPlan: p.launchPlan,
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p), cvrHint: hint,
     entry: p.entry, cashflow: p.cashflow,

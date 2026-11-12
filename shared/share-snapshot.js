@@ -82,6 +82,12 @@ function redactEconomics(a, source) {
   for (const k of ECON_INPUTS) delete a.inputs?.[k];
   const R = a.results || {};
   delete R.economics; delete R.budget; delete R.cashflow; // помесячные деньги — тоже закупочная экономика
+  // spec 020: пороги плана измерений считаются ИЗ экономики — безубыточный CVR и прибыль на цену.
+  // В режиме «без закупочной экономики» они обязаны уйти вместе с ней, иначе спрятанное утекает через план.
+  if (R.launchPlan) {
+    R.launchPlan = { ...R.launchPlan, thresholds: R.launchPlan.thresholds.filter((t) => t.key !== "cvr" && t.key !== "acos"),
+      pending: true, missing: [...(R.launchPlan.missing || []), "пороги конверсии и расхода на рекламу скрыты автором ссылки вместе с закупочной экономикой"] };
+  }
   if (R.borderline?.items) R.borderline.items = R.borderline.items.filter((i) => !i.economic);
   if (R.effective) R.effective = { price: R.effective.price, cpc: R.effective.cpc, cpcFromCerebro: R.effective.cpcFromCerebro, cpcSource: R.effective.cpcSource, priceFromMedian: R.effective.priceFromMedian };
   // Потолок себестоимости и реклама на единицу — это и есть закупочная экономика, только посчитанная.

@@ -58,6 +58,9 @@ export function buildAiPayload(analysis) {
         monthsAtTargetSales: r2(R.entry.reviews.atTarget?.months), monthsAtNewcomerSales: r2(R.entry.reviews.atCohort?.months) } : null,
     } : null,
     // Деньги по месяцам (spec 005): стоп-вопрос о бюджете оценивается по peakInvestment.
+    // spec 020: пороги вмешательства после запуска — посчитаны из экономики этой ниши
+    launchPlan: R.launchPlan ? { pending: R.launchPlan.pending, missing: R.launchPlan.missing,
+      thresholds: R.launchPlan.thresholds.map((t) => ({ key: t.key, label: t.label, value: r3(t.value), unit: t.unit, from: t.from })) } : null,
     cashflow: R.cashflow && !R.cashflow.pending ? { peakInvestment: r2(R.cashflow.peak),
       // spec 020: три сценария, самый требовательный и точка дозаказа
       scenarios: (R.cashflow.scenarios || []).map((x) => ({ key: x.key, rampMonths: x.rampMonths, peakInvestment: r2(x.peak), paybackMonth: x.paybackMonth, unitsPurchased: x.unitsPurchased })),

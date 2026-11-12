@@ -684,6 +684,28 @@
       <tr><td>Листингов в выдаче</td><td>${isNum(c.listingsInSearch) ? fmtN(c.listingsInSearch) + (c.listingsInSearch > 3000 ? " — высокая конкуренция" : "") : "—"}</td><td></td><td></td></tr></tbody></table></div>${regulatoryBlock(R)}`;
   }
 
+  /** План измерений после запуска (spec 020). Пороги посчитаны из экономики ЭТОЙ ниши.
+   *  Рисуется общим рендером, а не отдельным файлом: план обязан уезжать в автономный HTML
+   *  и по публичной ссылке — в отличие от раздела «Статистика», который туда намеренно не попадает. */
+  function secLaunchPlan(A, R) {
+    const p = R.launchPlan; if (!p) return "";
+    const unit = (t) => (t.unit === "доля" ? fmtPct(t.value, 1) : t.unit === "дней" ? `${fmtN(t.value)} дн.` : `${fmtN(t.value)} ${t.unit}`);
+    const rows = p.thresholds.map((t) => `<tr><td><b>${esc(t.label)}</b></td><td class="num"><b>${unit(t)}</b></td><td><small class="muted">${esc(t.from)}</small></td><td>${esc(t.action)}</td></tr>`).join("");
+    const miss = p.missing.length ? `<div class="notice info">${p.missing.map(esc).join("; ")}.</div>` : "";
+    const diag = p.diagnosis.map((d) => `<tr><td><b>${esc(d.signal)}</b></td><td>${esc(d.cause)}</td><td><small class="muted">${esc(d.check)}</small></td></tr>`).join("");
+    const list = (arr) => arr.map((x) => `<li>${esc(x)}</li>`).join("");
+    return `<h2>План измерений после запуска${p.pending ? ' <span class="chip pending">часть порогов не посчитана</span>' : ""}</h2>
+      <p class="muted">Пороги ниже посчитаны из экономики этой ниши, а не взяты из примера. Сами показатели после запуска смотрите в своём аккаунте продавца — приложение их не собирает.</p>
+      ${miss}
+      <div class="tablewrap"><table><thead><tr><th>Порог вмешательства</th><th class="num">Значение</th><th>Откуда</th><th>Что делать</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="cards" style="margin-top:.7rem">
+        <div class="card"><h4>Каждый день</h4><ul class="tight">${list(p.daily)}</ul><div class="muted">это останавливает продажи сразу</div></div>
+        <div class="card"><h4>Раз в неделю</h4><ul class="tight">${list(p.weekly)}</ul><div class="muted">здесь важно направление, а не отдельный день</div></div>
+      </div>
+      <h4 style="margin:.9rem 0 .3rem">Что проверять, когда цифры разошлись</h4>
+      <div class="tablewrap"><table><thead><tr><th>Сигнал</th><th>Вероятная причина</th><th>Что проверить</th></tr></thead><tbody>${diag}</tbody></table></div>`;
+  }
+
   function secConclusion(A, R) {
     const v = R.verdict;
     return `<h2>Выводы по правилам</h2><div class="verdict ${esc(v.ceiling)}"><div class="big">Потолок: ${esc(VLABEL[v.ceiling])}</div><div>Решающий: <b>${esc(v.decisiveGate || "—")}</b></div>
@@ -1029,6 +1051,7 @@
     "Top brand": "Доля крупнейшего бренда (1e). От 25 % бренд считается доминирующим, и включаются критерии 3–8.",
     "Концентрация": "Насколько деньги ниши собраны у немногих марок (1f): сумма квадратов долей выручки брендов, шкала 0…10 000. Меньше 1500 — за лидером есть место, 2500 и больше — рынок держат немногие.",
     "Три сценария продаж": "Одна и та же цель, но три скорости выхода на неё. Самый дорогой сценарий обычно — быстрый рост: дозаказы чаще и крупнее, и деньги кончаются тогда, когда всё получается.",
+    "План измерений после запуска": "Что отслеживать, как часто и при каких значениях вмешиваться. Пороги посчитаны из экономики ИМЕННО ЭТОЙ ниши, поэтому у другой ниши они будут другими. Сами показатели после запуска смотрите в своём аккаунте продавца.",
     "Деньги у летаргичных": "Какая доля выручки ниши приходится на марки, чьи отзывы обгоняют продажи. Ответ на вопрос «сколько здесь плохо охраняемых денег». На вердикт не влияет.",
     "Состояние брендов": "Отзывы копятся годами, а выручка мерится за месяц. Расхождение показывает марку, которую когда-то покупали все, а теперь нет — её оффер проще всего перебить.",
     "Доля отзывов": "Сколько из всех отзывов ниши собрал этот бренд. Это запас за всю жизнь листингов, а не за месяц — поэтому он и может обгонять текущую долю выручки.",
@@ -1372,7 +1395,7 @@
     ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget], ["cashflow", secCashflow, drawCashflow],
     ["traffic", secTraffic, drawTraffic], ["entry", secEntry], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
     ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)], ["config", secConfig, drawConfig],
-    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["tz", secTz], ["keywords", secKeywords], ["conclusion", secConclusion], ["ai", secAi],
+    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["launchPlan", secLaunchPlan], ["tz", secTz], ["keywords", secKeywords], ["conclusion", secConclusion], ["ai", secAi],
   ];
   // ---------- сворачивание секций ----------
   // Открытыми остаются только основные показатели и гейты; остальное разворачивается стрелкой.
@@ -1422,7 +1445,7 @@
     }, true);
   }
 
-  const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "cashflow", "entry", "pricing", "borderline", "challenger", "scorecard", "conclusion", "ai"];
+  const ECON_DEPENDENT = ["hero", "overview", "economics", "budget", "cashflow", "entry", "pricing", "borderline", "challenger", "scorecard", "launchPlan", "conclusion", "ai"];
 
   function render(container, A, opts = {}) {
     chartDefaults(); initTips(); container.__opts = { ...(container.__opts || {}), ...opts };
