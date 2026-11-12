@@ -369,9 +369,22 @@
         ${isNum(comp.lethargyRevenueShare) ? `<div class="tile"><div class="k">Деньги у летаргичных</div><div class="v">${fmtPct(comp.lethargyRevenueShare)}</div><div class="s">выручки у марок, чьи отзывы обгоняют продажи</div></div>` : ""}
       </div>${cmp}
       <div class="stack" style="margin-top:.8rem"><div class="chartbox tall"><canvas id="ch-brands"></canvas></div>
-      <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${lethargyTable(comp)}${cont}
+      <div class="tablewrap" style="max-height:420px;overflow:auto"><table>${rows}</table></div></div>${marketStructureBlock(R)}${lethargyTable(comp)}${cont}
       ${my.size || myBrand ? `<p class="muted" style="font-size:.8rem">Строки, подсвеченные жёлтым — ваш бренд или ASIN. ${comp.incumbent ? "Галочка «Оценивать как новый вход» снята: в долях брендов, топ-5 и планке отзывов вашего бренда нет — там только чужие. Размер рынка считается по всей нише, включая вашу выручку." : "Галочка «Оценивать как новый вход» стоит: ваш бренд считается обычным конкурентом — это сценарий «как если бы мы заходили с нуля». Снимите её, если оцениваете расширение внутри своей ниши."}</p>` : ""}`;
   }
+  /** Один вывод о структуре рынка (spec 020) и числа под ним. Без отчёта с историей вывода нет. */
+  const MS_CLS = { room: "ok", fragmented: "warn", consolidating: "fail", shrinking: "fail", steady: "" };
+  function marketStructureBlock(R) {
+    const m = R.marketStructure; if (!m) return "";
+    if (!m.verdict) return `<p class="muted" style="font-size:.8rem;margin-top:.6rem">${esc(m.note || "")}</p>`;
+    const pct = (v) => (isNum(v) ? `${v > 0 ? "+" : "\u2212"}${fmtN(Math.abs(v) * 100, 1)} п.п.` : "\u2014");
+    return `<div class="notice ${MS_CLS[m.verdict] || "info"}" style="margin-top:.7rem">
+      <b>Структура рынка:</b> ${esc(m.text)}
+      <div class="muted" style="margin-top:.3rem">${esc(m.demandDirection.label)} ${fmtPct(m.demandDirection.value, 0)} за год ·
+      ${esc(m.concentrationDirection.label)}: доля топ-5 ${fmtPct(m.concentrationDirection.now, 0)} против ${fmtPct(m.concentrationDirection.yearAgo, 0)} год назад (${pct(m.concentrationDirection.value)})${
+        isNum(m.concentrationLevel) ? ` · уровень концентрации сейчас ${fmtN(Math.round(m.concentrationLevel))}` : ""}</div></div>`;
+  }
+
   /** Состояние брендов (spec 019): отзывы — накопленный за годы запас, выручка — текущий месяц.
    *  Расхождение и есть летаргия: марка, которую когда-то покупали все, а теперь нет. Решений не меняет. */
   const LETH_LABEL = { giant: ["спящий гигант", "ok"], tired: ["подустал", ""], efficient: ["эффективен", "warn"], normal: ["в норме", ""] };
@@ -549,12 +562,13 @@
     const ro = c.reorder?.note
       ? `<div class="muted">${esc(c.reorder.note)}</div>`
       : `<div class="muted">Дозаказывать, когда запаса остаётся на <b>${fmtN(c.reorder.days)} дн.</b> — это примерно <b>${fmtN(c.reorder.units)} шт</b>. Считается от всей цепочки (${fmtN(c.reorder.leadDays)} дн.) плюс страховой запас ${fmtN(c.reorder.safetyDays)} дн., а не от остатка на складе.</div>`;
+    const same = c.scenariosDiffer ? "" : `<div class="muted">Все три сценария дают одинаковые деньги: пик задаёт первая партия, а её размер от скорости разгона не зависит. Выбор скорости здесь ничего не меняет — смотрите на размер первой партии и срок поставки.</div>`;
     const loss = c.lossRate > 0
       ? `<div class="muted">Возвраты ${fmtPct(c.lossRate, 1)} списываются, поэтому отгрузить и закупить надо больше, чем продать: всего отгружено ${fmtN(Math.round(c.unitsShipped))} шт.</div>`
       : "";
     return `<h4 style="margin:.9rem 0 .3rem">Три сценария продаж</h4>
       <div class="tablewrap"><table><thead><tr><th>Сценарий</th><th class="num">Разгон</th><th class="num">Пик вложений</th><th class="num">Месяц пика</th><th class="num">Возврат денег</th><th class="num">Закупить</th></tr></thead><tbody>${rows}</tbody></table></div>
-      ${gap}${ro}${loss}`;
+      ${same}${gap}${ro}${loss}`;
   }
 
   function secCashflow(A, R) {
@@ -1050,7 +1064,7 @@
     "Отзывы": "Среднее и медиана числа отзывов у товаров ниши (1d). Среднее искажают гиганты, поэтому смотрите и на медиану. Меньше 300 — барьер низкий.",
     "Top brand": "Доля крупнейшего бренда (1e). От 25 % бренд считается доминирующим, и включаются критерии 3–8.",
     "Концентрация": "Насколько деньги ниши собраны у немногих марок (1f): сумма квадратов долей выручки брендов, шкала 0…10 000. Меньше 1500 — за лидером есть место, 2500 и больше — рынок держат немногие.",
-    "Три сценария продаж": "Одна и та же цель, но три скорости выхода на неё. Самый дорогой сценарий обычно — быстрый рост: дозаказы чаще и крупнее, и деньги кончаются тогда, когда всё получается.",
+    "Три сценария продаж": "Одна и та же цель, но три скорости выхода на неё. Какой дороже — зависит от ниши: быстрый рост требует более частых дозаказов, а медленный дольше держит деньги в товаре. Приложение считает все три и называет самый требовательный, а если пик задаёт первая партия — говорит, что выбор скорости ничего не меняет.",
     "План измерений после запуска": "Что отслеживать, как часто и при каких значениях вмешиваться. Пороги посчитаны из экономики ИМЕННО ЭТОЙ ниши, поэтому у другой ниши они будут другими. Сами показатели после запуска смотрите в своём аккаунте продавца.",
     "Деньги у летаргичных": "Какая доля выручки ниши приходится на марки, чьи отзывы обгоняют продажи. Ответ на вопрос «сколько здесь плохо охраняемых денег». На вердикт не влияет.",
     "Состояние брендов": "Отзывы копятся годами, а выручка мерится за месяц. Расхождение показывает марку, которую когда-то покупали все, а теперь нет — её оффер проще всего перебить.",

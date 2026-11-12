@@ -58,6 +58,10 @@ export function buildAiPayload(analysis) {
         monthsAtTargetSales: r2(R.entry.reviews.atTarget?.months), monthsAtNewcomerSales: r2(R.entry.reviews.atCohort?.months) } : null,
     } : null,
     // Деньги по месяцам (spec 005): стоп-вопрос о бюджете оценивается по peakInvestment.
+    // spec 020: один вывод о структуре рынка и числа под ним
+    marketStructure: R.marketStructure?.verdict ? { verdict: R.marketStructure.verdict, text: R.marketStructure.text,
+      demandGrowthT360: r3(R.marketStructure.demandDirection.value), top5BrandsNow: r3(R.marketStructure.concentrationDirection.now),
+      top5BrandsYearAgo: r3(R.marketStructure.concentrationDirection.yearAgo), concentrationLevel: R.marketStructure.concentrationLevel } : null,
     // spec 020: пороги вмешательства после запуска — посчитаны из экономики этой ниши
     launchPlan: R.launchPlan ? { pending: R.launchPlan.pending, missing: R.launchPlan.missing,
       thresholds: R.launchPlan.thresholds.map((t) => ({ key: t.key, label: t.label, value: r3(t.value), unit: t.unit, from: t.from })) } : null,

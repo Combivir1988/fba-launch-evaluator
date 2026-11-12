@@ -21,7 +21,7 @@ export function stripNew(results) {
   delete r.computedAt; delete r.methodologyVersion; delete r.priceBand; delete r.cvrHint;
   for (const s of r.priceSegments?.segments || []) delete s.selected;
   delete r.budget; delete r.verdict;
-  for (const k of ["entry", "cashflow", "clickPrice", "borderline", "regulatory", "dataNotes", "config", "configScope", "amazon", "priceConfig", "sourceOverlap", "hero", "patentsToChecklist", "stage3", "launchPlan"]) delete r[k]; // launchPlan — spec 020, добавочный
+  for (const k of ["entry", "cashflow", "clickPrice", "borderline", "regulatory", "dataNotes", "config", "configScope", "amazon", "priceConfig", "sourceOverlap", "hero", "patentsToChecklist", "stage3", "launchPlan", "marketStructure"]) delete r[k]; // launchPlan — spec 020, добавочный
   if (r.economics) { // spec 020: добавочные поля возвратов — на прежний расчёт не влияют
     delete r.economics.returnRate; delete r.economics.returnSource; delete r.economics.returnCost;
     delete r.economics.netGross; delete r.economics.returnsCounted; delete r.economics.returnRateSuspicious; }

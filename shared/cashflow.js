@@ -28,7 +28,7 @@ export function cashflow(inputs, th, ctx = {}) {
     firstBatchUnits: null, landed: null, peak: null, peakMonth: null, batches: 0, unitsPurchased: 0, unitsSold: 0, paybackMonth: null, endCum: null, stockUnitsEnd: null, stockValueEnd: null,
     stockoutMonths: 0, cpcMissing: cpc === null, adsReserveUsed: 0, startupCosts: startup, reviewThreshold: isNum(ctx.reviewThreshold) ? ctx.reviewThreshold : null, reviewsReachedMonth: null, first90: null, assumptions: [],
     // spec 020: возвраты, сценарии и точка дозаказа
-    lossRate: 0, unitsShipped: 0, scenarios: [], hungriest: null, budgetGap: null, reorder: null };
+    lossRate: 0, unitsShipped: 0, scenarios: [], hungriest: null, scenariosDiffer: false, budgetGap: null, reorder: null };
   if (price === null || price <= 0 || cogs === null) { out.reason = "введите цену и COGS — без себестоимости помесячный сценарий не строится"; return out; }
   if (!(perDay > 0)) { out.reason = "задайте цель продаж (штук в день)"; return out; }
   out.pending = false;
@@ -115,6 +115,11 @@ export function cashflow(inputs, th, ctx = {}) {
     };
     out.scenarios = [side("slow", t.slowFactor), own, side("fast", t.fastFactor)];
     out.hungriest = out.scenarios.reduce((a, b) => (b.peak > a.peak ? b : a)).key;
+    // Замер на 56 живых анализах 2026-11-12: три сценария реально различаются только в 32 из них.
+    // В остальных пик задаёт ПЕРВАЯ партия (её размер от скорости разгона не зависит), и три строки
+    // выглядят одинаково. Честнее сказать это словами, чем показывать видимость выбора.
+    const uniq = (f) => new Set(out.scenarios.map(f)).size;
+    out.scenariosDiffer = uniq((x) => Math.round(x.peak)) > 1 || uniq((x) => x.paybackMonth) > 1;
 
     // Предупреждение считается по ВСЕМ сценариям: проверять только медленный значило бы молчать
     // про самый вероятный способ остаться без денег.

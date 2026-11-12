@@ -25,6 +25,7 @@ import { targetKeywords } from "./keywords-target.js";
 import { coverage as listingCoverage } from "./listing-coverage.js";
 import { scoreListing, listingBans } from "./listing-score.js";
 import { launchPlan } from "./launch-plan.js";
+import { marketStructure } from "./market-structure.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -90,11 +91,14 @@ export function compute(analysis) {
   p.challenger = challenger(p);
   p.scorecard = scorecard(p);
   // spec 020: план измерений считается последним — ему нужны и экономика, и помесячные деньги, и вход в нишу
+  // spec 020: структура рынка — направление только из отчёта с историей, уровень из отчёта по листингам.
+  // Берём ВСЮ нишу (whole), а не ценовой коридор: вопрос о рынке, а не о выбранном сегменте.
+  p.marketStructure = marketStructure({ poe: whole.poe, competition: compAll }, th);
   p.launchPlan = launchPlan(p, th);
   const g0 = gate0(whole);
   const results = {
     gate0: g0, criterion1: p.criterion1, economics: p.economics, budget: p.budget, traffic: p.traffic, competition: p.competition,
-    priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard, launchPlan: p.launchPlan,
+    priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard, launchPlan: p.launchPlan, marketStructure: p.marketStructure,
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p), cvrHint: hint,
     entry: p.entry, cashflow: p.cashflow,
