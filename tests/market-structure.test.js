@@ -64,3 +64,50 @@ test("под выводом названы все числа, из которы�
   assert.ok(r.concentrationDirection.now !== undefined && r.concentrationDirection.yearAgo !== undefined);
   assert.ok(r.text && r.text.length > 20, "вывод сформулирован словами");
 });
+
+test("несколько ниш POE: направление берётся по числу брендов и помечено как замена", () => {
+  // merge-poe.js обнуляет историю долей кликов при объединении ниш: доли двух разных ниш
+  // берутся от разных знаменателей и не складываются. Но число брендов складывается честно.
+  const p = {
+    nicheSummary: { searchVolumeGrowthT360: 1.3 },
+    launchPotential: {
+      top5BrandsClickShareT360: { current: 0.54, qoq: null, yoy: null, recomputed: true },
+      brandCountT360: { current: 26, qoq: 23, yoy: 31 },
+    },
+  };
+  const r = marketStructure({ poe: p, competition: { hhi: 2100 } }, TH);
+  assert.ok(r.verdict, "вывод обязан быть: данные для направления есть, просто другие");
+  assert.equal(r.concentrationDirection.proxy, true, "замена помечена");
+  assert.equal(r.concentrationDirection.proxyOf, "число брендов");
+  assert.match(r.concentrationDirection.reason, /несколько ниш POE/);
+  assert.equal(r.concentrationDirection.now, 26);
+  assert.equal(r.concentrationDirection.yearAgo, 31);
+  assert.equal(r.verdict, "consolidating", "брендов стало меньше при растущем спросе");
+});
+
+test("нет ни долей за год, ни истории числа брендов — вывода нет, и причина названа точно", () => {
+  const p = {
+    nicheSummary: { searchVolumeGrowthT360: 1.3 },
+    launchPotential: { top5BrandsClickShareT360: { current: 0.54, qoq: null, yoy: null, recomputed: true } },
+  };
+  const r = marketStructure({ poe: p, competition: { hhi: 2100 } }, TH);
+  assert.equal(r.verdict, null);
+  assert.match(r.note, /несколько ниш POE/, "причина настоящая, а не «в отчёте нет значений»");
+});
+
+test("обычный случай замену не включает", () => {
+  const r = ms(poe(0.35, 0.40, 0.55), 1200);
+  assert.equal(r.concentrationDirection.proxy, false);
+});
+
+test("спрос растёт, а расстановка сил стоит — это НЕ «ничего не меняется»", () => {
+  const r = ms(poe(1.3, 0.50, 0.50), 2100);
+  assert.equal(r.verdict, "growing_flat");
+  assert.match(r.text, /[Сс]прос растёт/, "про растущий спрос обязано быть сказано прямо");
+  assert.doesNotMatch(r.text, /^Спрос и расстановка сил почти не меняются/, "это было бы неправдой");
+});
+
+test("а вот когда и спрос стоит — тогда действительно steady", () => {
+  const r = ms(poe(0.01, 0.50, 0.50), 2100);
+  assert.equal(r.verdict, "steady");
+});

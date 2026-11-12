@@ -373,7 +373,7 @@
       ${my.size || myBrand ? `<p class="muted" style="font-size:.8rem">Строки, подсвеченные жёлтым — ваш бренд или ASIN. ${comp.incumbent ? "Галочка «Оценивать как новый вход» снята: в долях брендов, топ-5 и планке отзывов вашего бренда нет — там только чужие. Размер рынка считается по всей нише, включая вашу выручку." : "Галочка «Оценивать как новый вход» стоит: ваш бренд считается обычным конкурентом — это сценарий «как если бы мы заходили с нуля». Снимите её, если оцениваете расширение внутри своей ниши."}</p>` : ""}`;
   }
   /** Один вывод о структуре рынка (spec 020) и числа под ним. Без отчёта с историей вывода нет. */
-  const MS_CLS = { room: "ok", fragmented: "warn", consolidating: "fail", shrinking: "fail", steady: "" };
+  const MS_CLS = { room: "ok", fragmented: "warn", consolidating: "fail", shrinking: "fail", growing_flat: "", steady: "" };
   function marketStructureBlock(R) {
     const m = R.marketStructure; if (!m) return "";
     if (!m.verdict) return `<p class="muted" style="font-size:.8rem;margin-top:.6rem">${esc(m.note || "")}</p>`;
@@ -381,8 +381,11 @@
     return `<div class="notice ${MS_CLS[m.verdict] || "info"}" style="margin-top:.7rem">
       <b>Структура рынка:</b> ${esc(m.text)}
       <div class="muted" style="margin-top:.3rem">${esc(m.demandDirection.label)} ${fmtPct(m.demandDirection.value, 0)} за год ·
-      ${esc(m.concentrationDirection.label)}: доля топ-5 ${fmtPct(m.concentrationDirection.now, 0)} против ${fmtPct(m.concentrationDirection.yearAgo, 0)} год назад (${pct(m.concentrationDirection.value)})${
-        isNum(m.concentrationLevel) ? ` · уровень концентрации сейчас ${fmtN(Math.round(m.concentrationLevel))}` : ""}</div></div>`;
+      ${esc(m.concentrationDirection.label)}: ${m.concentrationDirection.proxy
+        ? `${esc(m.concentrationDirection.proxyOf)} ${fmtN(m.concentrationDirection.now)} против ${fmtN(m.concentrationDirection.yearAgo)} год назад`
+        : `доля топ-5 ${fmtPct(m.concentrationDirection.now, 0)} против ${fmtPct(m.concentrationDirection.yearAgo, 0)} год назад (${pct(m.concentrationDirection.value)})`}${
+        isNum(m.concentrationLevel) ? ` · уровень концентрации сейчас ${fmtN(Math.round(m.concentrationLevel))}` : ""}</div>${
+        m.concentrationDirection.proxy ? `<div class="muted" style="font-size:.8rem">Направление взято по ${esc(m.concentrationDirection.proxyOf)}, а не по доле кликов: ${esc(m.concentrationDirection.reason)}.</div>` : ""}</div>`;
   }
 
   /** Состояние брендов (spec 019): отзывы — накопленный за годы запас, выручка — текущий месяц.

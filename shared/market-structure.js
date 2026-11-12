@@ -22,20 +22,46 @@ export function marketStructure(p, th) {
 
   const poe = p?.poe;
   const sv = num(poe?.nicheSummary?.searchVolumeGrowthT360);
-  const top5 = poe?.launchPotential?.top5BrandsClickShareT360;
+  const lp = poe?.launchPotential;
+  const top5 = lp?.top5BrandsClickShareT360;
   const now = num(top5?.current), yearAgo = num(top5?.yoy);
 
-  if (sv === null || now === null || yearAgo === null) {
+  // Запасной источник направления. Когда в анализе НЕСКОЛЬКО ниш POE, доли кликов пересчитываются
+  // по объединённому набору (shared/merge-poe.js), и история у них обнуляется: доли двух разных ниш
+  // берутся от разных знаменателей и не складываются. Но число брендов складывается честно, и его
+  // история остаётся. Меньше брендов при растущем спросе — те же игроки забирают прирост себе.
+  // Это ДРУГАЯ мера, поэтому она помечается как замена и называется своими числами.
+  const brands = lp?.brandCountT360 || lp?.brandCount;
+  const bNow = num(brands?.current), bYear = num(brands?.yoy);
+  const merged = top5?.recomputed === true;
+
+  if (sv === null) {
     out.note = poe
-      ? "В отчёте ниши нет значений за год — направление спроса и концентрации посчитать не из чего, вывод не делается."
+      ? "В отчёте ниши нет роста поиска за год — направление спроса посчитать не из чего, вывод не делается."
       : "Отчёт ниши не загружен. Уровень концентрации виден, а направления — нет: оно считается только по истории, и выдумывать его нельзя.";
     return out;
   }
 
-  const dDelta = now - yearAgo;
   out.demandDirection = { value: sv, label: sv > DEMAND_FLAT ? "спрос растёт" : sv < -DEMAND_FLAT ? "спрос падает" : "спрос стоит на месте" };
-  out.concentrationDirection = { value: dDelta, now, yearAgo,
-    label: dDelta > CONC_FLAT ? "концентрация растёт" : dDelta < -CONC_FLAT ? "концентрация падает" : "концентрация не меняется" };
+
+  let dDelta = null;
+  if (now !== null && yearAgo !== null) {
+    dDelta = now - yearAgo;
+    out.concentrationDirection = { value: dDelta, now, yearAgo, proxy: false,
+      label: dDelta > CONC_FLAT ? "концентрация растёт" : dDelta < -CONC_FLAT ? "концентрация падает" : "концентрация не меняется" };
+  } else if (bNow !== null && bYear !== null && bYear > 0) {
+    // Брендов стало меньше -> рынок сжимается, больше -> расходится. Знак противоположен числу брендов.
+    const rel = (bYear - bNow) / bYear;
+    dDelta = rel;
+    out.concentrationDirection = { value: rel, now: bNow, yearAgo: bYear, proxy: true, proxyOf: "число брендов",
+      reason: merged ? "в анализе несколько ниш POE: доли кликов пересчитаны по объединённому набору, и история у них не сохраняется" : "в отчёте нет доли топ-5 брендов за год",
+      label: rel > CONC_FLAT ? "концентрация растёт" : rel < -CONC_FLAT ? "концентрация падает" : "концентрация не меняется" };
+  } else {
+    out.note = merged
+      ? "В анализе несколько ниш POE: доли кликов пересчитаны по объединённому набору, и история у них не сохраняется — направление концентрации посчитать не из чего. Уровень «сейчас» виден, вывод не делается."
+      : "В отчёте ниши нет значений за год по концентрации — направление посчитать не из чего, вывод не делается.";
+    return out;
+  }
 
   const растёт = sv > DEMAND_FLAT, падает = sv < -DEMAND_FLAT;
   const сжимается = dDelta > CONC_FLAT, расходится = dDelta < -CONC_FLAT;
@@ -49,6 +75,11 @@ export function marketStructure(p, th) {
   } else if (растёт && сжимается) {
     out.verdict = "consolidating";
     out.text = "Спрос растёт, но доля крупнейших марок тоже — лидеры забирают прирост себе. Подвинуть их дороже: нужен заметный повод выбрать вас, а не просто присутствие.";
+  } else if (растёт) {
+    // Спрос растёт, а расстановка сил стоит. Это НЕ «ничего не меняется»: рынок прибавляет,
+    // просто прирост делится примерно как раньше. Говорить «почти не меняются» было бы неправдой.
+    out.verdict = "growing_flat";
+    out.text = "Спрос растёт, а расстановка сил почти не меняется: прирост делится между игроками примерно как раньше. Место есть, но его никто не освобождает — долю придётся отбирать, а не подбирать.";
   } else if (level !== null && level < FRAGMENTED) {
     out.verdict = "fragmented";
     out.text = "Рынок сильно раздроблен: свободное место есть, но лояльности мало и цену будут ронять. Выигрывает не тот, кто зашёл, а тот, кто удержал отличие.";
