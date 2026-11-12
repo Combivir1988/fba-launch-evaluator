@@ -10,15 +10,15 @@ import { randomUUID } from "node:crypto";
 
 const today = (now = new Date()) => now.toISOString().slice(0, 10);
 
-const SOURCE_COLS = "id, platform, handle, title, active, paused_reason, threshold_mult, fails_in_row, created_by, created_at";
+const SOURCE_COLS = "id, platform, handle, title, market, active, paused_reason, threshold_mult, fails_in_row, created_by, created_at";
 // Столбцы date приводятся к тексту ЗДЕСЬ, а не разбираются потом: драйвер отдаёт их объектом Date,
 // и сравнение со строкой «сегодня» всегда ложно — молча, без единого признака ошибки.
 const RUN_COLS = `source_id, run_date::text AS run_date, status, fail_code, fail_message,
   seen_count, passed_count, no_metric, background, spent, via, started_at, finished_at`;
-const CAND_COLS = `id, source_id, platform, external_id, title, url, snippet, published_at,
+const CAND_COLS = `id, source_id, platform, market, external_id, title, url, snippet, published_at,
   first_seen_on::text AS first_seen_on, last_seen_on::text AS last_seen_on, days_held,
   metric, background, ratio, platforms, decision, decided_by, decided_at, analysis_id`;
-const CAND_COLS_C = `c.id, c.source_id, c.platform, c.external_id, c.title, c.url, c.snippet, c.published_at,
+const CAND_COLS_C = `c.id, c.source_id, c.platform, c.market, c.external_id, c.title, c.url, c.snippet, c.published_at,
   c.first_seen_on::text AS first_seen_on, c.last_seen_on::text AS last_seen_on, c.days_held,
   c.metric, c.background, c.ratio, c.platforms, c.decision, c.decided_by, c.decided_at, c.analysis_id`;
 
@@ -29,15 +29,15 @@ export function createIdeasStore(db) {
   const getSource = async (id) => (await db.query(`SELECT ${SOURCE_COLS} FROM idea_source WHERE id = $1`, [id])).rows[0] || null;
 
   /** Совпадение (platform, handle) ловится индексом: молча создать второй раздел за двойной расход нельзя. */
-  const findSource = async (platform, handle) =>
-    (await db.query(`SELECT ${SOURCE_COLS} FROM idea_source WHERE platform = $1 AND handle = $2`, [platform, handle])).rows[0] || null;
+  const findSource = async (platform, handle, market = "US") =>
+    (await db.query(`SELECT ${SOURCE_COLS} FROM idea_source WHERE platform = $1 AND handle = $2 AND market = $3`, [platform, handle, market])).rows[0] || null;
 
-  async function createSource({ platform, handle, title, thresholdMult = null, createdBy = null }) {
+  async function createSource({ platform, handle, title, market = "US", thresholdMult = null, createdBy = null }) {
     const id = randomUUID();
     const r = await db.query(
-      `INSERT INTO idea_source (id, platform, handle, title, threshold_mult, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${SOURCE_COLS}`,
-      [id, platform, handle, title, thresholdMult, createdBy]);
+      `INSERT INTO idea_source (id, platform, handle, title, market, threshold_mult, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${SOURCE_COLS}`,
+      [id, platform, handle, title, market, thresholdMult, createdBy]);
     return r.rows[0];
   }
 
@@ -122,9 +122,9 @@ export function createIdeasStore(db) {
   async function upsertCandidate(sourceId, date, c) {
     const r = await db.query(
       `INSERT INTO idea_candidate
-         (id, source_id, platform, external_id, title, url, snippet, published_at,
+         (id, source_id, platform, market, external_id, title, url, snippet, published_at,
           first_seen_on, last_seen_on, days_held, metric, background, ratio, platforms)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, 1, $10, $11, $12, $13)
+       VALUES ($1, $2, $3, $14, $4, $5, $6, $7, $8, $9, $9, 1, $10, $11, $12, $13)
        ON CONFLICT (source_id, external_id) DO UPDATE SET
          last_seen_on = EXCLUDED.last_seen_on,
          days_held = CASE WHEN idea_candidate.last_seen_on < EXCLUDED.last_seen_on
@@ -132,7 +132,7 @@ export function createIdeasStore(db) {
          metric = EXCLUDED.metric, background = EXCLUDED.background, ratio = EXCLUDED.ratio
        RETURNING ${CAND_COLS}`,
       [randomUUID(), sourceId, c.platform, c.externalId, c.title, c.url, c.snippet ?? null,
-        c.publishedAt ?? null, date, c.metric, c.background, c.ratio, [c.platform]]);
+        c.publishedAt ?? null, date, c.metric, c.background, c.ratio, [c.platform], c.market ?? "US"]);
     return r.rows[0];
   }
 

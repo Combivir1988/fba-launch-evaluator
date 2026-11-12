@@ -182,14 +182,15 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
 
   app.post("/api/ideas/sources", requireIdeas, jsonSmall, async (req, res) => {
     const { platform, handle, title, thresholdMult } = req.body || {};
+    const market = req.body?.market === "EU" ? "EU" : "US";
     if (!PLATFORMS.includes(platform)) return res.status(400).json({ error: "bad_platform", message: "Площадка не из списка" });
     const h = String(handle ?? "").trim(), t = String(title ?? "").trim();
     if (!h || !t) return res.status(400).json({ error: "bad_source", message: "Нужны адрес раздела и название" });
     // Совпадение ловится ДО сохранения: молча создать второй раздел за двойной расход нельзя (FR-009).
-    const dup = await ideasStore.findSource(platform, h);
+    const dup = await ideasStore.findSource(platform, h, market);
     if (dup) return res.status(409).json({ error: "duplicate", message: "Такой раздел уже заведён: «" + dup.title + "»", existing: { id: dup.id, title: dup.title } });
-    const row = await ideasStore.createSource({ platform, handle: h, title: t, thresholdMult: thresholdMult ?? null, createdBy: req.user.id });
-    log("info", "idea source added", { by: req.user.login, platform, handle: h });
+    const row = await ideasStore.createSource({ platform, handle: h, title: t, market, thresholdMult: thresholdMult ?? null, createdBy: req.user.id });
+    log("info", "idea source added", { by: req.user.login, platform, handle: h, market });
     res.status(201).json({ source: row });
   });
 

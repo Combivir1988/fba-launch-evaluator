@@ -28,6 +28,7 @@
     "Держится": "Сколько суток подряд элемент продолжает выделяться. Однодневный всплеск и то, что держится неделю, — разные вещи.",
     "Отклонение от фона": "Во сколько раз показатель выше середины своего раздела. Это мера отклонения, а не оценка товара.",
     "Расход": "Сколько потрачено на загрузку страниц. Оценка на будущее считается по числу разделов и помечена как оценка: предварительной цены без выполнения запроса служба не даёт.",
+    "Рынок": "США или Европа. У краудфандинга это разные пулы проектов — замерено. У видео область почти ничего не меняет, разницу даёт язык запроса. У канала рынка нет вовсе.",
     "За последний обход": "Числа последнего УДАЧНОГО обхода этого раздела. Если обход не удался, чисел нет вовсе — и это видно отдельно.",
     "Обход защиты": "Площадка отклоняет прямой запрос, и страница берётся через посредника. Замер: это один кредит, не двадцать пять.",
   };
@@ -39,6 +40,9 @@
     crowdfunding: { name: "Категория краудфандинга", hint: "Показывает оплаченный замысел, а не внимание" },
   };
   const pname = (p) => PLATFORM[p]?.name ?? p;
+  const MARKET = { US: "США", EU: "Европа" };
+  /** У канала рынка нет — подписывать его там было бы обещанием, которого площадка не даёт. */
+  const mchip = (s) => (s.platform === "channel" ? "" : `<span class="chip">${esc(MARKET[s.market] ?? s.market ?? "")}</span>`);
 
   // ---------- что раздел ДЕЛАЕТ и чего НЕ делает ----------
   const preamble = () => `<div class="panel section">
@@ -66,7 +70,7 @@
         : `<span class="muted"${tip("Не собрано")}>не собрано — цифр за эти сутки нет</span>`;
       const why = s.pausedReason || (r && r.status === "failed" ? r.failMessage : "");
       return `<tr>
-        <td><b>${esc(s.title)}</b><div class="muted">${esc(pname(s.platform))} · ${esc(s.handle)}</div></td>
+        <td><b>${esc(s.title)}</b> ${mchip(s)}<div class="muted">${esc(pname(s.platform))} · ${esc(s.handle)}</div></td>
         <td>${state}${why ? `<div class="muted">${esc(why)}</div>` : ""}</td>
         <td>${numbers}</td>
         <td>${r ? esc(r.date) : "—"}${r?.via ? `<div class="muted">${r.via === "direct" ? "прямым запросом" : `<span${tip("Обход защиты")}>через обход защиты</span>`}</div>` : ""}</td>
@@ -78,7 +82,7 @@
 
     const missing = d.notCollected.length
       ? `<div class="notice warn"><b>В ленте не хватает:</b> ${d.notCollected.map((s) =>
-          `${esc(s.title)} — ${esc(s.reason)}`).join("; ")}. Это <b>не</b> значит, что там ничего нет: туда не удалось посмотреть.</div>`
+          `${esc(s.title)}${s.market ? " (" + esc(MARKET[s.market] ?? s.market) + ")" : ""} — ${esc(s.reason)}`).join("; ")}. Это <b>не</b> значит, что там ничего нет: туда не удалось посмотреть.</div>`
       : `<div class="notice ok">Все заведённые разделы собраны за сегодня.</div>`;
 
     return `<div class="panel section">
@@ -96,9 +100,18 @@
         `<option value="${k}">${esc(v.name)}</option>`).join("")}</select></label>
       <label>Адрес раздела<input id="idea-handle" placeholder="имя канала, тема или номер категории"></label>
       <label>Как назвать<input id="idea-title" placeholder="чтобы узнавать в списке"></label>
+      <label${tip("Рынок")}>Рынок<select id="idea-market"><option value="US">США</option><option value="EU">Европа</option></select></label>
       <label>Своя кратность порога<input id="idea-mult" type="number" step="0.5" placeholder="пусто — общая"></label>
     </div>
     <p class="muted">${Object.values(PLATFORM).map((v) => esc(v.hint)).join(" · ")}</p>
+    <p class="muted"><b>Про рынок — честно, по замерам.</b> У краудфандинга он работает: США и Европа — это
+    <b>разные пулы проектов</b> (в общей ленте пересекаются 5 и 2 из двенадцати). У видео область поиска
+    почти ничего не меняет: при английском запросе 18–19 роликов из 20 одни и те же для любой страны.
+    Разницу там даёт <b>язык запроса</b>: тот же вопрос по-немецки дал 17 своих роликов из 20, по-польски — 20 из 23.
+    Поэтому европейский раздел видео заводится <b>отдельной строкой с фразой на местном языке</b>.
+    У канала мессенджера рынка нет вовсе — он только подписывает раздел в списке.</p>
+    <p class="muted">США и Европа — всегда <b>два отдельных раздела</b>, у каждого свой фон. Сложить их в один
+    фон было бы той же ошибкой, что сложить канал на две тысячи с каналом на два миллиона.</p>
     <button id="idea-add" class="primary mt">Завести</button>
   </details>`;
 
@@ -129,7 +142,7 @@
     const cards = d.feed.map((c) => `<div class="ideacard${c.decision === "dismissed" ? " dim" : ""}">
       <div class="ideahead">
         <a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer"><b>${esc(c.title)}</b></a>
-        <span class="chip">${esc(pname(c.platform))}</span>
+        <span class="chip">${esc(pname(c.platform))}</span>${c.market ? `<span class="chip">${esc(MARKET[c.market] ?? c.market)}</span>` : ""}
       </div>
       ${c.snippet ? `<p class="muted">${esc(c.snippet.slice(0, 300))}</p>` : ""}
       ${c.explain ? `<details class="mt"><summary>Почему это здесь</summary>
@@ -186,6 +199,7 @@
           platform: root.querySelector("#idea-platform").value,
           handle: root.querySelector("#idea-handle").value,
           title: root.querySelector("#idea-title").value,
+          market: root.querySelector("#idea-market").value,
           thresholdMult: mult === "" ? null : Number(mult),
         });
       }

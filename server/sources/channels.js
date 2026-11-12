@@ -6,6 +6,9 @@
 // не существует. Радар видит только названные каналы — и ничего больше.
 import { parseChannelPreview } from "../../shared/idea-parse.js";
 
+/** Область здесь НЕ ПРИМЕНИМА: у площадки нет ни поиска, ни разделения по странам —
+ *  человек называет канал сам. Рынок у такого раздела только подписывает его в списке. */
+export const hasMarket = false;
 export const buildUrl = (handle) => "https://t.me/s/" + encodeURIComponent(String(handle).replace(/^@/, ""));
 
 export const headers = () => ({});

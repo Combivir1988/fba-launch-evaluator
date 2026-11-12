@@ -16,8 +16,17 @@ const BASE = "https://www.youtube.com/results";
 /** Фильтр «за этот месяц». Вся выборка попадает внутрь compareWindowDays = 90. */
 export const MONTH_FILTER = "EgQIBBAB";
 
-export const buildUrl = (handle, { sp = MONTH_FILTER } = {}) =>
-  `${BASE}?search_query=${encodeURIComponent(handle)}&hl=en&gl=US&sp=${sp}`;
+/** Область поиска по рынку. ЗАМЕР 2026-11-12: сама по себе она почти ничего не меняет —
+ *  из двадцати роликов 18-19 те же самые для US, GB, DE, FR и PL при английском запросе.
+ *  Разницу даёт ЯЗЫК ЗАПРОСА: немецкий дал 17 своих роликов из 20, польский 20 из 23.
+ *  Поэтому область ставим, но в интерфейсе говорим прямо, где настоящий рычаг. */
+export const GL = { US: "US", EU: "DE" };
+
+/** hl остаётся английским при ЛЮБОЙ области и при запросе на ЛЮБОМ языке — замерено на
+ *  US, GB, DE, FR, PL и на немецком и польском запросах: текст чисел остался английским
+ *  во всех 143 роликах. Ловушку D8 закрывает именно hl, а не область. */
+export const buildUrl = (handle, { sp = MONTH_FILTER, market = "US" } = {}) =>
+  `${BASE}?search_query=${encodeURIComponent(handle)}&hl=en&gl=${GL[market] ?? GL.US}&sp=${sp}`;
 
 /** Заголовок языка дублирует параметр адреса намеренно: площадка смотрит на оба. */
 export const headers = () => ({ "accept-language": "en-US,en;q=0.9" });

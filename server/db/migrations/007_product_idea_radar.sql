@@ -13,6 +13,12 @@ CREATE TABLE idea_source (
   id             uuid PRIMARY KEY,
   platform       text NOT NULL CHECK (platform IN ('channel', 'video', 'crowdfunding')),
   handle         text NOT NULL,                 -- категория, тема или имя канала
+  -- Рынок раздела. ЗАМЕРЕНО 2026-11-12, и площадки ведут себя ПО-РАЗНОМУ:
+  --   краудфандинг — фильтр сильный: США 183 проекта, Европа 100, пересечение с общей лентой 5 и 2 из 12;
+  --   видео — область почти ничего не меняет (18-19 из 20 роликов те же), разницу даёт ЯЗЫК запроса
+  --            (запрос на немецком дал 17 своих роликов из 20, на польском 20 из 23);
+  --   канал — области нет вовсе, человек называет канал сам.
+  market         text NOT NULL DEFAULT ('US') CHECK (market IN ('US', 'EU')),
   title          text NOT NULL,                 -- как человек его назвал
   active         boolean NOT NULL DEFAULT true, -- приостановлен человеком
   paused_reason  text,                          -- приостановлен системой после отказов подряд — причина
@@ -21,7 +27,10 @@ CREATE TABLE idea_source (
   created_by     uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at     timestamptz NOT NULL DEFAULT now(),
   -- один и тот же раздел не заводится дважды: иначе одну нишу обходили бы два раза за двойной расход
-  CONSTRAINT uq_idea_source UNIQUE (platform, handle)
+  -- Рынок — часть опознавателя раздела: один и тот же запрос по США и по Европе это ДВА раздела
+  -- со СВОИМ фоном у каждого. Сложить их в один фон было бы той же ошибкой, что сложить
+  -- канал на две тысячи с каналом на два миллиона (ворота SC-003).
+  CONSTRAINT uq_idea_source UNIQUE (platform, handle, market)
 );
 
 -- Суточный обход одного раздела.
@@ -68,6 +77,9 @@ CREATE TABLE idea_candidate (
   id            uuid PRIMARY KEY,
   source_id     uuid REFERENCES idea_source(id) ON DELETE SET NULL, -- раздел удалён — кандидат остаётся
   platform      text NOT NULL,
+  -- Рынок хранится У КАНДИДАТА, а не берётся из раздела: раздел можно удалить, а идея остаётся,
+  -- и «США или Европа» — часть того, что о ней известно.
+  market        text NOT NULL DEFAULT ('US'),
   external_id   text NOT NULL,
   title         text NOT NULL,
   url           text NOT NULL,

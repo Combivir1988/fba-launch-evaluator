@@ -10,8 +10,13 @@ import { parseCrowdfundingFeed } from "../../shared/idea-parse.js";
 
 const BASE = "https://www.kickstarter.com/discover/advanced";
 
-export const buildUrl = (handle) =>
-  `${BASE}?category_id=${encodeURIComponent(handle)}&sort=popularity&state=live&format=json`;
+/** Область площадки. ЗАМЕР 2026-11-12, и здесь она РАБОТАЕТ, в отличие от видео:
+ *  без фильтра 398 проектов (US, GB, HK вперемешку), США 183, Европа 100;
+ *  пересечение с общей лентой — 5 и 2 из двенадцати. Это РАЗНЫЕ пулы, а не оттенки одного. */
+export const WOE = { US: "23424977", EU: "24865675" };
+
+export const buildUrl = (handle, { market = "US" } = {}) =>
+  `${BASE}?category_id=${encodeURIComponent(handle)}&sort=popularity&state=live&woe_id=${WOE[market] ?? WOE.US}&format=json`;
 
 export const headers = () => ({ accept: "application/json" });
 

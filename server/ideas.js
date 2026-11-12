@@ -61,7 +61,7 @@ export function createIdeas(db, store, { getCap = async () => 0, cfg = {}, thres
     if (!adapter) return { status: "failed", code: "unparsed" };
     if (!(await store.claimRun(source.id, date))) return { status: "skipped" }; // сутки уже обойдены
 
-    const url = adapter.buildUrl(source.handle);
+    const url = adapter.buildUrl(source.handle, { market: source.market });
     let res;
     try {
       res = await fetchPage(url, cfg, { headers: adapter.headers(), forceBypass: adapter.needsBypass, fetchImpl });
@@ -100,7 +100,7 @@ export function createIdeas(db, store, { getCap = async () => 0, cfg = {}, thres
     await store.saveItems(source.id, date, ranked.items.filter((i) => !i.candidate)
       .map((i) => ({ ...i, raw: { value: i.value, ageDays: i.ageDays } })));
     for (const c of ranked.items.filter((i) => i.candidate)) {
-      await store.upsertCandidate(source.id, date, { ...c, platform: source.platform, background: ranked.background });
+      await store.upsertCandidate(source.id, date, { ...c, platform: source.platform, market: source.market, background: ranked.background });
     }
     await store.finishRun(source.id, date, {
       seen: ranked.seen, passed: ranked.passed, noMetric: ranked.noMetric,
@@ -178,7 +178,7 @@ export function createIdeas(db, store, { getCap = async () => 0, cfg = {}, thres
       const r = byId.get(s.id);
       const collectedToday = r?.run_date && String(r.run_date).slice(0, 10) === today && r.status === "ok";
       return {
-        id: s.id, platform: s.platform, handle: s.handle, title: s.title,
+        id: s.id, platform: s.platform, handle: s.handle, title: s.title, market: s.market,
         active: s.active, pausedReason: s.paused_reason, thresholdMult: s.threshold_mult == null ? null : Number(s.threshold_mult),
         // ТРИ разных состояния, и они никогда не сливаются в одно:
         //   collected — собран; failed — не собран, причина названа; never — ещё ни разу.
@@ -200,7 +200,7 @@ export function createIdeas(db, store, { getCap = async () => 0, cfg = {}, thres
     return {
       sources: sourceRows,
       // Раздел называет, какого источника в ленте не хватает и почему.
-      notCollected: notCollected.map((s) => ({ id: s.id, title: s.title, platform: s.platform, reason: s.lastRun?.failMessage ?? "Ещё ни разу не собирался" })),
+      notCollected: notCollected.map((s) => ({ id: s.id, title: s.title, platform: s.platform, market: s.market, reason: s.lastRun?.failMessage ?? "Ещё ни разу не собирался" })),
       complete: notCollected.length === 0,
       // Склейка КОНСЕРВАТИВНАЯ (D10): ложная склейка прячет одну из двух вещей, и человек не узнает,
       // что она была; дубль он просто отмахнёт.
@@ -222,7 +222,7 @@ export function createIdeas(db, store, { getCap = async () => 0, cfg = {}, thres
   }
 
   const feedRow = (c) => ({
-    id: c.id, platform: c.platform, title: c.title, url: c.url, snippet: c.snippet,
+    id: c.id, platform: c.platform, market: c.market, title: c.title, url: c.url, snippet: c.snippet,
     sourceTitle: c.source_title, publishedAt: c.published_at,
     firstSeenOn: String(c.first_seen_on).slice(0, 10), lastSeenOn: String(c.last_seen_on).slice(0, 10),
     daysHeld: c.days_held, ratio: Number(c.ratio), metric: Number(c.metric), background: Number(c.background),
