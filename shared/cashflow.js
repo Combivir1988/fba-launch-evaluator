@@ -26,11 +26,21 @@ export function cashflow(inputs, th, ctx = {}) {
   const reviewRate = pos(rateIn, t.reviewRate), vine = isNum(vineIn) && vineIn >= 0 ? vineIn : t.vineReviews;
   const out = { pending: true, reason: null, rows: [], horizonMonths: horizon, rampMonths: ramp, leadDays, leadMonths: null, targetMonthly: perDay * 30, startSales: null, startSource: null,
     firstBatchUnits: null, landed: null, peak: null, peakMonth: null, batches: 0, unitsPurchased: 0, unitsSold: 0, paybackMonth: null, endCum: null, stockUnitsEnd: null, stockValueEnd: null,
-    stockoutMonths: 0, cpcMissing: cpc === null, adsReserveUsed: 0, startupCosts: startup, reviewThreshold: isNum(ctx.reviewThreshold) ? ctx.reviewThreshold : null, reviewsReachedMonth: null, first90: null, assumptions: [] };
+    stockoutMonths: 0, cpcMissing: cpc === null, adsReserveUsed: 0, startupCosts: startup, reviewThreshold: isNum(ctx.reviewThreshold) ? ctx.reviewThreshold : null, reviewsReachedMonth: null, first90: null, assumptions: [],
+    // spec 020: возвраты, сценарии и точка дозаказа
+    lossRate: 0, unitsShipped: 0, scenarios: [], hungriest: null, budgetGap: null, reorder: null };
   if (price === null || price <= 0 || cogs === null) { out.reason = "введите цену и COGS — без себестоимости помесячный сценарий не строится"; return out; }
   if (!(perDay > 0)) { out.reason = "задайте цель продаж (штук в день)"; return out; }
   out.pending = false;
   const landed = cogs + ship, payoutUnit = price - price * referral - fba, target = perDay * 30;
+
+  // spec 020: возвращённый товар списывается, значит на ту же цель по ПРОДАННЫМ единицам
+  // нужно отгрузить и закупить больше. Доля возвратов приходит контекстом из экономики;
+  // если она неизвестна — потерь нет и всё считается ровно как раньше (SC-002).
+  const rRet = num(ctx.returnRate);
+  const lossRate = rRet === null ? 0 : Math.min(0.95, Math.max(0, rRet * (1 - (th.economics?.resalableShare ?? 0))));
+  const shipFactor = 1 / (1 - lossRate);
+  out.lossRate = lossRate;
   const L = Math.max(1, Math.round(leadDays / 30)); const T = L + horizon - 1; // последний месяц сценария (продажи идут в месяцы L…T)
   out.landed = landed; out.leadMonths = L;
 
@@ -45,7 +55,7 @@ export function cashflow(inputs, th, ctx = {}) {
   const demandSum = (from, to) => { let s = 0; for (let j = from; j <= to; j++) s += demand(j); return s; };
 
   const firstIn = num(inputs.firstBatchUnits);
-  out.firstBatchUnits = Math.max(1, Math.round(isNum(firstIn) && firstIn > 0 ? firstIn : perDay * leadDays)); // по умолчанию — продажи за срок поставки
+  out.firstBatchUnits = Math.max(1, Math.round(isNum(firstIn) && firstIn > 0 ? firstIn : perDay * leadDays * shipFactor)); // по умолчанию — ОТГРУЗКА за срок поставки
 
   let stock = 0, cum = 0, minCum = 0, cumSold = 0; const arrivals = new Map();
   const order = (m, qty) => { arrivals.set(m + L, (arrivals.get(m + L) || 0) + qty); out.batches++; out.unitsPurchased += qty; return qty * landed; };
@@ -55,15 +65,21 @@ export function cashflow(inputs, th, ctx = {}) {
     if (m === 0) { row.ordered = out.firstBatchUnits; row.orderCost = order(0, row.ordered); row.startup = startup + (out.cpcMissing ? adsReserve : 0); out.adsReserveUsed = out.cpcMissing ? adsReserve : 0; }
     else {
       const onOrder = [...arrivals.values()].reduce((s, q) => s + q, 0), position = stock + onOrder;
-      if (m + L <= T && position < demandSum(m, m + L)) {
-        const leftover = Math.max(0, position - demandSum(m, m + L - 1));
-        const qty = Math.ceil(demandSum(m + L, Math.min(T, m + 2 * L)) - leftover);
+      if (m + L <= T && position < demandSum(m, m + L) * shipFactor) {
+        const leftover = Math.max(0, position - demandSum(m, m + L - 1) * shipFactor);
+        const qty = Math.ceil(demandSum(m + L, Math.min(T, m + 2 * L)) * shipFactor - leftover);
         if (qty > 0) { row.ordered = qty; row.orderCost = order(m, qty); }
       }
     }
     if (row.demand > 0) {
-      row.sold = Math.min(row.demand, stock); row.stockout = row.sold < row.demand - 1e-9; if (row.stockout) out.stockoutMonths++;
-      stock -= row.sold; row.revenue = row.sold * price; row.payout = row.sold * payoutUnit;
+      // со склада уходит ОТГРУЗКА, а продажей остаётся её часть: возвращённые единицы списываются.
+      const canShip = stock / shipFactor;
+      row.sold = Math.min(row.demand, canShip); row.stockout = row.sold < row.demand - 1e-9; if (row.stockout) out.stockoutMonths++;
+      row.shipped = row.sold * shipFactor; row.returned = row.shipped - row.sold;
+      stock -= row.shipped; out.unitsShipped += row.shipped;
+      row.revenue = row.sold * price;
+      // возвращённая единица: цену вернули покупателю, комиссию вернули нам, сбор за отправку остался уплаченным.
+      row.payout = row.sold * payoutUnit - row.returned * fba;
       const reviewsBefore = (m > L ? vine : 0) + reviewRate * cumSold; // отзывы Vine появляются к концу первого месяца продаж
       const young = isNum(out.reviewThreshold) && reviewsBefore < out.reviewThreshold;
       row.cvr = cvr * (young ? t.newListingCvrFactor : 1);
@@ -85,6 +101,35 @@ export function cashflow(inputs, th, ctx = {}) {
   // месяц возврата: первый месяц, начиная с которого итог нарастающим неотрицателен до конца горизонта
   let pay = null; for (let i = out.rows.length - 1; i >= 1; i--) { if (out.rows[i].cum >= 0) pay = out.rows[i].month; else break; }
   out.paybackMonth = pay;
+
+  // ---------- сценарии продаж (spec 020) ----------
+  // Три прогона той же модели с разной скоростью разгона; цель общая — её задаёт менеджер.
+  // Замер 2026-11-12: самый глубокий пик у БЫСТРОГО роста, а не у медленного. Медленные продажи
+  // означают более редкие и меньшие дозаказы, поэтому денег им нужно МЕНЬШЕ.
+  // Денег не хватает не когда продажи провалились, а когда они пошли.
+  if (!ctx.scenarioOnly) {
+    const own = { key: "base", rampMonths: ramp, peak: out.peak, peakMonth: out.peakMonth, paybackMonth: out.paybackMonth, batches: out.batches, unitsPurchased: out.unitsPurchased };
+    const side = (key, factor) => {
+      const r = cashflow({ ...inputs, rampMonths: Math.max(1, Math.round(ramp * factor)) }, th, { ...ctx, scenarioOnly: true });
+      return { key, rampMonths: r.rampMonths, peak: r.peak, peakMonth: r.peakMonth, paybackMonth: r.paybackMonth, batches: r.batches, unitsPurchased: r.unitsPurchased };
+    };
+    out.scenarios = [side("slow", t.slowFactor), own, side("fast", t.fastFactor)];
+    out.hungriest = out.scenarios.reduce((a, b) => (b.peak > a.peak ? b : a)).key;
+
+    // Предупреждение считается по ВСЕМ сценариям: проверять только медленный значило бы молчать
+    // про самый вероятный способ остаться без денег.
+    const budget = num(inputs.budget);
+    const worst = out.scenarios.find((x) => x.key === out.hungriest);
+    out.budgetGap = isNum(budget) && budget > 0 && worst.peak > budget
+      ? { scenario: worst.key, need: worst.peak, budget, amount: worst.peak - budget } : null;
+  }
+
+  // ---------- точка дозаказа ----------
+  // Считается от всей цепочки поставки, а не от остатка: решение принимают за недели до того,
+  // как покупатели увидят, что товара мало.
+  out.reorder = leadDays > 0
+    ? { days: leadDays + t.safetyDays, units: Math.round(perDay * (leadDays + t.safetyDays) * shipFactor), leadDays, safetyDays: t.safetyDays, note: null }
+    : { days: null, units: null, leadDays, safetyDays: t.safetyDays, note: "срок поставки не задан — точку дозаказа считать не от чего" };
 
   out.assumptions.push(`разгон продаж за ${ramp} мес. от ${Math.round(out.startSales)} шт/мес (${{ input: "задано вручную", cohort: "медиана продаж новичков ниши", zero: "данных о новичках нет — с нуля" }[out.startSource]}) до ${Math.round(target)} шт/мес`);
   out.assumptions.push(`срок поставки ${leadDays} дн. ≈ ${L} мес.; партия оплачивается целиком при заказе`);

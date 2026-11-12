@@ -531,6 +531,32 @@
     if (c.startSource === "cohort") return `<div class="notice info" style="margin-top:.6rem"><b>Продажи стартуют с ${fmtN(c.startSales)} шт/мес</b> — медиана продаж новичков ниши — и растут до цели ${fmtN(c.targetMonthly)} шт/мес за ${fmtN(c.rampMonths)} мес. Другой старт — поле «Стартовые продажи, шт/мес» в панели.</div>`;
     return `<div class="notice info" style="margin-top:.6rem"><b>Стартовые продажи заданы вручную: ${fmtN(c.startSales)} шт/мес</b>, разгон до ${fmtN(c.targetMonthly)} шт/мес за ${fmtN(c.rampMonths)} мес.</div>`;
   }
+  /** Три сценария продаж и точка дозаказа (spec 020). Самый дорогой сценарий — обычно УСПЕХ:
+   *  продажи идут, дозаказы чаще и крупнее, касса кончается, когда всё получается. */
+  const SCEN = { slow: "Медленный старт", base: "Ожидаемый", fast: "Быстрый рост" };
+  function scenariosBlock(c) {
+    if (!c.scenarios?.length) return "";
+    const rows = c.scenarios.map((x) => `<tr class="${x.key === c.hungriest ? "leader" : ""}">
+        <td>${SCEN[x.key] || x.key}${x.key === c.hungriest ? ' <span class="chip warn">нужно больше всего денег</span>' : ""}</td>
+        <td class="num">${fmtN(x.rampMonths)} мес</td>
+        <td class="num"><b>${fmtMoney(x.peak)}</b></td>
+        <td class="num">${x.peakMonth ?? 0}</td>
+        <td class="num">${x.paybackMonth !== null ? "месяц " + x.paybackMonth : "не наступает"}</td>
+        <td class="num">${fmtN(x.unitsPurchased)}</td></tr>`).join("");
+    const gap = c.budgetGap
+      ? `<div class="notice fail">Бюджета не хватает на сценарий «${SCEN[c.budgetGap.scenario] || c.budgetGap.scenario}»: нужно ${fmtMoney(c.budgetGap.need)}, есть ${fmtMoney(c.budgetGap.budget)} — не хватает <b>${fmtMoney(c.budgetGap.amount)}</b>. Денег чаще всего не хватает не когда продажи провалились, а когда они пошли: дозаказы становятся чаще и крупнее.</div>`
+      : "";
+    const ro = c.reorder?.note
+      ? `<div class="muted">${esc(c.reorder.note)}</div>`
+      : `<div class="muted">Дозаказывать, когда запаса остаётся на <b>${fmtN(c.reorder.days)} дн.</b> — это примерно <b>${fmtN(c.reorder.units)} шт</b>. Считается от всей цепочки (${fmtN(c.reorder.leadDays)} дн.) плюс страховой запас ${fmtN(c.reorder.safetyDays)} дн., а не от остатка на складе.</div>`;
+    const loss = c.lossRate > 0
+      ? `<div class="muted">Возвраты ${fmtPct(c.lossRate, 1)} списываются, поэтому отгрузить и закупить надо больше, чем продать: всего отгружено ${fmtN(Math.round(c.unitsShipped))} шт.</div>`
+      : "";
+    return `<h4 style="margin:.9rem 0 .3rem">Три сценария продаж</h4>
+      <div class="tablewrap"><table><thead><tr><th>Сценарий</th><th class="num">Разгон</th><th class="num">Пик вложений</th><th class="num">Месяц пика</th><th class="num">Возврат денег</th><th class="num">Закупить</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${gap}${ro}${loss}`;
+  }
+
   function secCashflow(A, R) {
     const c = R.cashflow; if (!c) return "";
     if (c.pending) return `<h2>Деньги по месяцам <span class="chip pending">ожидает данных</span></h2><div class="notice info">${esc(c.reason || "")}.</div>`;
@@ -545,7 +571,7 @@
       </div>
       ${startNote(c, R)}
       <div class="stack" style="margin-top:.8rem"><div class="chartbox"><canvas id="ch-cash"></canvas></div>
-      <div class="tablewrap" style="max-height:420px;overflow:auto"><table class="cashtable"><thead><tr><th>Месяц</th><th class="num">Заказ, шт</th><th class="num">Оплата партии</th><th class="num">Продано</th><th class="num">Поступления</th><th class="num">Реклама</th><th class="num">За месяц</th><th class="num">Итог</th><th class="num">Склад</th><th class="num">Отзывы</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+      <div class="tablewrap" style="max-height:420px;overflow:auto"><table class="cashtable"><thead><tr><th>Месяц</th><th class="num">Заказ, шт</th><th class="num">Оплата партии</th><th class="num">Продано</th><th class="num">Поступления</th><th class="num">Реклама</th><th class="num">За месяц</th><th class="num">Итог</th><th class="num">Склад</th><th class="num">Отзывы</th></tr></thead><tbody>${rows}</tbody></table></div></div>${scenariosBlock(c)}
       <p class="muted" style="font-size:.8rem">Поступления — выручка минус комиссия Amazon и FBA. Себестоимость списывается один раз, при оплате партии, и с продаж повторно не вычитается. Допущения сценария: ${esc(c.assumptions.join("; "))}. Горизонт, разгон, первая партия и стартовые расходы задаются в панели «Экономика и бюджет». Критерий 2 считает свои 90 дней на целевом уровне продаж; здесь продажи идут по разгону — обе цифры показаны рядом в строках 2g–2i.</p>`;
   }
   function drawCashflow(container, R) {
@@ -1002,6 +1028,7 @@
     "Отзывы": "Среднее и медиана числа отзывов у товаров ниши (1d). Среднее искажают гиганты, поэтому смотрите и на медиану. Меньше 300 — барьер низкий.",
     "Top brand": "Доля крупнейшего бренда (1e). От 25 % бренд считается доминирующим, и включаются критерии 3–8.",
     "Концентрация": "Насколько деньги ниши собраны у немногих марок (1f): сумма квадратов долей выручки брендов, шкала 0…10 000. Меньше 1500 — за лидером есть место, 2500 и больше — рынок держат немногие.",
+    "Три сценария продаж": "Одна и та же цель, но три скорости выхода на неё. Самый дорогой сценарий обычно — быстрый рост: дозаказы чаще и крупнее, и деньги кончаются тогда, когда всё получается.",
     "Деньги у летаргичных": "Какая доля выручки ниши приходится на марки, чьи отзывы обгоняют продажи. Ответ на вопрос «сколько здесь плохо охраняемых денег». На вердикт не влияет.",
     "Состояние брендов": "Отзывы копятся годами, а выручка мерится за месяц. Расхождение показывает марку, которую когда-то покупали все, а теперь нет — её оффер проще всего перебить.",
     "Доля отзывов": "Сколько из всех отзывов ниши собрал этот бренд. Это запас за всю жизнь листингов, а не за месяц — поэтому он и может обгонять текущую долю выручки.",

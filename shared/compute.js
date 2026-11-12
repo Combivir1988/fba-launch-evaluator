@@ -74,7 +74,9 @@ export function compute(analysis) {
   const compWhole = band.active ? compAll : p.competition;
   const refDate = new Date(whole.poe?.meta?.capturedAt || analysis.createdAt || Date.now());
   p.entry = entryFeasibility(whole, { refDate: Number.isNaN(refDate.getTime()) ? new Date() : refDate, nicheReviewMedian: compWhole.reviewBarrier?.median ?? null, leaderReviews: compWhole.reviewBarrier?.leaderReviews ?? null });
-  p.cashflow = cashflow({ ...inputs, price, cpc }, th, { cohortSalesMedian: p.entry.cohort.ok ? p.entry.cohort.salesMedian : null, reviewThreshold: p.entry.reviews.threshold });
+  p.cashflow = cashflow({ ...inputs, price, cpc }, th, { cohortSalesMedian: p.entry.cohort.ok ? p.entry.cohort.salesMedian : null, reviewThreshold: p.entry.reviews.threshold,
+    // spec 020: берём уже разрешённую долю (ручной ввод победил отчёт), чтобы модель и экономика говорили об одном
+    returnRate: p.economics.returnRate });
   p.budget = budget({ ...inputs, price }, th, { cash: p.cashflow, roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value, revenueSource: p.criterion1.items["1a"].source });
   // Промо по нише (spec 014): если чеклист «Купоны/дилы» не заполнен вручную — берём из промо листингов этапа 2
   const promo = analysis.config?.table ? promoStats(agg.listings, whole.xray?.asins, Object.keys(analysis.config.table.rows)) : null;

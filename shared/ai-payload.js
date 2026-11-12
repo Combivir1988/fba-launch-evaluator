@@ -58,7 +58,11 @@ export function buildAiPayload(analysis) {
         monthsAtTargetSales: r2(R.entry.reviews.atTarget?.months), monthsAtNewcomerSales: r2(R.entry.reviews.atCohort?.months) } : null,
     } : null,
     // Деньги по месяцам (spec 005): стоп-вопрос о бюджете оценивается по peakInvestment.
-    cashflow: R.cashflow && !R.cashflow.pending ? { peakInvestment: r2(R.cashflow.peak), peakMonth: R.cashflow.peakMonth, batches: R.cashflow.batches, unitsPurchased: R.cashflow.unitsPurchased, paybackMonth: R.cashflow.paybackMonth, monthsModelled: R.cashflow.rows.length - 1,
+    cashflow: R.cashflow && !R.cashflow.pending ? { peakInvestment: r2(R.cashflow.peak),
+      // spec 020: три сценария, самый требовательный и точка дозаказа
+      scenarios: (R.cashflow.scenarios || []).map((x) => ({ key: x.key, rampMonths: x.rampMonths, peakInvestment: r2(x.peak), paybackMonth: x.paybackMonth, unitsPurchased: x.unitsPurchased })),
+      hungriestScenario: R.cashflow.hungriest, budgetGap: R.cashflow.budgetGap && r2(R.cashflow.budgetGap.amount),
+      reorderAtDays: R.cashflow.reorder?.days ?? null, reorderAtUnits: R.cashflow.reorder?.units ?? null, lossRate: r3(R.cashflow.lossRate), peakMonth: R.cashflow.peakMonth, batches: R.cashflow.batches, unitsPurchased: R.cashflow.unitsPurchased, paybackMonth: R.cashflow.paybackMonth, monthsModelled: R.cashflow.rows.length - 1,
       endBalance: r2(R.cashflow.endCum), stockValueAtEnd: r2(R.cashflow.stockValueEnd), stockoutMonths: R.cashflow.stockoutMonths, startSalesMonthly: r2(R.cashflow.startSales), startSource: R.cashflow.startSource, targetSalesMonthly: R.cashflow.targetMonthly,
       first90DaysByRampScenario: R.cashflow.first90 && { units: r2(R.cashflow.first90.units), revenue: r2(R.cashflow.first90.revenue), ads: r2(R.cashflow.first90.ads), profit: r2(R.cashflow.first90.profit), note: "те же 90 дней, что criterion2 2g–2i, но по сценарию разгона; criterion2 считает их на целевом уровне продаж" }, assumptions: R.cashflow.assumptions } : null,
     clickWeightedPrice: R.clickPrice ? { value: r2(R.clickPrice.value), simpleAvg: r2(R.clickPrice.simpleAvg), median: r2(R.clickPrice.median), myPriceGap: r3(R.clickPrice.myPriceGap), flags: R.clickPrice.flags, note: "цена ниши, взвешенная долей кликов (POE, средние за 360 дней)" } : null,
