@@ -8,7 +8,10 @@ const r2 = (v) => round(v, 2), r3 = (v) => round(v, 3);
 export function buildAiPayload(analysis) {
   const R = analysis.results; if (!R) throw new Error("Сначала рассчитайте дашборд");
   const agg = analysis.aggregates || {}; const inp = analysis.inputs || {};
-  const c1 = Object.fromEntries(Object.entries(R.criterion1.items).map(([k, i]) => [k, { value: i.pct ? r3(i.value) : r2(i.value), unit: i.unit, status: i.status, source: i.source, threshold: i.threshold, note: i.note }]));
+  const c1 = Object.fromEntries(Object.entries(R.criterion1.items).map(([k, i]) => [k, { value: i.pct ? r3(i.value) : r2(i.value), unit: i.unit, status: i.status, source: i.source, threshold: i.threshold, note: i.note,
+    // spec 022: подпункт может решать не по value (1d решает по медиане). Без этого модель напишет
+    // вывод по числу, которое ни на что не влияло — живой прецедент spec 020 с патентным сканом.
+    ...(i.decidedBy === "median" ? { median: r2(i.median), decidedBy: "median", decidedValue: r2(i.median) } : {}) }]));
   const eco = R.economics;
   const payload = {
     niche: analysis.niche, coreKeyword: analysis.coreKeyword, marketplace: analysis.marketplace,
@@ -54,7 +57,10 @@ export function buildAiPayload(analysis) {
       newEntrants: R.entry.cohort.ok ? { count: R.entry.cohort.size, ofProducts: R.entry.cohort.population, excluded: R.entry.cohort.excluded, salesMedianMonthly: r2(R.entry.cohort.salesMedian), salesRange: [r2(R.entry.cohort.salesP25), r2(R.entry.cohort.salesP75)],
         reviewsMedian: r2(R.entry.cohort.reviewsMedian), reviewsKind: R.entry.cohort.reviewsSource === "poe" ? "только отзывы с текстом (POE)" : "все оценки (Xray)", clickShareMedian: r3(R.entry.cohort.shareMedian),
         top: R.entry.cohort.members.slice(0, 6).map((m) => ({ asin: m.asin, brand: m.brand, ageMonths: m.ageMonths, clickShare: r3(m.share), salesMonthly: m.sales, reviews: m.reviews })) } : { unavailable: R.entry.cohort.reason },
-      reviews: R.entry.reviews.ok ? { threshold: r2(R.entry.reviews.threshold), thresholdFrom: R.entry.reviews.thresholdFrom, leaderReviews: R.entry.reviews.leaderReviews, reviewRate: R.entry.reviews.reviewRate, reviewRateIsAssumption: R.entry.reviews.reviewRateAssumed, vineReviews: R.entry.reviews.vineReviews,
+      reviews: R.entry.reviews.ok ? { threshold: r2(R.entry.reviews.threshold), thresholdFrom: R.entry.reviews.thresholdFrom, leaderReviews: R.entry.reviews.leaderReviews, reviewRate: R.entry.reviews.reviewRate, reviewRateIsAssumption: R.entry.reviews.reviewRateAssumed,
+        // spec 022: откуда взялась доля — из когорты ниши, из умолчания или введена вручную.
+        // Без этого модель не отличит посчитанное от допущенного и напишет о них одинаково уверенно.
+        reviewRateSource: R.entry.reviews.reviewRateSource, vineReviews: R.entry.reviews.vineReviews,
         monthsAtTargetSales: r2(R.entry.reviews.atTarget?.months), monthsAtNewcomerSales: r2(R.entry.reviews.atCohort?.months) } : null,
     } : null,
     // Деньги по месяцам (spec 005): стоп-вопрос о бюджете оценивается по peakInvestment.

@@ -28,7 +28,11 @@ test("секция «Вход в нишу»: продажи на 1 % клико�
   assert.ok(t.includes(`${E.reach.productsWithShare} из ${E.reach.productsTotal}`)); assert.match(t, /достижимо|на пределе|выше достигнутого/);
   assert.match(t, /Новые участники/); assert.ok(t.includes(`${E.cohort.size} из ${E.cohort.population} товаров`)); assert.match(t, /возраст от 2 до 24 месяцев/); assert.match(t, /всех оценок \(Xray\)/);
   assert.equal(el.querySelectorAll("#sec-entry table tbody tr").length, E.cohort.members.length);
-  assert.match(t, /Срок до планки отзывов/); assert.match(t, /При целевых продажах/); assert.match(t, /При продажах новичков/); assert.match(t, /допущение/);
+  assert.match(t, /Срок до планки отзывов/); assert.match(t, /При целевых продажах/); assert.match(t, /При продажах новичков/);
+  // spec 022: доля с отзывом БОЛЬШЕ не допущение там, где её можно посчитать по когорте ниши.
+  // На этой фикстуре когорта даёт 7,7 % против прежних допущенных 2 % — срок был завышен вчетверо.
+  assert.match(t, /посчитана по новичкам этой ниши/);
+  assert.doesNotMatch(t, /Доля покупателей с отзывом — допущение/, "когорта есть — называть это допущением было бы неправдой");
   assert.match(t, /Особенности данных POE \(3\)/); assert.match(t, /только отзывы с текстом/);
   const order = [...el.querySelectorAll("[data-section]")].map((s) => s.dataset.section);
   assert.ok(order.indexOf("cashflow") === order.indexOf("budget") + 1); assert.ok(order.indexOf("entry") === order.indexOf("traffic") + 1); assert.ok(order.indexOf("borderline") < order.indexOf("checklist"));
@@ -75,7 +79,9 @@ test("цена по кликам, пограничные значения и р�
 test("FR-012: AI получает вход в нишу, деньги по месяцам, пограничные и триггеры; промпт обязывает их использовать", () => {
   const a = entryFixture(); a.niche = "disinfectant wipes"; a.results = compute(a); const p = buildAiPayload(a);
   assert.ok(p.entry.salesPer1pctClicks.median > 0); assert.equal(p.entry.reach.targetUnitsMonthly, 300); assert.equal(p.entry.reach.preliminary, true); assert.ok(p.entry.newEntrants.count >= 3); assert.ok(p.entry.newEntrants.top.length <= 6);
-  assert.equal(p.entry.reviews.reviewRateIsAssumption, true); assert.ok(p.cashflow.peakInvestment > 0); assert.equal(p.cashflow.rows, undefined, "строки сценария в AI не уходят"); assert.match(p.budget.basis, /пик вложений/); assert.ok(p.budget.needTwoBatchesReference > 0);
+  // spec 022: на этой фикстуре когорта даёт долю с отзывом, значит это больше НЕ допущение,
+  // и модель обязана видеть, откуда число взялось.
+  assert.equal(p.entry.reviews.reviewRateIsAssumption, false); assert.equal(p.entry.reviews.reviewRateSource, "cohort"); assert.ok(p.cashflow.peakInvestment > 0); assert.equal(p.cashflow.rows, undefined, "строки сценария в AI не уходят"); assert.match(p.budget.basis, /пик вложений/); assert.ok(p.budget.needTwoBatchesReference > 0);
   assert.ok(p.clickWeightedPrice.value > 0); assert.ok(Array.isArray(p.borderline)); assert.ok(p.regulatory.triggers.some((t) => t.agency === "EPA" && t.inNicheName)); assert.equal(p.dataNotes.length, 3);
   assert.ok(JSON.stringify(p).length < 60_000, "пейлоад остаётся компактным");
   const poor = buildAiPayload(fixtureAnalysis()); assert.match(poor.entry.salesPer1pctClicks.unavailable, /файлы от разных ниш/); assert.match(poor.entry.reach.unavailable, /файлы от разных ниш/);

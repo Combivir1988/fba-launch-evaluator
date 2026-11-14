@@ -108,3 +108,65 @@ test("Amazon как продавец: авто по Xray, «нет» польз�
   assert.equal(yes.competition.amazonSells, true); assert.equal(yes.criterion1.items["1e"].status, "fail");
   assert.match(yes.criterion1.items["1e"].note, /вручную/);
 });
+
+// ---------- spec 022, ВОРОТА SC-001: подпункт 1d судится по МЕДИАНЕ ----------
+
+import { criterion1 } from "../shared/criterion1.js";
+import { mergeThresholds } from "../shared/thresholds.js";
+import { REVIEWS_AGREE_OK, REVIEWS_AGREE_FAIL, REVIEWS_SKEWED_WARN, REVIEWS_SKEWED_OK } from "./helpers/reviews-fixture.js";
+
+const TH022 = mergeThresholds(null);
+const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+const median022 = (a) => { const s = [...a].sort((x, y) => x - y); return s.length % 2 ? s[s.length >> 1] : (s[(s.length >> 1) - 1] + s[s.length >> 1]) / 2; };
+
+/** Минимальный контекст: подпункт 1d читает только competition.reviewBarrier. */
+const c1of = (reviews, overrides = {}) => criterion1({
+  xray: null, cerebro: null, poe: null, traffic: null, thresholds: TH022,
+  inputs: { manualOverrides: overrides },
+  competition: { source: "xray", reviewBarrier: { avg: mean(reviews), median: median022(reviews), leaderReviews: Math.max(...reviews), tier: null } },
+}).items["1d"];
+
+test("ВОРОТА SC-001: статус подпункта «Отзывы по нише» определяет МЕДИАНА", () => {
+  // Среднее валит, медиана нет — статус следует медиане.
+  const warn = c1of(REVIEWS_SKEWED_WARN);          // медиана 900, среднее 14 270
+  assert.equal(warn.status, "warn", "среднее 14 270 дало бы fail; решать должна медиана 900");
+
+  const ok = c1of(REVIEWS_SKEWED_OK);              // медиана 130, среднее 7 590
+  assert.equal(ok.status, "ok", "среднее 7 590 дало бы fail; медиана 130 проходит с запасом");
+
+  // Среднее по-прежнему показывается как число — его не прячут.
+  assert.equal(Math.round(warn.value), 14270);
+  assert.equal(warn.median, 900);
+  // И видно, какая величина решила.
+  assert.equal(warn.decidedBy, "median");
+});
+
+test("ВОРОТА SC-001: где медиана и среднее согласны, не меняется НИЧЕГО", () => {
+  // Это доказательство, что затронуто только то, что должно быть затронуто.
+  assert.equal(c1of(REVIEWS_AGREE_OK).status, "ok", "медиана 200 = среднее 200");
+  assert.equal(c1of(REVIEWS_AGREE_FAIL).status, "fail", "медиана 2000 = среднее 2000");
+});
+
+test("SC-001: правило отсутствия — ноль отзывов и отсутствие данных это разное", () => {
+  const none = criterion1({
+    xray: null, cerebro: null, poe: null, traffic: null, thresholds: TH022, inputs: { manualOverrides: {} },
+    competition: { source: "xray", reviewBarrier: { avg: null, median: null, leaderReviews: null, tier: null } },
+  }).items["1d"];
+  assert.equal(none.value, null);
+  assert.equal(none.status, "na", "данных нет — это не «ноль отзывов»");
+
+  // Медианы нет, среднее есть — судим по тому, что есть, и говорим об этом.
+  const onlyAvg = criterion1({
+    xray: null, cerebro: null, poe: null, traffic: null, thresholds: TH022, inputs: { manualOverrides: {} },
+    competition: { source: "xray", reviewBarrier: { avg: 150, median: null, leaderReviews: 150, tier: null } },
+  }).items["1d"];
+  assert.equal(onlyAvg.status, "ok");
+  assert.equal(onlyAvg.decidedBy, "value", "медианы нет — решало среднее, и это названо");
+});
+
+test("SC-001: введённое вручную значение главнее медианы", () => {
+  const it = c1of(REVIEWS_SKEWED_OK, { "1d": { value: 5000 } });
+  assert.equal(it.value, 5000);
+  assert.equal(it.status, "fail", "ручной ввод решает сам");
+  assert.equal(it.decidedBy, "value");
+});

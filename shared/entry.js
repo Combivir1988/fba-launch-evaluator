@@ -126,14 +126,46 @@ export function reach(per, cohort, poe, inputs, th) {
   return out;
 }
 
+/**
+ * Spec 022, D5 — доля покупателей, оставляющих отзыв, ПО КОГОРТЕ ниши.
+ *
+ * доля участника = отзывы ÷ (продажи в месяц × возраст в месяцах)
+ *
+ * Три слоя защиты, и каждый поставлен по замеру 2026-11-14 (182 участника когорт из 30 ниш):
+ *  1. участники с долей ≥ 1 ОТБРАСЫВАЮТСЯ — отзывов не может быть больше, чем продано за всё время
+ *     жизни листинга. Это арифметика, а не выброс: унаследованные отзывы или рухнувшие продажи.
+ *     Таких 2 из 182;
+ *  2. берётся МЕДИАНА — выброс здесь норма (50-й процентиль 3,53 %, 90-й 12,18 %, 99-й 101,74 %);
+ *  3. итог ограничен потолком — на случай, когда битая не одна строка, а бо́льшая часть когорты
+ *     (есть ниша с медианой 69,26 %). Потолок 0,20 отсекает 9 участников из 182 и 2 ниши из 30.
+ *
+ * Данных не хватает — возвращается null, и наверху остаётся умолчание с пометкой «допущение».
+ * Выдуманного числа не появляется.
+ */
+export function cohortReviewRate(cohort, th) {
+  if (!cohort?.ok || !Array.isArray(cohort.members)) return null;
+  const rates = cohort.members
+    .filter((m) => isNum(m?.reviews) && isNum(m?.sales) && m.sales > 0 && isNum(m?.ageMonths) && m.ageMonths > 0)
+    .map((m) => m.reviews / (m.sales * m.ageMonths))
+    .filter((r) => r > 0 && r < 1);
+  if (rates.length < (th?.reviewRateMinMembers ?? 3)) return null;
+  const m = median(rates);
+  const cap = th?.reviewRateCap;
+  return isNum(cap) && cap > 0 ? Math.min(m, cap) : m;
+}
+
 /** Срок до планки отзывов: (планка − Vine) ÷ доля покупателей с отзывом ÷ продажи в месяц. */
-export function reviewBarrier(cohort, nicheReviewMedian, leaderReviews, inputs, th, targetMonthly) {
+export function reviewBarrier(cohort, nicheReviewMedian, leaderReviews, inputs, th, targetMonthly, resolvedRate = null) {
   const rateIn = num(inputs.reviewRate), vineIn = num(inputs.vineReviews);
-  const rate = isNum(rateIn) && rateIn > 0 ? rateIn : th.reviewRate, vine = isNum(vineIn) && vineIn >= 0 ? vineIn : th.vineReviews;
+  // Приоритет: введённое человеком → когорта → умолчание. Ручное значение не перекрывается никогда.
+  const manual = isNum(rateIn) && rateIn > 0;
+  const rate = manual ? rateIn : isNum(resolvedRate) && resolvedRate > 0 ? resolvedRate : th.reviewRate;
+  const rateSource = manual ? "input" : isNum(resolvedRate) && resolvedRate > 0 ? "cohort" : "default";
+  const vine = isNum(vineIn) && vineIn >= 0 ? vineIn : th.vineReviews;
   const fromCohort = cohort.ok && isNum(cohort.reviewsMedian);
   const threshold = fromCohort ? cohort.reviewsMedian : isNum(nicheReviewMedian) ? nicheReviewMedian : null;
   const out = { ok: threshold !== null, threshold, thresholdFrom: threshold === null ? null : fromCohort ? "cohort" : "niche", source: fromCohort ? cohort.reviewsSource : null,
-    leaderReviews: isNum(leaderReviews) ? leaderReviews : null, reviewRate: rate, reviewRateAssumed: !(isNum(rateIn) && rateIn > 0), vineReviews: vine, vineOnly: false, atTarget: null, atCohort: null };
+    leaderReviews: isNum(leaderReviews) ? leaderReviews : null, reviewRate: rate, reviewRateSource: rateSource, reviewRateAssumed: rateSource === "default", vineReviews: vine, vineOnly: false, atTarget: null, atCohort: null };
   if (threshold === null) return out;
   const rest = Math.max(0, threshold - vine); out.vineOnly = rest === 0;
   const months = (sales) => (isNum(sales) && sales > 0 ? rest / (rate * sales) : null);
@@ -187,7 +219,10 @@ export function entryFeasibility(p, ctx = {}) {
   const per = salesPerClickPct(p.xray, p.poe, th);
   const cohort = newEntrantCohort(p.xray, p.poe, th, ctx.refDate || new Date());
   const r = reach(per, cohort, p.poe, p.inputs, th);
-  const reviews = reviewBarrier(cohort, ctx.nicheReviewMedian, ctx.leaderReviews, p.inputs, thc, r.targetMonthly);
+  // spec 022, D6: доля с отзывом считается ЗДЕСЬ — тут и когорта, и пороги — и отдаётся наружу,
+  // чтобы помесячные деньги взяли ТУ ЖЕ величину. Два расчёта одной величины разойдутся при первой правке.
+  const reviews = reviewBarrier(cohort, ctx.nicheReviewMedian, ctx.leaderReviews, p.inputs, thc, r.targetMonthly,
+    cohortReviewRate(cohort, thc));
   const { rows, ...perSummary } = per; // строки по товарам в результаты не кладём — они восстанавливаются из отчётов
   return { available: Boolean(p.xray?.asins?.length || p.poe?.asinMetrics?.length), salesPerClickPct: perSummary, cohort: { ...cohort, members: cohort.members.slice(0, 12) }, reach: r, reviews };
 }

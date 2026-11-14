@@ -1,3 +1,7 @@
+// spec 022: отпечаток сдвинулся НАМЕРЕННО — подпункт 1d мерил среднее число отзывов и стал мерить
+// медиану. На этой фикстуре среднее 2429 (fail), медиана 391 (warn). Сдвинулись ровно четыре величины:
+// статус 1d, его примечание, failCount Критерия 1 и его redItems. Доказано тестом «ВОРОТА SC-003»
+// в concentration.test.js, который сравнивает два расчёта поимённо, а не по хэшу.
 // spec 003: ценовой диапазон в дашборде (jsdom), в снимке публичной ссылки и в общей истории.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -68,5 +72,5 @@ test("диапазон живёт в общей истории; старый д�
   assert.equal(opened.inputs.priceMin, 20); assert.equal(opened.inputs.priceMax, 60);
   assert.equal(compute(opened).priceBand.inCount, a.results.priceBand.inCount);
   const legacy = JSON.parse(JSON.stringify(fixtureAnalysis())); delete legacy.inputs.priceMin; delete legacy.inputs.priceMax; delete legacy.results;
-  const m = migrate(legacy); assert.equal(m.inputs.priceMin, null); assert.equal(resultsHash(compute(m)), "8c8fb00a99b54fdb");
+  const m = migrate(legacy); assert.equal(m.inputs.priceMin, null); assert.equal(resultsHash(compute(m)), "6504858a594ed7d8");
 });

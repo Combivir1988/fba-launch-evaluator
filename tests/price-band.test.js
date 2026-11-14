@@ -1,3 +1,7 @@
+// spec 022: отпечаток сдвинулся НАМЕРЕННО — подпункт 1d мерил среднее число отзывов и стал мерить
+// медиану. На этой фикстуре среднее 2429 (fail), медиана 391 (warn). Сдвинулись ровно четыре величины:
+// статус 1d, его примечание, failCount Критерия 1 и его redItems. Доказано тестом «ВОРОТА SC-003»
+// в concentration.test.js, который сравнивает два расчёта поимённо, а не по хэшу.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixtureAnalysis } from "./helpers/fixture-analysis.js";
@@ -55,11 +59,11 @@ test("applyPriceBand: счётчики, выручка и доля, исходн
 // Добавочные поля концентрации и летаргии из отпечатка исключены (tests/helpers/results-hash.js), поэтому
 // изменение отпечатка целиком объясняется именно сменой меры в 1f, а не появлением новых величин.
 test("SC-002 совместимость: без диапазона результаты те же, что до появления фильтра", () => {
-  assert.equal(resultsHash(fixtureAnalysis().results), "8c8fb00a99b54fdb");
+  assert.equal(resultsHash(fixtureAnalysis().results), "6504858a594ed7d8");
   const poeOnly = newAnalysis({ niche: "u", coreKeyword: "urinal screen deodorizer" }); poeOnly.aggregates = { poe: parsePoe(readJson(POE)) }; Object.assign(poeOnly.inputs, { price: 24.99, cogs: 4.37 });
-  assert.equal(resultsHash(compute(poeOnly)), "7f7e706f236a112a");
+  assert.equal(resultsHash(compute(poeOnly)), "73440b427310f50b");
   assert.equal(resultsHash(compute(newAnalysis({ niche: "e" }))), "f0ef040ef6e247ce");
-  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "8c8fb00a99b54fdb", "некорректный диапазон не применяется");
+  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "6504858a594ed7d8", "некорректный диапазон не применяется");
   assert.equal(bad.results.priceBand.valid, false); assert.equal(bad.results.priceBand.active, false);
   const old = migrate({ schemaVersion: 1, id: "x", niche: "старый", inputs: { cogs: 3 } }); assert.equal(old.inputs.priceMin, null); assert.equal(old.inputs.priceMax, null);
 });

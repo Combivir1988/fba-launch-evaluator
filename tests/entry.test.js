@@ -89,10 +89,18 @@ test("FR-013: ценовой диапазон не меняет трафик, к
 
 test("срок до планки отзывов: две точки продаж, Vine, допущение 2 %", () => {
   const a = entryFixture(); const rv = a.results.entry.reviews, c = a.results.entry.cohort;
-  assert.equal(rv.thresholdFrom, "cohort"); assert.equal(rv.threshold, c.reviewsMedian); assert.equal(rv.source, "xray"); assert.equal(rv.reviewRateAssumed, true); assert.equal(rv.reviewRate, 0.02); assert.equal(rv.vineReviews, 30);
-  near(rv.atTarget.months, Math.max(0, rv.threshold - 30) / (0.02 * 300)); near(rv.atCohort.months, Math.max(0, rv.threshold - 30) / (0.02 * c.salesMedian)); assert.equal(rv.atCohort.salesMonthly, c.salesMedian);
+  assert.equal(rv.thresholdFrom, "cohort"); assert.equal(rv.threshold, c.reviewsMedian); assert.equal(rv.source, "xray"); assert.equal(rv.vineReviews, 30);
+  // spec 022: доля с отзывом БОЛЬШЕ не берётся из умолчания, когда когорта позволяет её посчитать.
+  // На этой фикстуре восемь годных участников дают медиану 7,67 % — против прежних допущенных 2 %.
+  // Прежний срок до планки был завышен почти вчетверо, и это ровно то, ради чего менялось.
+  assert.equal(rv.reviewRateSource, "cohort"); assert.equal(rv.reviewRateAssumed, false);
+  assert.ok(rv.reviewRate > 0.02, "когорта этой ниши оставляет отзывы чаще умолчания: " + rv.reviewRate);
+  near(rv.atTarget.months, Math.max(0, rv.threshold - 30) / (rv.reviewRate * 300));
+  near(rv.atCohort.months, Math.max(0, rv.threshold - 30) / (rv.reviewRate * c.salesMedian)); assert.equal(rv.atCohort.salesMonthly, c.salesMedian);
   assert.ok(rv.leaderReviews > rv.threshold, "планка новичков ниже отзывов лидера");
-  const custom = entryFixture({ inputs: { reviewRate: 0.04, vineReviews: 0 } }).results.entry.reviews; assert.equal(custom.reviewRateAssumed, false); near(custom.atTarget.months, custom.threshold / (0.04 * 300));
+  const custom = entryFixture({ inputs: { reviewRate: 0.04, vineReviews: 0 } }).results.entry.reviews;
+  assert.equal(custom.reviewRateAssumed, false); assert.equal(custom.reviewRateSource, "input", "ручной ввод главнее когорты");
+  assert.equal(custom.reviewRate, 0.04); near(custom.atTarget.months, custom.threshold / (0.04 * 300));
   const cohortStub = { ok: true, reviewsMedian: 25, reviewsSource: "poe", salesMedian: 120 };
   const vineOnly = reviewBarrier(cohortStub, 400, 5000, {}, TH.cashflow, 300); assert.equal(vineOnly.vineOnly, true); assert.equal(vineOnly.atTarget.months, 0); assert.equal(vineOnly.source, "poe");
   const fallback = reviewBarrier({ ok: false, reviewsMedian: null, salesMedian: null }, 400, 5000, {}, TH.cashflow, 300); assert.equal(fallback.thresholdFrom, "niche"); assert.equal(fallback.threshold, 400); assert.equal(fallback.atCohort.months, null);
@@ -130,4 +138,46 @@ test("совпадение товаров Xray и POE: ноль = разные �
   assert.deepEqual([ok.hit, ok.share, ok.level], [5, 0.5, "ok"]);
   assert.equal(entryFixture().results.sourceOverlap.level, "ok", "фикстура с общими ASIN");
   assert.equal(fixtureAnalysis().results.sourceOverlap.level, "none", "Xray и POE из разных ниш");
+});
+
+// ---------- spec 022: доля с отзывом по когорте ----------
+
+import { cohortReviewRate } from "../shared/entry.js";
+import { RATE_PLAIN, RATE_WITH_IMPOSSIBLE, RATE_OVER_CAP, RATE_TOO_FEW } from "./helpers/reviews-fixture.js";
+
+const THC = TH.cashflow;
+const coh = (members) => ({ ok: true, members, size: members.length });
+
+test("spec 022: доля с отзывом считается по когорте — контрольные значения", () => {
+  assert.equal(cohortReviewRate(coh(RATE_PLAIN), THC), 0.10, "три участника по 10 % дают 10 %");
+});
+
+test("spec 022: невозможная доля ОТБРАСЫВАЕТСЯ, а не ограничивается", () => {
+  // 900 отзывов при 300 проданных за всё время — отзывов больше, чем продано. Это не выброс,
+  // а признак того, что строка про другое: унаследованные отзывы или рухнувшие продажи.
+  // Замер 2026-11-14: таких 2 из 182 участников.
+  assert.equal(cohortReviewRate(coh(RATE_WITH_IMPOSSIBLE), THC), 0.10,
+    "если бы её ограничили потолком вместо отбрасывания, медиана сдвинулась бы вверх");
+});
+
+test("spec 022: потолок срабатывает, когда битая бо́льшая часть когорты", () => {
+  // Доли 10 / 30 / 40 %: медиана 30 % выше потолка 20 %.
+  assert.equal(cohortReviewRate(coh(RATE_OVER_CAP), THC), THC.reviewRateCap);
+  assert.equal(THC.reviewRateCap, 0.20, "потолок выбран замером: 90-й процентиль по участникам 12,18 %");
+});
+
+test("spec 022: мало годных участников — НЕИЗВЕСТНОЕ остаётся неизвестным", () => {
+  assert.equal(cohortReviewRate(coh(RATE_TOO_FEW), THC), null, "выдуманного числа не появляется");
+  assert.equal(cohortReviewRate({ ok: false }, THC), null);
+  assert.equal(cohortReviewRate(null, THC), null);
+  // Участники без продаж или без возраста просто не участвуют.
+  assert.equal(cohortReviewRate(coh([{ reviews: 10 }, { reviews: 20, sales: 0, ageMonths: 3 }, { reviews: 5, sales: 10, ageMonths: 0 }]), THC), null);
+});
+
+test("spec 022: срок до планки и рост отзывов по месяцам берут ОДНО число", () => {
+  const R = entryFixture().results;
+  assert.equal(R.cashflow.reviewRateSource, R.entry.reviews.reviewRateSource,
+    "два расчёта одной величины разошлись бы при первой же правке");
+  // И это именно та величина, которую видит человек в сроке до планки.
+  assert.equal(R.entry.reviews.reviewRateSource, "cohort");
 });

@@ -22,8 +22,11 @@ export function cashflow(inputs, th, ctx = {}) {
   const leadDays = (num(inputs.productionDays) ?? 30) + (num(inputs.shippingDays) ?? 30) + (num(inputs.receivingDays) ?? th.budget.receivingDays);
   const horizon = Math.round(pos(num(inputs.horizonMonths), t.horizonMonths)), ramp = Math.max(1, Math.round(pos(num(inputs.rampMonths), t.rampMonths)));
   const startup = Math.max(0, num(inputs.startupCosts) ?? 0), adsReserve = Math.max(0, num(inputs.adsReserve) ?? 0);
-  const rateIn = num(inputs.reviewRate), vineIn = num(inputs.vineReviews);
-  const reviewRate = pos(rateIn, t.reviewRate), vine = isNum(vineIn) && vineIn >= 0 ? vineIn : t.vineReviews;
+  const vineIn = num(inputs.vineReviews);
+  // spec 022, D6: долю с отзывом здесь НЕ СЧИТАЕМ — она приходит контекстом уже разрешённой
+  // (ручной ввод → когорта ниши → умолчание). Свой расчёт разошёлся бы со сроком до планки отзывов.
+  const reviewRate = pos(num(ctx.reviewRate), pos(num(inputs.reviewRate), t.reviewRate));
+  const vine = isNum(vineIn) && vineIn >= 0 ? vineIn : t.vineReviews;
   const out = { pending: true, reason: null, rows: [], horizonMonths: horizon, rampMonths: ramp, leadDays, leadMonths: null, targetMonthly: perDay * 30, startSales: null, startSource: null, startCappedFrom: null,
     firstBatchUnits: null, landed: null, peak: null, peakMonth: null, batches: 0, unitsPurchased: 0, unitsSold: 0, paybackMonth: null, endCum: null, stockUnitsEnd: null, stockValueEnd: null,
     stockoutMonths: 0, cpcMissing: cpc === null, adsReserveUsed: 0, startupCosts: startup, reviewThreshold: isNum(ctx.reviewThreshold) ? ctx.reviewThreshold : null, reviewsReachedMonth: null, first90: null, assumptions: [],
@@ -41,6 +44,7 @@ export function cashflow(inputs, th, ctx = {}) {
   const lossRate = rRet === null ? 0 : Math.min(0.95, Math.max(0, rRet * (1 - (th.economics?.resalableShare ?? 0))));
   const shipFactor = 1 / (1 - lossRate);
   out.lossRate = lossRate;
+  out.reviewRateSource = ctx.reviewRateSource ?? null; // откуда взялась доля с отзывом (spec 022)
   const L = Math.max(1, Math.round(leadDays / 30)); const T = L + horizon - 1; // последний месяц сценария (продажи идут в месяцы L…T)
   out.landed = landed; out.leadMonths = L;
 

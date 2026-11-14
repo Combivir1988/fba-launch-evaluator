@@ -19,8 +19,11 @@ function candidates(R, th) {
   add({ id: "1b", label: "1b — цена ниши", value: v1("1b"), threshold: t1.priceOk, unit: "money", better: "higher", fail: "погранично" });
   add({ id: "1b-low", label: "1b — цена ниши (нижняя граница)", value: v1("1b"), threshold: t1.priceWarn, unit: "money", better: "higher", pass: "погранично" });
   add({ id: "1c", label: "1c — Adj. SV главного ключа", value: v1("1c"), threshold: t1.adjSv, unit: "num", better: "higher" });
-  add({ id: "1d", label: "1d — среднее число отзывов в нише", value: v1("1d"), threshold: t1.reviewsOk, unit: "num", better: "lower", fail: "погранично" });
-  add({ id: "1d-high", label: "1d — среднее число отзывов (верхняя граница)", value: v1("1d"), threshold: t1.reviewsFail, unit: "num", better: "lower", pass: "погранично" });
+  // spec 022: подпункт 1d судится по МЕДИАНЕ, значит и «почти прошло» считается от неё.
+  // Оставить здесь среднее значило бы держать в одном отчёте две меры одного подпункта.
+  const d1 = c1["1d"]?.decidedBy === "median" && c1["1d"]?.median != null ? c1["1d"].median : v1("1d");
+  add({ id: "1d", label: "1d — медианное число отзывов в нише", value: d1, threshold: t1.reviewsOk, unit: "num", better: "lower", fail: "погранично" });
+  add({ id: "1d-high", label: "1d — медианное число отзывов (верхняя граница)", value: d1, threshold: t1.reviewsFail, unit: "num", better: "lower", pass: "погранично" });
   add({ id: "1e", label: "1e — доля бренда-лидера", value: v1("1e"), threshold: t1.topBrandShare, unit: "pct", better: "lower" });
   // spec 019: подпункт меряет концентрацию ниши — число шкалы 0…10 000, не долю. Единица "num" в этом модуле
   // уже есть (ею пользуются 1c и 1d), новую заводить не нужно; направление «меньше — лучше» не меняется.

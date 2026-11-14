@@ -1,3 +1,11 @@
+// spec 022: отпечаток сдвинулся НАМЕРЕННО, по двум причинам, и обе — суть работы.
+// 1. Подпункт 1d мерил СРЕДНЕЕ число отзывов и стал мерить МЕДИАНУ: на этой фикстуре среднее 2429
+//    (НЕ OK), медиана 391 (погранично). Следом сдвинулись failCount и redItems Критерия 1.
+// 2. Барьер отзывов считается по тому, во что обошёлся вход новичкам, а не по накоплениям лидера:
+//    у лидера 26 511 отзывов, а когорта входила с медианой 62 — Scorecard перестал снимать 2 балла
+//    с оси конкуренции и сменил пояснение.
+// Что НЕ сдвинулось — проверяет тест «ВОРОТА SC-003» в concentration.test.js: он сравнивает два
+// расчёта поимённо и называет каждое расхождение, а не отвечает «не совпало».
 // spec 007: объединение нескольких ниш POE в один рынок.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -29,7 +37,7 @@ const analysisOf = (poe, parts) => { const a = newAnalysis({ id: "m", niche: "n"
 
 test("FR-006/SC-004: одна ниша возвращается как есть — расчёты прежние", () => {
   const a = A(); assert.equal(mergePoe([a]), a); assert.equal(mergePoe([]), null); assert.equal(mergePoe(null), null); assert.equal(a.merged, undefined);
-  assert.equal(baselineHash(mergePoe([a])), "7f7e706f236a112a"); assert.deepEqual(mergedPoeNotes(a), []);
+  assert.equal(baselineHash(mergePoe([a])), "73440b427310f50b"); assert.deepEqual(mergedPoeNotes(a), []);
 });
 
 test("SC-001/SC-002: товары и запросы без дублей, клики сложены, доли — от общих кликов (сверка ручным расчётом)", () => {
@@ -71,7 +79,7 @@ test("FR-001/FR-005: добавить, обновить, удалить нишу
   const b2 = B({ sharedAsins: 5 }); r = upsertPoePart(r.parts, b2); assert.equal(r.action, "updated"); assert.equal(r.parts.length, 2); assert.equal(r.parts[1], b2); assert.equal(poePartKey(b2), "niche-b");
   const noId = A(); noId.meta = { ...noId.meta, nicheId: null, nicheTitle: "  Some   Niche " }; assert.equal(poePartKey(noId), "some niche");
   const many = Array.from({ length: MAX_POE_PARTS }, (_, i) => { const p = A(); p.meta = { ...p.meta, nicheId: "n" + i }; return p; }); assert.throws(() => upsertPoePart(many, b), new RegExp("не больше " + MAX_POE_PARTS + " ниш"));
-  const back = mergePoe(r.parts.filter((p) => poePartKey(p) !== "niche-b")); assert.equal(back, a); assert.equal(baselineHash(back), "7f7e706f236a112a");
+  const back = mergePoe(r.parts.filter((p) => poePartKey(p) !== "niche-b")); assert.equal(back, a); assert.equal(baselineHash(back), "73440b427310f50b");
 });
 
 test("в расчёте: конверсия клика, новички и цена по кликам считаются по общему рынку; пометки, AI и снимок ссылки", () => {

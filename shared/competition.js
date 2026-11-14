@@ -87,6 +87,31 @@ const normBrand = (b) => String(b || "").toLowerCase().replace(/[’'`"]/g, "").
  * Свои листинги в нише: по названию бренда и по списку своих ASIN (второе важно, если бренд в Xray написан иначе).
  * @returns {{ brands: string[], asins: Set<string>, rows: object[] }}
  */
+/**
+ * Spec 022, D2 — ДЕЙСТВУЮЩИЙ уровень барьера отзывов.
+ *
+ * Барьер измеряется не тем, что накопил лидер, а тем, ВО ЧТО ОБОШЁЛСЯ ВХОД тем, кто вошёл недавно.
+ * Шкала та же (reviewsMoat 500 / 2000), новых порогов нет.
+ *
+ * Почему не «признак, что когорта опровергает»: такого правила не существует. Лидеры разбросаны
+ * от 2 672 до 110 459 отзывов, и любой абсолютный порог на одном конце врёт, а отношение к лидеру
+ * врёт на другом: когорта [1208, 1466, 11310] при лидере 40 981 — это 3,6 % от него, и по отношению
+ * барьер выглядел бы опровергнутым, хотя вход стоил больше тысячи отзывов. Замер 2026-11-14.
+ *
+ * Сырой уровень (reviewBarrier.tier) остаётся фактом о лидере и НЕ ТРОГАЕТСЯ: число лидера
+ * не скрывается, оно лишь перестаёт решать в одиночку.
+ */
+export function effectiveReviewBarrier({ leaderReviews = null, cohortReviewMedian = null } = {}, th) {
+  const byCohort = typeof cohortReviewMedian === "number" && Number.isFinite(cohortReviewMedian);
+  return {
+    tier: reviewTier(byCohort ? cohortReviewMedian : leaderReviews, th),
+    // «Нечем опровергнуть» и «барьер подтверждён» — разные вещи, и основание это различает.
+    basis: byCohort ? "cohort" : "leader",
+    leaderReviews: typeof leaderReviews === "number" ? leaderReviews : null,
+    cohortReviewMedian: byCohort ? cohortReviewMedian : null,
+  };
+}
+
 export function ownListings(asins, inputs = {}) {
   const wanted = normBrand(inputs.myBrand);
   const mine = new Set((inputs.myAsins || []).map((a) => String(a).toUpperCase().trim()).filter(Boolean));

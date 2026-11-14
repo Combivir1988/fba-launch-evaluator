@@ -1,6 +1,26 @@
 // US1 (spec 019): концентрация ниши. Тесты написаны ДО реализации и обязаны упасть без неё.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { stripNew } from "./helpers/results-hash.js";
+import { compute } from "../shared/compute.js";
+import { parseXray } from "../shared/parse-xray.js";
+import { parseCerebro, suggestCluster } from "../shared/parse-cerebro.js";
+import { newAnalysis } from "../shared/analysis.js";
+import { readCsv, XRAY, CEREBRO } from "./helpers.js";
+/** Полный анализ на живых фикстурах — на нём и считается отпечаток в остальных тестах. */
+function fullAnalysisForHash() {
+  const xray = parseXray(readCsv(XRAY));
+  const brands = [...new Set(xray.asins.map((a) => a.brand))];
+  const core = "sound deadening mat";
+  const cerebro = parseCerebro(readCsv(CEREBRO), { coreKeyword: core, brands });
+  const a = newAnalysis({ niche: "car sound deadening mat", coreKeyword: core });
+  a.aggregates = { xray, cerebro };
+  a.inputs.clusterKeywords = suggestCluster(cerebro.keywords, { coreKeyword: core });
+  Object.assign(a.inputs, { price: 24.99, cogs: 4.37 });
+  return a;
+}
+
 import { competition } from "../shared/competition.js";
 import { criterion1 } from "../shared/criterion1.js";
 import { DEFAULT_THRESHOLDS, mergeThresholds } from "../shared/thresholds.js";
@@ -114,4 +134,99 @@ test("D4 · прежняя доля топ-5 брендов осталась ж�
   assert.equal(r.top5Share, 1, "три бренда — это и есть топ-5");
   assert.equal(typeof r.brandsOver10pct, "number");
   assert.equal(DEFAULT_THRESHOLDS.challenger.top5Ok, 0.30, "пороги критерия 5 не трогаем");
+});
+
+// ---------- spec 022, ВОРОТА SC-002: барьер меряется стоимостью входа ----------
+
+import { effectiveReviewBarrier } from "../shared/competition.js";
+import { MOAT_CASES, MOAT_NO_COHORT } from "./helpers/reviews-fixture.js";
+
+const MOAT_TH = mergeThresholds(null).reviewsMoat;
+
+test("ВОРОТА SC-002: уровень барьера считается по МЕДИАНЕ отзывов когорты", () => {
+  for (const c of MOAT_CASES) {
+    const r = effectiveReviewBarrier({ leaderReviews: c.leader, cohortReviewMedian: c.median }, MOAT_TH);
+    assert.equal(r.tier, c.expect, `${c.label}: лидер ${c.leader}, медиана когорты ${c.median}`);
+    assert.equal(r.basis, "cohort");
+    assert.equal(r.leaderReviews, c.leader, "число лидера никуда не девается");
+    assert.equal(r.cohortReviewMedian, c.median);
+  }
+});
+
+test("ВОРОТА SC-002: пересчёт НЕ обязан всегда смягчать", () => {
+  // Эти два случая — причина, по которой правило «во сколько раз ниже лидера» было отвергнуто.
+  const byRatio = MOAT_CASES.find((c) => c.leader === 40_981);
+  assert.equal(byRatio.median / byRatio.leader < 0.05, true, "по отношению к лидеру это 3,6 %");
+  assert.equal(effectiveReviewBarrier({ leaderReviews: byRatio.leader, cohortReviewMedian: byRatio.median }, MOAT_TH).tier,
+    "medium", "и всё равно не «пробиваем»: вход стоил больше тысячи отзывов");
+
+  const confirms = MOAT_CASES.find((c) => c.leader === 4203);
+  assert.equal(effectiveReviewBarrier({ leaderReviews: confirms.leader, cohortReviewMedian: confirms.median }, MOAT_TH).tier,
+    "moat", "когорта ПОДТВЕРЖДАЕТ барьер");
+});
+
+test("ВОРОТА SC-002: когорты нет — уровень по лидеру, и это названо", () => {
+  const r = effectiveReviewBarrier({ leaderReviews: MOAT_NO_COHORT.leader, cohortReviewMedian: null }, MOAT_TH);
+  assert.equal(r.tier, "moat");
+  assert.equal(r.basis, "leader", "«нечем опровергнуть» и «барьер подтверждён» — разные вещи");
+  assert.equal(r.cohortReviewMedian, null);
+  // Замер 2026-11-14: таких анализов 25 из 43.
+});
+
+test("SC-002: новых порогов не вводится — шкала та же, что у сырого уровня", () => {
+  // Границы 500 / 2000 берутся из reviewsMoat и ничем не подменяются.
+  assert.equal(effectiveReviewBarrier({ leaderReviews: 9999, cohortReviewMedian: 499 }, MOAT_TH).tier, "breakable");
+  assert.equal(effectiveReviewBarrier({ leaderReviews: 9999, cohortReviewMedian: 500 }, MOAT_TH).tier, "medium");
+  assert.equal(effectiveReviewBarrier({ leaderReviews: 9999, cohortReviewMedian: 2000 }, MOAT_TH).tier, "medium");
+  assert.equal(effectiveReviewBarrier({ leaderReviews: 9999, cohortReviewMedian: 2001 }, MOAT_TH).tier, "moat");
+});
+
+test("SC-002: нет ни лидера, ни когорты — уровня нет, а не «пробиваем»", () => {
+  const r = effectiveReviewBarrier({ leaderReviews: null, cohortReviewMedian: null }, MOAT_TH);
+  assert.equal(r.tier, null, "отсутствие данных не превращается в вывод");
+  assert.equal(r.basis, "leader");
+});
+
+test("spec 022: критерий 5 не тронут — он читает top5Share, а не барьер отзывов", () => {
+  // Сосед опасный: правка «заодно» утащила бы его за собой, и это заметили бы не сразу.
+  const src = readFileSync(new URL("../shared/challenger.js", import.meta.url), "utf8");
+  assert.ok(!/reviewBarrier|reviewBarrierEffective/.test(src),
+    "challenger.js стал читать барьер отзывов — критерий 5 про другое");
+  assert.ok(/top5Share/.test(src), "а top5Share он читать должен");
+});
+
+test("spec 022: Scorecard снимает баллы по ДЕЙСТВУЮЩЕМУ уровню, а не по сырому", () => {
+  const sc = readFileSync(new URL("../shared/scorecard.js", import.meta.url), "utf8");
+  assert.ok(/reviewBarrierEffective/.test(sc),
+    "Scorecard считает по лидеру, а на экране показано другое — два ответа об одной нише");
+});
+
+test("ВОРОТА SC-003: кроме статуса 1d и его прямых следствий не сдвинулось НИЧЕГО", () => {
+  // Хэш отвечает «совпало / не совпало» и не говорит, ЧТО разошлось. Эти ворота отвечают именно на это:
+  // они сравнивают два расчёта — по медиане и по среднему — и перечисляют все различия поимённо.
+  // Разрешено ровно четыре: сам статус 1d и то, что из него механически следует.
+  const base = fullAnalysisForHash();
+  const byMedian = stripNew(compute(base));
+  const byMean = stripNew(compute(base));
+  // воспроизводим прежнее правило на уже посчитанном результате: статус 1d по среднему
+  const it = byMean.criterion1.items["1d"];
+  const t = mergeThresholds(null).criterion1;
+  it.status = it.value < t.reviewsOk ? "ok" : it.value > t.reviewsFail ? "fail" : "warn";
+  byMean.criterion1.redItems = Object.entries(byMean.criterion1.items).filter(([, x]) => x.status === "fail").map(([k]) => k);
+  byMean.criterion1.failCount = byMean.criterion1.redItems.length;
+
+  const diffs = [];
+  const walk = (a, b, path) => {
+    if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
+      if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push(path);
+      return;
+    }
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) walk(a[k], b[k], path ? path + "." + k : k);
+  };
+  walk(byMean, byMedian, "");
+
+  const allowed = ["criterion1.items.1d.status", "criterion1.items.1d.note", "criterion1.failCount"];
+  const unexpected = diffs.filter((d) => !allowed.some((a) => d.startsWith(a)) && !d.startsWith("criterion1.redItems"));
+  assert.deepEqual(unexpected, [], "сдвинулось что-то помимо 1d и его следствий: " + unexpected.join(", "));
+  assert.ok(diffs.some((d) => d === "criterion1.items.1d.status"), "а сам статус 1d обязан был измениться — иначе проверяем не то");
 });

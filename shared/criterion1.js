@@ -55,8 +55,12 @@ export function criterion1(p) {
     const it = item({ unit: "отзывов", threshold: `< ${t.reviewsOk} OK · > ${t.reviewsFail} НЕ OK` });
     if (comp?.reviewBarrier?.avg !== null && comp?.reviewBarrier?.avg !== undefined) {
       it.value = comp.reviewBarrier.avg; it.source = comp.source; it.median = comp.reviewBarrier.median;
-      it.note = `среднее ${Math.round(it.value)} / медиана ${Math.round(it.median ?? 0)} — среднее искажают выбросы`;
-      if (it.median !== null && it.value > t.reviewsOk && it.median < t.reviewsOk) it.note += "; по медиане барьер проходим";
+      // Решает МЕДИАНА (spec 022, D1): вопрос подпункта — сколько отзывов у того, с кем придётся
+      // конкурировать, а не сколько в среднем по нише. Среднее остаётся на экране как число.
+      it.decidedBy = "median";
+      it.note = it.median === null
+        ? `медианы нет — статус по среднему ${Math.round(it.value)}`
+        : `медиана ${Math.round(it.median)} — по ней и статус; среднее ${Math.round(it.value)} искажают выбросы`;
     }
     items["1d"] = finalize(it, mo["1d"], (v) => v < t.reviewsOk, (v) => v > t.reviewsFail);
   }
@@ -139,8 +143,14 @@ function finalize(it, override, okFn, failFn) {
   if (override && override.value !== null && override.value !== undefined && override.value !== "") {
     it.autoValue = it.value; it.autoSource = it.source;
     it.value = Number(override.value); it.source = "manual"; it.note = (override.note ? override.note + "; " : "") + "введено вручную";
+    it.decidedBy = "value"; // ручной ввод решает сам, какой бы ни была мера подпункта
   }
-  it.status = triage(it.value, okFn, failFn);
+  // spec 022: подпункт может решать не по it.value. Сейчас так делает только 1d (медиана вместо
+  // среднего), но механизм общий, чтобы следующая такая смена не потребовала трогать finalize.
+  const judged = it.decidedBy === "median" && it.median !== null && it.median !== undefined ? it.median : it.value;
+  if (it.decidedBy === undefined) it.decidedBy = "value";
+  if (it.decidedBy === "median" && (it.median === null || it.median === undefined)) it.decidedBy = "value";
+  it.status = triage(judged, okFn, failFn);
   return it;
 }
 function fmtK(v) { return v >= 1e6 ? (v / 1e6).toFixed(2) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "k" : String(Math.round(v)); }

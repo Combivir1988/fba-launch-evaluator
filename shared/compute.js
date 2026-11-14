@@ -1,6 +1,6 @@
 // Оркестратор: Analysis → Results. Чистая функция, одинаковая в браузере и тестах.
 import { mergeThresholds } from "./thresholds.js";
-import { competition, priceSegments } from "./competition.js";
+import { competition, effectiveReviewBarrier, priceSegments } from "./competition.js";
 import { traffic } from "./traffic.js";
 import { criterion1, summarizeCriterion1 } from "./criterion1.js";
 import { applyPriceBand, wholeNicheRef } from "./price-band.js";
@@ -76,7 +76,16 @@ export function compute(analysis) {
   const compWhole = band.active ? compAll : p.competition;
   const refDate = new Date(whole.poe?.meta?.capturedAt || analysis.createdAt || Date.now());
   p.entry = entryFeasibility(whole, { refDate: Number.isNaN(refDate.getTime()) ? new Date() : refDate, nicheReviewMedian: compWhole.reviewBarrier?.median ?? null, leaderReviews: compWhole.reviewBarrier?.leaderReviews ?? null });
+  // spec 022, D4: порядок конвейера НЕ меняем — competition считается на ~41, когорта появляется
+  // только здесь, и поток идёт competition → entry. Поэтому действующий уровень барьера считается
+  // ТУТ, после entry, и дописывается отдельным полем; сырой уровень в competition не трогается.
+  p.reviewBarrierEffective = effectiveReviewBarrier(
+    { leaderReviews: compWhole.reviewBarrier?.leaderReviews ?? null,
+      cohortReviewMedian: p.entry.cohort.ok ? p.entry.cohort.reviewsMedian : null }, th.reviewsMoat);
   p.cashflow = cashflow({ ...inputs, price, cpc }, th, { cohortSalesMedian: p.entry.cohort.ok ? p.entry.cohort.salesMedian : null, reviewThreshold: p.entry.reviews.threshold,
+    // spec 022, D6: берём УЖЕ РАЗРЕШЁННУЮ долю с отзывом (ручной ввод → когорта → умолчание),
+    // чтобы срок до планки и график отзывов говорили об одном числе
+    reviewRate: p.entry.reviews.reviewRate, reviewRateSource: p.entry.reviews.reviewRateSource,
     // spec 020: берём уже разрешённую долю (ручной ввод победил отчёт), чтобы модель и экономика говорили об одном
     returnRate: p.economics.returnRate });
   p.budget = budget({ ...inputs, price }, th, { cash: p.cashflow, roi: p.economics.roi, revenueStatus: p.criterion1.items["1a"].status, revenueMonthly: p.criterion1.items["1a"].value, revenueSource: p.criterion1.items["1a"].source });
@@ -99,6 +108,10 @@ export function compute(analysis) {
   const results = {
     gate0: g0, criterion1: p.criterion1, economics: p.economics, budget: p.budget, traffic: p.traffic, competition: p.competition,
     priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard, launchPlan: p.launchPlan, marketStructure: p.marketStructure,
+    // spec 022: результат собирается ЯВНЫМ перечнем ключей — поле, посчитанное в конвейере, но не
+    // перечисленное здесь, до интерфейса не доедет и ни один тест не упадёт. Ровно это случилось
+    // с launchPlan в spec 020 и повторилось здесь.
+    reviewBarrierEffective: p.reviewBarrierEffective,
     effective: { price, cpc, cpcFromCerebro: cpcFromCerebro && p.traffic.cpcCore !== null, cpcSource: cpcFromCerebro ? p.traffic.cpcSource : "введено вручную", priceFromMedian: (inputs.price === null || inputs.price === undefined || inputs.price === "") && price !== null },
     reconciliation: reconciliation(p), cvrHint: hint,
     entry: p.entry, cashflow: p.cashflow,

@@ -19,7 +19,12 @@ export function scorecard(p) {
     let s = null; const notes = [];
     if (typeof comp?.top5Share === "number") {
       const x = comp.top5Share; s = x < 0.30 ? 9.5 : x < 0.45 ? 7 : x < 0.65 ? 4 : 1; notes.push(`топ-5 ${(x * 100).toFixed(0)} %`);
-      const tier = comp.reviewBarrier?.tier; if (tier === "moat") { s -= 2; notes.push("ров отзывов лидера непробиваем"); } else if (tier === "medium") { s -= 1; notes.push("средний барьер отзывов"); }
+      // spec 022: баллы снимаются по ДЕЙСТВУЮЩЕМУ уровню — тому, который показан человеку.
+      // Считать здесь по лидеру, а на экране писать другое значило бы дать два разных ответа об одной нише.
+      const eff = p.reviewBarrierEffective, tier = eff?.tier ?? comp.reviewBarrier?.tier;
+      const byCohort = eff?.basis === "cohort";
+      if (tier === "moat") { s -= 2; notes.push(byCohort ? "новички входят с большим числом отзывов" : "ров отзывов лидера непробиваем"); }
+      else if (tier === "medium") { s -= 1; notes.push(byCohort ? "вход стоит заметного числа отзывов" : "средний барьер отзывов"); }
       if (comp.dominant) { s -= 1; notes.push("доминирующий бренд"); }
       const azl = p.amazon?.level; // spec 016: вендор с малой долей — обычный конкурент, минуса нет
       if (comp.amazonSells && azl !== "normal") { s -= azl === "watch" ? 1 : 2; notes.push(azl === "own" ? "Amazon продаёт свою марку" : azl === "watch" ? "Amazon продаёт вендора с заметной долей" : "Amazon продаёт сам"); }

@@ -1,3 +1,7 @@
+// spec 022: отпечаток сдвинулся НАМЕРЕННО — подпункт 1d мерил среднее число отзывов и стал мерить
+// медиану. На этой фикстуре среднее 2429 (fail), медиана 391 (warn). Сдвинулись ровно четыре величины:
+// статус 1d, его примечание, failCount Критерия 1 и его redItems. Доказано тестом «ВОРОТА SC-003»
+// в concentration.test.js, который сравнивает два расчёта поимённо, а не по хэшу.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseSqp } from "../shared/parse-sqp.js";
@@ -67,5 +71,5 @@ test("в расчёте: подсказка ничего не меняет са�
   const withSqp = fixtureAnalysis(); withSqp.aggregates.sqp = SQP; withSqp.inputs.clusterKeywords = ["urinal cakes", "urinal screen"]; const R2 = compute(withSqp);
   assert.match(R2.cvrHint.note, /по POE .*; SQP по запросам вашего кластера: рынок 11,9 %, ваш ASIN 15,5 %/); assert.deepEqual(R2.economics.gate2, compute(Object.assign(fixtureAnalysis(), { inputs: withSqp.inputs })).economics.gate2);
   const p = buildAiPayload(a); assert.equal(p.cvrHint.usedCvr, 0.10); assert.ok(p.cvrHint.nicheClickCvr.cvr > 0); assert.equal(p.cvrHint.market, null);
-  assert.equal(resultsHash(R), "8c8fb00a99b54fdb", "расчёты не изменились");
+  assert.equal(resultsHash(R), "6504858a594ed7d8", "расчёты не изменились");
 });
