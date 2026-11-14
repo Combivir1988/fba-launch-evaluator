@@ -45,9 +45,15 @@ function candidates(R, th) {
     add({ id: "top2", label: "Доля топ-2 ключей в трафике", value: tr.top2Share, threshold: tt.top2ShareMax, unit: "pct", better: "lower" });
     if (tr.source === "cerebro") add({ id: "relevant", label: "Релевантных ключей", value: tr.relevantCount, threshold: tt.relevantMin, unit: "num", better: "higher" });
   }
-  const lr = R.competition?.reviewBarrier?.leaderReviews;
-  add({ id: "moat", label: "Отзывы лидера — ров пробиваем", value: lr, threshold: th.reviewsMoat.breakable, unit: "num", better: "lower", pass: "пробиваем", fail: "средний барьер" });
-  add({ id: "moat-high", label: "Отзывы лидера — средний барьер", value: lr, threshold: th.reviewsMoat.medium, unit: "num", better: "lower", pass: "средний барьер", fail: "непробиваем" });
+  // spec 022: пограничные значения барьера считаются от ТОЙ ЖЕ величины, что и сам вывод о барьере —
+  // от медианы отзывов когорты, когда она есть. Оставить здесь число лидера значило бы в одном отчёте
+  // мерить барьер двумя разными величинами: вывод по входу новичков, «почти прошло» по накоплениям лидера.
+  const eff = R.reviewBarrierEffective;
+  const byCohort = eff?.basis === "cohort" && isNum(eff.cohortReviewMedian);
+  const mv = byCohort ? eff.cohortReviewMedian : R.competition?.reviewBarrier?.leaderReviews;
+  const mlabel = byCohort ? "Отзывы у вошедших недавно" : "Отзывы лидера";
+  add({ id: "moat", label: mlabel + " — ров пробиваем", value: mv, threshold: th.reviewsMoat.breakable, unit: "num", better: "lower", pass: "пробиваем", fail: "средний барьер" });
+  add({ id: "moat-high", label: mlabel + " — средний барьер", value: mv, threshold: th.reviewsMoat.medium, unit: "num", better: "lower", pass: "средний барьер", fail: "непробиваем" });
   const b = R.budget;
   if (b && isNum(b.budget) && isNum(b.need)) add({ id: "budget", label: b.basis === "cash" ? "Бюджет против пика вложений" : "Бюджет против двух партий", value: b.budget, threshold: b.need, unit: "money", better: "higher", pass: "хватает", fail: "не хватает", economic: true });
   const sc = R.scorecard;

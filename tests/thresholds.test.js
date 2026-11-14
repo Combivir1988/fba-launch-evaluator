@@ -102,3 +102,18 @@ test("spec 021 · группа ideas заведена, старые личные
   assert.deepEqual(th.ideas, DEFAULT_THRESHOLDS.ideas, "новая группа целиком из умолчаний");
   assert.equal(th.criterion1.passCount, 5, "а чужая подкрутка сохранилась");
 });
+
+test("spec 022 · потолок доли с отзывом заведён, старые наборы деградируют мягко", () => {
+  const c = DEFAULT_THRESHOLDS.cashflow;
+  assert.equal(c.reviewRate, 0.02, "умолчание не меняется — оно работает там, где когорты нет");
+  assert.equal(c.reviewRateCap, 0.20, "потолок выбран замером: 90-й процентиль по 182 участникам 12,18 %");
+  assert.equal(c.reviewRateMinMembers, 3);
+
+  // Набор, сохранённый ДО этой работы, грузится без ошибки и добирает новое из умолчаний.
+  const old = { criterion1: { passCount: 5 }, cashflow: { rampMonths: 8 } };
+  const th = mergeThresholds(old);
+  assert.equal(th.cashflow.reviewRateCap, 0.20, "новый порог пришёл из умолчаний");
+  assert.equal(th.cashflow.reviewRateMinMembers, 3);
+  assert.equal(th.cashflow.rampMonths, 8, "а чужая подкрутка сохранилась");
+  assert.equal(th.criterion1.passCount, 5);
+});
