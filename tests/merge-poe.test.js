@@ -70,7 +70,7 @@ test("FR-001/FR-005: добавить, обновить, удалить нишу
   const a = A(), b = B(); let r = upsertPoePart([], a); assert.equal(r.action, "added"); r = upsertPoePart(r.parts, b); assert.equal(r.action, "added"); assert.equal(r.parts.length, 2);
   const b2 = B({ sharedAsins: 5 }); r = upsertPoePart(r.parts, b2); assert.equal(r.action, "updated"); assert.equal(r.parts.length, 2); assert.equal(r.parts[1], b2); assert.equal(poePartKey(b2), "niche-b");
   const noId = A(); noId.meta = { ...noId.meta, nicheId: null, nicheTitle: "  Some   Niche " }; assert.equal(poePartKey(noId), "some niche");
-  const many = Array.from({ length: MAX_POE_PARTS }, (_, i) => { const p = A(); p.meta = { ...p.meta, nicheId: "n" + i }; return p; }); assert.throws(() => upsertPoePart(many, b), /не больше 8 ниш/);
+  const many = Array.from({ length: MAX_POE_PARTS }, (_, i) => { const p = A(); p.meta = { ...p.meta, nicheId: "n" + i }; return p; }); assert.throws(() => upsertPoePart(many, b), new RegExp("не больше " + MAX_POE_PARTS + " ниш"));
   const back = mergePoe(r.parts.filter((p) => poePartKey(p) !== "niche-b")); assert.equal(back, a); assert.equal(baselineHash(back), "7f7e706f236a112a");
 });
 
@@ -84,4 +84,23 @@ test("в расчёте: конверсия клика, новички и цен
   const p = buildAiPayload(both); assert.equal(p.poe.mergedFrom.niches.length, 2); assert.equal(p.poe.mergedFrom.sharedProducts, 10); assert.equal(buildAiPayload(single).poe.mergedFrom, null);
   const snap = buildSnapshot(both, { mode: "full" }); assert.equal(snap.analysis.aggregates.poeParts, undefined, "ниши по отдельности в ссылку не попадают"); assert.equal(snap.analysis.aggregates.poe.merged.count, 2); assert.ok(both.aggregates.poeParts, "исходный анализ не тронут");
   const t0 = performance.now(); mergePoe([a, b, B(), B(), B()].map((p, i) => ({ ...p, meta: { ...p.meta, nicheId: "x" + i } }))); assert.ok(performance.now() - t0 < 1000, "SC-005: пять ниш быстрее секунды");
+});
+
+test("предел ниш POE — грубая отсечка, а настоящая граница измерена в байтах", () => {
+  // Замер 2026-11-14 на живых данных: ниша ~22 КБ сжатых, ~136 КБ сырых.
+  // 30 ниш — 1,29 МБ из 3 МБ хранения (45 %). Узко не здесь, а в теле запроса,
+  // и дороже всех там Cerebro (7,1 МБ сырых в самом тяжёлом живом анализе).
+  assert.equal(MAX_POE_PARTS, 30);
+
+  const parts = Array.from({ length: MAX_POE_PARTS }, (_, i) => { const p = A(); p.meta = { ...p.meta, nicheId: "n" + i }; return p; });
+  const t0 = Date.now();
+  const merged = mergePoe(parts);
+  assert.ok(Date.now() - t0 < 2000, "слияние тридцати ниш не должно быть медленным");
+  assert.ok(merged.asinMetrics.length > 0);
+
+  // Та же ниша по-прежнему ОБНОВЛЯЕТСЯ, а не занимает новое место — иначе предел упёрся бы в повторы.
+  const again = { ...A(), meta: { ...A().meta, nicheId: "n0" } };
+  const r = upsertPoePart(parts, again);
+  assert.equal(r.action, "updated");
+  assert.equal(r.parts.length, MAX_POE_PARTS);
 });

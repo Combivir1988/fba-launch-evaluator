@@ -9,7 +9,12 @@
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const up = (s) => String(s || "").toUpperCase();
 const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
-export const MAX_POE_PARTS = 8;
+// Замер 2026-11-14 на живых данных: ниша стоит ~22 КБ сжатых и ~136 КБ сырых.
+// Тридцать ниш — 1,29 МБ из 3 МБ хранения (45 %) и 20 мс на слияние: ни то, ни другое не узко.
+// Узко ТЕЛО ЗАПРОСА, и виноват в нём не POE, а Cerebro: в самом тяжёлом живом анализе он
+// 7,1 МБ сырых против 0,1 МБ на нишу. Поэтому счётчик — не настоящая защита, настоящая —
+// проверка размера ниже; этот предел оставлен как грубая отсечка от случайной лавины файлов.
+export const MAX_POE_PARTS = 30;
 const MIN_COMMON_WEEKS = 8;
 
 const sumN = (xs) => { const v = xs.filter(isNum); return v.length ? v.reduce((a, b) => a + b, 0) : null; };

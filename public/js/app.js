@@ -397,11 +397,15 @@ async function handleFiles(list) {
       const r = await detectAndParse(f, { coreKeyword: S.a.coreKeyword, brands: allBrands() });
       if (r.kind === "import") { await importDoc(r.data); continue; }
       if (r.kind === "poe") { toast(addPoePart(r.data, r.meta), 5000); if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; reannotateCerebro(); continue; } // бренды POE тоже помечают брендовые запросы // POE не заменяется, а добавляется к объединению ниш
+      // Xray, Cerebro и SQP хранятся по одному: второй файл ЗАМЕНЯЕТ первый. Молчать об этом нельзя —
+      // человек, бросивший двадцать пять выгрузок, увидел бы двадцать пять сообщений об успехе и один
+      // оставшийся отчёт. Склейка нескольких выгрузок делается в одном файле, а не в двадцати пяти.
+      const replaced = Boolean(S.a.aggregates[r.kind]);
       S.a.aggregates[r.kind] = r.data; S.a.sources[r.kind] = r.meta; S.aggDirty = true;
       if (r.kind === "poe") { if (!S.a.niche) S.a.niche = r.data.meta.nicheTitle; if (!S.a.coreKeyword) S.a.coreKeyword = r.data.meta.nicheTitle; }
       if (r.kind === "xray") reannotateCerebro();
       if (r.kind === "cerebro") { reannotateCerebro(); if (!S.a.inputs.clusterKeywords.length) autoCluster(); }
-      toast(`${r.kind.toUpperCase()}: ${r.meta.rows} ${r.kind === "xray" || r.kind === "poe" ? "ASIN" : "строк"} из ${f.name}${r.meta.duplicatesDropped ? ` (дублей удалено: ${r.meta.duplicatesDropped})` : ""}`);
+      toast(`${r.kind.toUpperCase()}: ${r.meta.rows} ${r.kind === "xray" || r.kind === "poe" ? "ASIN" : "строк"} из ${f.name}${r.meta.duplicatesDropped ? ` (дублей удалено: ${r.meta.duplicatesDropped})` : ""}${replaced ? " — ЗАМЕНИЛ прежний отчёт этого вида" : ""}`, replaced ? 7000 : 4000);
     } catch (err) { console.error(err); toast("Ошибка: " + err.message, 6000); }
   }
   markDirty(); renderAll();

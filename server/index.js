@@ -67,7 +67,9 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   // Лимиты тела — по роутам (contracts/api.md): 100 KB по умолчанию, 1 MB для AI-задач.
   const jsonSmall = express.json({ limit: "100kb" });
   const jsonMid = express.json({ limit: "1mb" });
-  const jsonBig = express.json({ limit: "12mb" }); // агрегаты отчётов и импорт целого анализа
+  // 24 МБ: замер 2026-11-14 — разбор тела на 11,8 МБ стоит 30 мс и заметного прироста RSS не даёт,
+  // а тридцать ниш POE рядом с тяжёлым Cerebro упираются ровно в прежние 12 МБ (103 %).
+  const jsonBig = express.json({ limit: "24mb" }); // агрегаты отчётов и импорт целого анализа
   app.use("/api", sessions.attachUser, csrfGuard);
   const { requireUser, requireAdmin, requirePasswordChanged } = sessions;
   const authed = [requireUser, requirePasswordChanged];
@@ -375,7 +377,8 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
     if (res.headersSent) return;
     if (err instanceof UserError) { if (err.retryAfter) res.set("Retry-After", String(err.retryAfter)); return res.status(err.status).json({ error: err.code, message: err.message, ...(err.extra || {}) }); }
-    if (err?.type === "entity.too.large") return res.status(413).json({ error: "too_large", message: "Слишком большой запрос" });
+    // Причина почти всегда одна и та же, и молчать о ней — значит заставить человека гадать.
+    if (err?.type === "entity.too.large") return res.status(413).json({ error: "too_large", message: "Отчёты в сумме слишком велики для одного анализа. Больше всего места занимает выгрузка Cerebro — уменьшите её или разнесите ниши POE по нескольким анализам" });
     if (err?.type === "entity.parse.failed" || err instanceof SyntaxError) return res.status(400).json({ error: "bad_json", message: "Некорректный JSON" });
     if (isStorageError(err)) { log("error", "storage unavailable", { code: err.code, message: err.message, path: req.path }); return res.status(503).json({ error: "storage_unavailable", message: "Хранилище недоступно — изменения не сохранены, повторите через несколько секунд" }); }
     log("error", "unhandled", { path: req.path, message: err?.message, code: err?.code });
