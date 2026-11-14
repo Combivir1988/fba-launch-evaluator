@@ -107,3 +107,36 @@ test("потолок себестоимости согласован с экон
   assert.equal(cheapAd.cogsCeiling, Math.round((cheapAd.market * (1 - 0.15 - 0.3) - 5 - 2.4 - (2.5 / 0.1) * 0.7) * 100) / 100);
   assert.ok(cheapAd.cogsCeiling < cheapNoAd.cogsCeiling);
 });
+
+// 2026-11-14. Потолок себестоимости считался ТОЛЬКО от цены аналогов такой же конфигурации. На живом разборе
+// аналоги брали $29,99, а человек планировал $65 — и подсказка под COGS писала «маржа недостижима даже при
+// бесплатном товаре», пока соседний блок показывал маржу 44,2 %. Теперь есть второй потолок — при цене,
+// по которой приложение считает экономику. Обе величины считает ОДНА функция, разойтись им нельзя.
+test("потолок себестоимости: отдельно при цене аналогов и при цене из панели", () => {
+  const { config, stats, xray, listings } = build();
+  const th = { minAnalogs: 5, marginMin: 0.3, cheapPrice: 25, cheapMarginMin: 0.4 };
+  const base = { referralPct: 0.15, fbaFee: 5, shippingPerUnit: 2 };
+
+  const noPrice = priceByConfig({ config, stats, xray, listings, inputs: base, th });
+  assert.equal(noPrice.cogsCeilingAtPrice, null, "цена не задана — второго потолка нет, выдуманного числа не появляется");
+
+  // цена аналогов и цена в панели совпадают → оба потолка совпадают
+  const same = priceByConfig({ config, stats, xray, listings, inputs: { ...base, price: noPrice.market }, th });
+  assert.equal(same.cogsCeilingAtPrice.ceiling, same.cogsCeiling, "одна цена — один ответ");
+  assert.equal(same.cogsCeiling, noPrice.cogsCeiling, "потолок при цене аналогов от панели не зависит");
+
+  // панель вдвое дороже аналогов → потолок выше, и при цене аналогов он НЕ изменился
+  const rich = priceByConfig({ config, stats, xray, listings, inputs: { ...base, price: noPrice.market * 2 }, th });
+  assert.equal(rich.cogsCeiling, noPrice.cogsCeiling, "цена аналогов — факт о рынке, панель его не двигает");
+  assert.ok(rich.cogsCeilingAtPrice.ceiling > noPrice.cogsCeiling, "по своей цене платить за товар можно больше");
+  assert.equal(rich.cogsCeilingAtPrice.price, Math.round(noPrice.market * 2 * 100) / 100, "названа та самая цена");
+
+  // формула при своей цене — та же, что и при цене аналогов (реклама не задана: цены клика нет)
+  const p = rich.cogsCeilingAtPrice.price;
+  assert.equal(rich.cogsCeilingAtPrice.ceiling, Math.round((p * (1 - 0.15 - 0.3) - 5 - 2) * 100) / 100);
+
+  // дешёвый сегмент определяется по ТОЙ цене, о которой идёт речь, а не по цене аналогов
+  const cheap = priceByConfig({ config, stats, xray, listings, inputs: { ...base, price: 20 }, th });
+  assert.equal(cheap.cogsCeilingAtPrice.marginMin, 0.4, "при $20 действует повышенная планка дешёвого сегмента");
+  assert.equal(cheap.cogsCeilingCheap, false, "а аналоги по $100 дешёвым сегментом не стали");
+});

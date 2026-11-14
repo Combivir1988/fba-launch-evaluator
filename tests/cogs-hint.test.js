@@ -23,3 +23,36 @@ test("подсказка под COGS: потолок, превышение и с
   const none = cogsHint({ ...pc, cogsCeiling: -5.08 }, 4);
   assert.equal(none.level, "none"); assert.match(none.text, /не сходится/); assert.match(none.text, /не хватает \$5\.08/);
 });
+
+// 2026-11-14. Подсказка отвечала про цену аналогов такой же конфигурации и не говорила об этом. Живой случай:
+// аналоги $29,99, человек планирует $65 — текст «маржа 30 % недостижима даже при бесплатном товаре» не менялся
+// ни при цене от $30 до $200, ни при COGS от $2 до $40, а рядом стоял Gate 1 PASS с маржой 44,2 %.
+test("подсказка под COGS: отвечает про цену, по которой считается экономика, и всегда её называет", () => {
+  const market = { market: 29.99, cogsCeiling: -6.04, marginMin: 0.3, cogsCeilingAfterAds: true, cogsCeilingMissing: [] };
+
+  // прежнее поведение (своей цены нет) сохранено дословно — подсказка просто называет, о какой цене речь
+  const old = cogsHint(market, 10);
+  assert.equal(old.level, "none");
+  assert.match(old.text, /при цене аналогов такой конфигурации \$29\.99/);
+
+  // тот самый живой случай: своя цена $65 → потолок сходится, и уровень меняется
+  const own = { ...market, cogsCeilingAtPrice: { price: 65, ceiling: 13.22, afterAds: true, marginMin: 0.3, cheap: false } };
+  const h = cogsHint(own, 10);
+  assert.equal(h.level, "ok", "при своей цене потолок сходится — прежний текст был неправдой");
+  assert.match(h.text, /потолок ≤ \$13\.22 при вашей цене \$65\.00/);
+  assert.match(h.text, /аналоги такой конфигурации берут \$29\.99/, "расхождение с рынком названо отдельно");
+
+  // подсказка следует за COGS — именно этого человек и не видел
+  assert.equal(cogsHint(own, 20).level, "over");
+  assert.match(cogsHint(own, 20).text, /выше потолка на \$6\.78/);
+
+  // и за ценой: тот же анализ при своей цене $30 даёт другой ответ
+  const low = { ...market, cogsCeilingAtPrice: { price: 30, ceiling: -5.9, afterAds: true, marginMin: 0.3, cheap: false } };
+  assert.equal(cogsHint(low, 10).level, "none");
+  assert.match(cogsHint(low, 10).text, /при вашей цене \$30\.00/);
+  assert.notEqual(cogsHint(low, 10).text, cogsHint(own, 10).text, "разная цена — разный ответ");
+
+  // цена совпадает с рынком → лишней строки про аналогов нет
+  const eq = { ...market, cogsCeilingAtPrice: { price: 29.99, ceiling: -6.04, afterAds: true, marginMin: 0.3, cheap: false } };
+  assert.doesNotMatch(cogsHint(eq, 10).text, /аналоги такой конфигурации берут/);
+});

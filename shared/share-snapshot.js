@@ -94,7 +94,7 @@ function redactEconomics(a, source) {
   // Числа-источники (FBA, доставка, CPC) вычищает проверка ниже, а производные оставались видны: по ним
   // читатель ссылки узнаёт, сколько автор может платить за товар. Режим «без экономики» их прятать обязан.
   if (R.priceConfig) {
-    for (const k of ["cogsCeiling", "cogsCeilingParts", "cogsCeilingMissing", "cogsCeilingAfterAds", "cogsCeilingCheap", "cheapPrice", "adCostPerUnit", "marginMin"]) delete R.priceConfig[k];
+    for (const k of ["cogsCeiling", "cogsCeilingAtPrice", "cogsCeilingParts", "cogsCeilingMissing", "cogsCeilingAfterAds", "cogsCeilingCheap", "cheapPrice", "adCostPerUnit", "marginMin"]) delete R.priceConfig[k];
     R.priceConfig.economicsHidden = true;
   }
   if (R.scorecard?.axes?.economics) R.scorecard.axes.economics.note = HIDDEN_NOTE;

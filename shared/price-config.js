@@ -82,17 +82,30 @@ export function priceByConfig({ config, stats, xray, listings = {}, choice = {},
   // для дешёвого сегмента порог выше (при цене ниже $25 прибыль $15/шт недостижима). Берём меньшее:
   // потолок не вправе обещать себестоимость, с которой гейт не пропустит.
   const cheapPrice = isNum(th?.cheapPrice) ? th.cheapPrice : null;
-  const cheap = isNum(market) && cheapPrice !== null && market < cheapPrice;
   const marginAds = th?.marginMin ?? 0.3;
-  const marginNoAds = (cheap && isNum(th?.cheapMarginMin) ? th.cheapMarginMin : th?.marginMin) ?? 0.3;
-  const byAds = isNum(market) ? market * (1 - referral - marginAds) - fba - ship - ad : null;
-  const byGate1 = isNum(market) ? market * (1 - referral - marginNoAds) - fba - ship : null;
-  const adBinds = adKnown && isNum(byAds) && byAds <= byGate1; // без цены клика реклама не вычтена — потолок не «после рекламы»
-  const cogsCeiling = isNum(market) ? round(Math.min(byAds, byGate1), 2) : null;
-  const marginMin = adBinds ? marginAds : marginNoAds;
+  // ОДНА функция на два разных вопроса, и это намеренно: «сколько можно платить за товар, если продавать по цене
+  // аналогов такой же конфигурации» и «…если продавать по цене из панели „Экономика“». Два отдельных расчёта
+  // разошлись бы при первой правке; а не различать эти цены нельзя — ответы отличаются в разы.
+  const ceilingAt = (pr) => {
+    if (!isNum(pr) || pr <= 0) return null;
+    const cheap = cheapPrice !== null && pr < cheapPrice;
+    const marginNoAds = (cheap && isNum(th?.cheapMarginMin) ? th.cheapMarginMin : th?.marginMin) ?? 0.3;
+    const byAds = pr * (1 - referral - marginAds) - fba - ship - ad;
+    const byGate1 = pr * (1 - referral - marginNoAds) - fba - ship;
+    const afterAds = adKnown && byAds <= byGate1; // без цены клика реклама не вычтена — потолок не «после рекламы»
+    return { price: round(pr, 2), ceiling: round(Math.min(byAds, byGate1), 2), afterAds, marginMin: afterAds ? marginAds : marginNoAds, cheap };
+  };
+  const atMarket = ceilingAt(market);
+  // Цена, по которой приложение считает экономику (панель или медиана 1b). Подсказка под полем COGS стоит среди
+  // собственных чисел человека и обязана отвечать про них: прежде она отвечала про цену аналогов и молчала об этом.
+  const atOwnPrice = ceilingAt(inputs.price);
+  const cogsCeiling = atMarket?.ceiling ?? null;
+  const adBinds = Boolean(atMarket?.afterAds);
+  const cheap = Boolean(atMarket?.cheap);
+  const marginMin = atMarket?.marginMin ?? (th?.marginMin ?? 0.3);
   // Не задано — значит не вычтено: честнее сказать, что потолок завышен, чем молча считать расход нулевым.
   const cogsCeilingMissing = [!fbaKnown ? "FBA-сбор" : null, !shipKnown ? "доставка до склада Amazon" : null, !adKnown ? "реклама (нет цены клика)" : null].filter(Boolean);
   const leader = analogs.slice().sort((a, b) => b.w - a.w)[0] || null;
-  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, cogsCeilingCheap: cheap, cheapPrice, cogsCeilingMissing, cogsCeilingAfterAds: adBinds, adCostPerUnit: adKnown ? round(ad, 2) : null,
+  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, cogsCeilingCheap: cheap, cheapPrice, cogsCeilingMissing, cogsCeilingAfterAds: adBinds, adCostPerUnit: adKnown ? round(ad, 2) : null, cogsCeilingAtPrice: atOwnPrice,
     cogsCeilingParts: { referral, fba, ship, ad: adKnown ? round(ad, 2) : null, cpc: adKnown ? inputs.cpc : null, cvr, ppcShare: ppc }, contributions, warn, analogAsins: analogs.map((a) => a.asin).slice(0, 50) };
 }
