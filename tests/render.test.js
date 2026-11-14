@@ -170,3 +170,32 @@ test("фото ниши в шапке: картинка со ссылкой на
   assert.equal(el2.querySelector("#sec-hero .herophoto"), null, "пустой рамки нет");
   assert.match(el2.querySelector("#sec-hero h1").textContent, /car sound deadening mat/);
 });
+
+test("отзыв 2026-11-13: чеклист показывает ВЕРДИКТ по Amazon, а не выставленный порог", () => {
+  // Было: чеклист печатал настройку «однозначно No-Go» при mode === "block" независимо от того,
+  // блокирует ли Amazon ЭТУ нишу. При вендоре со средней долей (level = "watch") карта писала
+  // «вердикт не блокируется», а чеклист рядом — «однозначно No-Go». Один отчёт, два ответа.
+  const a = fullAnalysis();
+  const amz = a.results.amazon;
+  if (!amz) return; // в фикстуре Amazon не продаёт — проверять нечего
+
+  const textOf = (an) => {
+    const { w } = makeWindow(); const el = w.document.getElementById("d");
+    w.FBARender.render(el, an, { static: true });
+    const row = [...el.querySelectorAll("#sec-checklist tr")].find((r) => /Amazon продаёт сам/.test(r.textContent));
+    assert.ok(row, "строка про Amazon в чеклисте есть");
+    return row.textContent;
+  };
+
+  // Порог стоит на «No-Go», но ниша им НЕ блокируется → чеклист не смеет писать «No-Go».
+  const soft = structuredClone(a);
+  soft.results.amazon = { ...amz, mode: "block", blocks: false, level: "watch" };
+  const t1 = textOf(soft);
+  assert.ok(!/однозначно No-Go/.test(t1), "чеклист повторял настройку вместо вердикта: " + t1);
+  assert.ok(/не сработал/.test(t1), "и говорит, почему порог не сработал: " + t1);
+
+  // А когда ниша действительно блокируется — так и написано.
+  const hard = structuredClone(a);
+  hard.results.amazon = { ...amz, mode: "block", blocks: true, level: "own" };
+  assert.match(textOf(hard), /вердикт No-Go/);
+});

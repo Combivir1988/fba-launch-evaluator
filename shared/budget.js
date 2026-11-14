@@ -7,10 +7,16 @@ export function budget(inputs, th, ctx = {}) {
   const prod = num(inputs.productionDays) ?? 30, shipDays = num(inputs.shippingDays) ?? 30, recv = num(inputs.receivingDays) ?? th.budget.receivingDays;
   const adsReserve = num(inputs.adsReserve) ?? 0, bud = num(inputs.budget);
   const price = num(inputs.price);
-  const out = { pending: cogs === null, landed: null, leadDays: prod + shipDays + recv, batchUnits: null, batchCost: null, batches: th.budget.batches, twoBatches: null, adsReserve, need: null, needTwoBatches: null, basis: null, budget: bud, gap: null, status: "pending", markup: null };
+  const out = { pending: cogs === null, landed: null, leadDays: prod + shipDays + recv, batchUnits: null, batchFrom: null, batchCost: null, batches: th.budget.batches, twoBatches: null, adsReserve, need: null, needTwoBatches: null, basis: null, budget: bud, gap: null, status: "pending", markup: null };
   if (cogs !== null) {
     out.landed = cogs + ship;
-    out.batchUnits = units * out.leadDays;
+    // Размер первой партии берём ИЗ СЦЕНАРИЯ, а не считаем заново. Он там уже учитывает возвраты
+    // (spec 020, FR-017a: списанный товар надо докупить), а здесь этого не было — две цифры одной
+    // и той же партии расходились в одном отчёте: 75 шт против 83 при 10 % возвратов.
+    // Своя формула остаётся запасной: сценарий не строится, пока не задана цель продаж.
+    const fromCash = ctx.cash && !ctx.cash.pending && typeof ctx.cash.firstBatchUnits === "number" ? ctx.cash.firstBatchUnits : null;
+    out.batchUnits = fromCash ?? units * out.leadDays;
+    out.batchFrom = fromCash === null ? "lead_time" : "cashflow";
     out.batchCost = out.landed * out.batchUnits;
     out.twoBatches = out.batchCost * th.budget.batches;
     out.needTwoBatches = out.twoBatches + adsReserve;

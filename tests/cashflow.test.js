@@ -80,3 +80,34 @@ test("первые 90 дней по сценарию разгона — тот �
   assert.ok(noPenalty.cashflow.first90.ads >= p.adSpend - 1e-6, "до планки отзывов реклама дороже, чем на целевом уровне");
   assert.equal(cashflow({ ...BASE, cogs: null }, TH).first90, null);
 });
+
+// ---------- отзыв 2026-11-13: три расхождения, найденные на живом прогоне ----------
+
+test("старт выше цели — источник называется ЦЕЛЬЮ, а не когортой", () => {
+  // Было: при цели 30 шт/мес и медиане новичков 386 подпись гласила
+  // «старт 30 шт/мес — медиана продаж новичков ниши». Число приходило из цели,
+  // а подпись — от когорты, и читатель думал, что новички продают по 30.
+  const c = cashflow({ ...BASE, unitsPerDay: 1 }, TH, { cohortSalesMedian: 386, reviewThreshold: 120 });
+
+  assert.equal(c.startSales, 30, "старт ограничен целью");
+  assert.equal(c.startSource, "target", "и источник — цель, а не когорта");
+  assert.deepEqual(c.startCappedFrom, { value: 386, source: "cohort" }, "а откуда ограничили — названо");
+
+  const text = c.assumptions.join(" ");
+  assert.ok(!/^.*30 шт\/мес \(медиана продаж новичков/.test(text), "подпись больше не приписывает 30 когорте");
+  assert.ok(/386/.test(text), "настоящее число когорты показано: " + text);
+});
+
+test("старт ниже цели — когорта остаётся когортой", () => {
+  const c = cashflow({ ...BASE, unitsPerDay: 10 }, TH, { cohortSalesMedian: 90, reviewThreshold: 120 });
+  assert.equal(c.startSales, 90);
+  assert.equal(c.startSource, "cohort");
+  assert.equal(c.startCappedFrom, null);
+});
+
+test("введённый вручную старт выше цели тоже не выдаётся за ввод", () => {
+  const c = cashflow({ ...BASE, unitsPerDay: 1, startSalesMonthly: 500 }, TH, { cohortSalesMedian: 90 });
+  assert.equal(c.startSales, 30);
+  assert.equal(c.startSource, "target");
+  assert.equal(c.startCappedFrom.source, "input");
+});

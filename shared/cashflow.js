@@ -24,7 +24,7 @@ export function cashflow(inputs, th, ctx = {}) {
   const startup = Math.max(0, num(inputs.startupCosts) ?? 0), adsReserve = Math.max(0, num(inputs.adsReserve) ?? 0);
   const rateIn = num(inputs.reviewRate), vineIn = num(inputs.vineReviews);
   const reviewRate = pos(rateIn, t.reviewRate), vine = isNum(vineIn) && vineIn >= 0 ? vineIn : t.vineReviews;
-  const out = { pending: true, reason: null, rows: [], horizonMonths: horizon, rampMonths: ramp, leadDays, leadMonths: null, targetMonthly: perDay * 30, startSales: null, startSource: null,
+  const out = { pending: true, reason: null, rows: [], horizonMonths: horizon, rampMonths: ramp, leadDays, leadMonths: null, targetMonthly: perDay * 30, startSales: null, startSource: null, startCappedFrom: null,
     firstBatchUnits: null, landed: null, peak: null, peakMonth: null, batches: 0, unitsPurchased: 0, unitsSold: 0, paybackMonth: null, endCum: null, stockUnitsEnd: null, stockValueEnd: null,
     stockoutMonths: 0, cpcMissing: cpc === null, adsReserveUsed: 0, startupCosts: startup, reviewThreshold: isNum(ctx.reviewThreshold) ? ctx.reviewThreshold : null, reviewsReachedMonth: null, first90: null, assumptions: [],
     // spec 020: возвраты, сценарии и точка дозаказа
@@ -46,9 +46,15 @@ export function cashflow(inputs, th, ctx = {}) {
 
   // стартовый уровень продаж: ввод менеджера → медиана продаж новичков ниши → 0
   const startIn = num(inputs.startSalesMonthly);
-  if (isNum(startIn) && startIn >= 0) { out.startSales = Math.min(startIn, target); out.startSource = "input"; }
-  else if (isNum(ctx.cohortSalesMedian) && ctx.cohortSalesMedian > 0) { out.startSales = Math.min(ctx.cohortSalesMedian, target); out.startSource = "cohort"; }
-  else { out.startSales = 0; out.startSource = "zero"; }
+  // ВАЖНО: ограничение целью меняет не только число, но и ОТКУДА оно взялось. Прежде источник
+  // оставался «медиана новичков» даже когда медиана была выше цели и число приходило из цели:
+  // при цели 30 шт/мес и медиане когорты 386 подпись гласила «старт 30 — медиана продаж новичков».
+  // Число из цели, подпись от когорты — читатель думал, что новички продают по 30.
+  const cap = (v, src) => (v > target ? { startSales: target, startSource: "target", cappedFrom: { value: v, source: src } } : { startSales: v, startSource: src, cappedFrom: null });
+  const picked = isNum(startIn) && startIn >= 0 ? cap(startIn, "input")
+    : isNum(ctx.cohortSalesMedian) && ctx.cohortSalesMedian > 0 ? cap(ctx.cohortSalesMedian, "cohort")
+    : { startSales: 0, startSource: "zero", cappedFrom: null };
+  out.startSales = picked.startSales; out.startSource = picked.startSource; out.startCappedFrom = picked.cappedFrom;
   const demand = (m) => { if (m < L || m > T) return 0; const k = m - L + 1; if (ramp <= 1) return target;
     // известен стартовый уровень — первый месяц продаж идёт на нём; не известен — разгон с нуля, первый месяц = цель ÷ rampMonths
     const f = out.startSource === "zero" ? k / ramp : (k - 1) / (ramp - 1); return out.startSales + (target - out.startSales) * Math.min(1, f); };
@@ -136,7 +142,7 @@ export function cashflow(inputs, th, ctx = {}) {
     ? { days: leadDays + t.safetyDays, units: Math.round(perDay * (leadDays + t.safetyDays) * shipFactor), leadDays, safetyDays: t.safetyDays, note: null }
     : { days: null, units: null, leadDays, safetyDays: t.safetyDays, note: "срок поставки не задан — точку дозаказа считать не от чего" };
 
-  out.assumptions.push(`разгон продаж за ${ramp} мес. от ${Math.round(out.startSales)} шт/мес (${{ input: "задано вручную", cohort: "медиана продаж новичков ниши", zero: "данных о новичках нет — с нуля" }[out.startSource]}) до ${Math.round(target)} шт/мес`);
+  out.assumptions.push(`разгон продаж за ${ramp} мес. от ${Math.round(out.startSales)} шт/мес (${{ input: "задано вручную", cohort: "медиана продаж новичков ниши", zero: "данных о новичках нет — с нуля", target: "это и есть цель: " + (out.startCappedFrom?.source === "cohort" ? "новички ниши продают больше (" + Math.round(out.startCappedFrom.value) + " шт/мес), и разгона не требуется" : "введённый старт (" + Math.round(out.startCappedFrom?.value ?? 0) + " шт/мес) выше цели") }[out.startSource]}) до ${Math.round(target)} шт/мес`);
   out.assumptions.push(`срок поставки ${leadDays} дн. ≈ ${L} мес.; партия оплачивается целиком при заказе`);
   out.assumptions.push(out.cpcMissing ? `CPC неизвестен — реклама по месяцам не посчитана${adsReserve ? `, резерв на рекламу $${Math.round(adsReserve)} списан в месяце 0` : ""}` : `реклама = продажи × доля PPC ${Math.round(ppc * 100)} % × CPC ÷ CVR${isNum(out.reviewThreshold) ? `; до планки ${Math.round(out.reviewThreshold)} отзывов CVR × ${t.newListingCvrFactor}` : ""}${adsReserve ? "; резерв на рекламу в сценарий не добавляется — реклама уже посчитана по месяцам" : ""}`);
   out.assumptions.push("выплаты Amazon приходят с задержкой до двух недель и хранение на складе не учтены — держите запас сверх пика");

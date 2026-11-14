@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { budget } from "../shared/budget.js";
+import { cashflow } from "../shared/cashflow.js";
 import { DEFAULT_THRESHOLDS as TH } from "../shared/thresholds.js";
 
 test("Партия, пример 1: $7 × 10 шт × 60 дн = $4 200 партия, две партии $8 400", () => {
@@ -44,4 +45,26 @@ test("spec 005: стоп-вопрос о бюджете оценивается �
   assert.equal(budget(inp, TH, { cash: { pending: false, peak: 25000 } }).quickScreen.budgetFit.status, "fail");
   const noBudget = budget({ ...inp, budget: null }, TH, { cash: { pending: false, peak: 12000 } }); assert.equal(noBudget.status, "unknown"); assert.match(noBudget.quickScreen.budgetFit.detail, /нужно \$12.000 на пике вложений/);
   const fallback = budget(inp, TH, { cash: { pending: true, peak: null } }); assert.equal(fallback.basis, "two_batches"); assert.equal(fallback.need, 18000); assert.match(fallback.quickScreen.budgetFit.text, /две партии/);
+});
+
+test("отзыв 2026-11-13: первая партия в бюджете та же, что в сценарии — с учётом возвратов", () => {
+  // Было: budget считал units × leadDays БЕЗ поправки на возвраты, а cashflow — с ней.
+  // Одна и та же первая партия расходилась в одном отчёте: 75 шт против 83 при 10 % возвратов.
+  const inputs = { price: 40, cogs: 8, shippingPerUnit: 2, referralPct: 0.15, fbaFee: 6, cpc: 1, cvr: 0.1, ppcShare: 0.7,
+    unitsPerDay: 1, productionDays: 30, shippingDays: 30, receivingDays: 15 };
+  const cash = cashflow(inputs, TH, { cohortSalesMedian: 500, returnRate: 0.10 });
+  const b = budget(inputs, TH, { cash });
+
+  assert.ok(cash.lossRate > 0, "возвраты в сценарии учтены");
+  assert.equal(b.batchUnits, cash.firstBatchUnits, "в отчёте одна первая партия, а не две разные");
+  assert.equal(b.batchFrom, "cashflow");
+  assert.ok(b.batchUnits > inputs.unitsPerDay * b.leadDays, "и она БОЛЬШЕ прежней: списанное надо докупить");
+  assert.equal(b.batchCost, b.landed * b.batchUnits);
+});
+
+test("без сценария первая партия считается по сроку поставки — запасной путь жив", () => {
+  const inputs = { price: 40, cogs: 8, shippingPerUnit: 2, unitsPerDay: 2, productionDays: 30, shippingDays: 30, receivingDays: 15 };
+  const b = budget(inputs, TH, {});           // цели продаж нет — сценарий не строится
+  assert.equal(b.batchFrom, "lead_time");
+  assert.equal(b.batchUnits, 2 * b.leadDays);
 });
