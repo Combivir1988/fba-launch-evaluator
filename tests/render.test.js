@@ -199,3 +199,56 @@ test("отзыв 2026-11-13: чеклист показывает ВЕРДИКТ 
   hard.results.amazon = { ...amz, mode: "block", blocks: true, level: "own" };
   assert.match(textOf(hard), /вердикт No-Go/);
 });
+
+// Поле панели и ползунок дашборда показывают одно и то же число. Частичный пересчёт (ECON_DEPENDENT)
+// секцию «quick» не перерисовывает — иначе оборвалось бы перетаскивание, — поэтому значения переносятся
+// в уже отрисованные ползунки. Без этого ползунок CVR в панели двигался, а его двойник оставался прежним.
+test("живая экономика: ползунки следуют за полями панели при частичном пересчёте", () => {
+  const { w } = makeWindow();
+  const a = fullAnalysis();
+  const el = w.document.getElementById("d");
+  w.FBARender.render(el, a, { static: false });
+
+  const val = (k) => el.querySelector(`[data-quick="${k}"]`).value;
+  const out = (k) => el.querySelector(`[data-quick="${k}"]`).parentElement.querySelector("output").textContent;
+  const before = val("cvr");
+  assert.equal(before, String(a.inputs.cvr * 100), "исходное положение ползунка — текущее значение");
+
+  // ровно то, что делает панель: значение меняется, и идёт ЧАСТИЧНЫЙ пересчёт (секции «quick» в списке нет)
+  assert.ok(!w.FBARender.ECON_DEPENDENT.includes("quick"), "секция quick намеренно не в списке перерисовки");
+  Object.assign(a.inputs, { cvr: 0.05, ppcShare: 0.7, unitsPerDay: 39, cogs: 20 });
+  assert.notEqual(String(a.inputs.cvr * 100), before, "проверка имеет смысл только если значение вправду изменилось");
+  a.results = compute(a);
+  w.FBARender.update(el, a, { static: false });
+
+  assert.equal(val("cvr"), "5", "ползунок CVR догнал поле панели");
+  assert.equal(out("cvr"), "5,0 %", "и подпись под ним тоже");
+  assert.equal(val("ppcShare"), "70");
+  assert.equal(val("unitsPerDay"), "39");
+  assert.equal(val("cogs"), "20");
+
+  // все шесть ползунков описаны одной таблицей: добавленный мимо неё не будет синхронизироваться
+  for (const sl of el.querySelectorAll("[data-quick]")) {
+    const k = sl.dataset.quick;
+    const expected = { price: a.results.effective.price, cogs: a.inputs.cogs, cpc: a.results.effective.cpc, cvr: a.inputs.cvr, ppcShare: a.inputs.ppcShare, unitsPerDay: a.inputs.unitsPerDay }[k];
+    assert.ok(expected !== undefined, `ползунок ${k} учтён в проверке`);
+    assert.equal(Number(sl.value), expected * Number(sl.dataset.scale || 1), `ползунок ${k} показывает текущее значение`);
+  }
+});
+
+test("живая экономика: ползунок, который сейчас тянут, пересчёт не дёргает", () => {
+  const { w } = makeWindow();
+  const a = fullAnalysis();
+  const el = w.document.getElementById("d");
+  w.FBARender.render(el, a, { static: false });
+  const sl = el.querySelector('[data-quick="cvr"]');
+  const held = sl.value;
+  sl.focus(); // перетаскивание даёт ползунку фокус
+  assert.equal(w.document.activeElement, sl, "ползунок в фокусе");
+  a.inputs.cvr = 0.2; a.results = compute(a);
+  w.FBARender.update(el, a, { static: false });
+  assert.notEqual(String(a.inputs.cvr * 100), held, "проверка имеет смысл только если значение вправду изменилось");
+  assert.equal(sl.value, held, "значение под рукой человека не переписано");
+  // а соседний — догнал
+  assert.equal(el.querySelector('[data-quick="cogs"]').value, String(a.inputs.cogs));
+});

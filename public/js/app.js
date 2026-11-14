@@ -227,7 +227,7 @@ document.addEventListener("input", (e) => {
   if (el.dataset.axis) { S.a.inputs.axisManual[el.dataset.axis] = Number(el.value); setOutput(el); markDirty(); scheduleEcon(); return; }
   if (el.dataset.quick) { // ползунки в дашборде
     const k = el.dataset.quick; const scale = Number(el.dataset.scale || 1); S.a.inputs[k] = Number(el.value) / scale;
-    const out = el.parentElement.querySelector("output"); if (out) { const v = S.a.inputs[k]; out.textContent = k === "cvr" ? (v * 100).toFixed(1) + " %" : k === "ppcShare" ? Math.round(v * 100) + " %" : k === "unitsPerDay" ? String(v) : "$" + v.toFixed(2); }
+    const out = el.parentElement.querySelector("output"); if (out) out.textContent = R().quickText(k, S.a.inputs[k]); // тот же формат, что и при отрисовке: иначе число меняет вид от того, каким путём его изменили
     const side = $(`.side [data-input="${k}"]`); if (side) { side.value = side.type === "range" ? S.a.inputs[k] * Number(side.dataset.scale || 1) : S.a.inputs[k]; if (side.type === "range") setOutput(side); }
     markDirty(); scheduleEcon(); return;
   }

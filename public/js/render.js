@@ -180,17 +180,44 @@
   }
   const NAMES1 = { "1a": "Niche Revenue", "1b": "Средняя цена (медиана проверенных)", "1c": "Adj. SV главного ключа", "1d": "Отзывы по нише (барьер)", "1e": "Доминация бренда / Amazon", "1f": "Концентрация ниши", "1g": "Сезонность (просадка SV)", "1h": "Успешность запусков" };
 
+  // Ползунки «Живой экономики». ОДНО описание на два применения — отрисовку секции и перенос значений в уже
+  // отрисованные ползунки при частичном пересчёте (syncQuick). Два списка разошлись бы при первой же правке:
+  // ровно так и появилась ошибка, когда ползунок CVR в панели двигался, а его двойник в дашборде оставался прежним.
+  // [ключ, подпись, откуда берётся значение, min, max, шаг, формат, масштаб]
+  const QUICK = [
+    ["price", "Цена, $", (inp, eff) => eff.price, 5, 200, 0.5, (v) => fmtMoney(v, 2), 1],
+    ["cogs", "COGS, $", (inp) => inp.cogs ?? 0, 0, 100, 0.25, (v) => fmtMoney(v, 2), 1],
+    ["cpc", "CPC, $", (inp, eff) => eff.cpc ?? 0, 0, 6, 0.05, (v) => fmtMoney(v, 2), 1],
+    ["cvr", "CVR, %", (inp) => inp.cvr, 0.03, 0.30, 0.005, (v) => fmtPct(v, 1), 100],
+    ["ppcShare", "Доля PPC, %", (inp) => inp.ppcShare, 0, 1, 0.05, (v) => fmtPct(v), 100],
+    ["unitsPerDay", "Шт/день", (inp) => inp.unitsPerDay, 1, 100, 1, (v) => fmtN(v), 1],
+  ];
+  /** Текст рядом с ползунком. Нужен и приложению: иначе одно и то же число пишется по-разному в зависимости от того, каким путём его изменили. */
+  const quickText = (key, v) => { const q = QUICK.find((x) => x[0] === key); return q ? q[6](v) : String(v); };
+
   function secQuick(A, R, o) {
     if (o.static) return "";
     const inp = A.inputs, eff = R.effective;
     return `<h2>Живая экономика <span class="chip">двигайте ползунки — пересчёт мгновенный, без AI</span></h2><div class="quick-sliders noprint">
-      ${sl("price", "Цена, $", eff.price, 5, 200, 0.5, (v) => fmtMoney(v, 2))}
-      ${sl("cogs", "COGS, $", inp.cogs ?? 0, 0, 100, 0.25, (v) => fmtMoney(v, 2))}
-      ${sl("cpc", "CPC, $", eff.cpc ?? 0, 0, 6, 0.05, (v) => fmtMoney(v, 2))}
-      ${sl("cvr", "CVR, %", inp.cvr, 0.03, 0.30, 0.005, (v) => fmtPct(v, 1), 100)}
-      ${sl("ppcShare", "Доля PPC, %", inp.ppcShare, 0, 1, 0.05, (v) => fmtPct(v), 100)}
-      ${sl("unitsPerDay", "Шт/день", inp.unitsPerDay, 1, 100, 1, (v) => fmtN(v))}
+      ${QUICK.map(([key, label, pick, min, max, step, fmt, scale]) => sl(key, label, pick(inp, eff), min, max, step, fmt, scale)).join("\n      ")}
     </div>`;
+  }
+
+  /** Поля панели и ползунки дашборда показывают ОДНО И ТО ЖЕ число, и расходиться им нельзя.
+   *  Частичный пересчёт секцию «quick» намеренно не перерисовывает — это оборвало бы перетаскивание, —
+   *  поэтому значения переносятся в уже отрисованные ползунки. Тот, за который держат прямо сейчас, не трогаем. */
+  function syncQuick(container, A, R) {
+    const inp = A.inputs, eff = R.effective;
+    const active = container.ownerDocument?.activeElement ?? null;
+    for (const [key, , pick, , , , fmt, scale] of QUICK) {
+      const el = container.querySelector(`[data-quick="${key}"]`);
+      if (!el || el === active) continue;
+      const v = pick(inp, eff);
+      if (!isNum(v)) continue;
+      el.value = String(v * scale);
+      // Текст берётся из настоящего значения, а не из ползунка: за пределами его шкалы ползунок упирается в край, а число остаётся верным.
+      const out = el.parentElement.querySelector("output"); if (out) out.textContent = fmt(v);
+    }
   }
   function secEconomics(A, R, o) {
     const e = R.economics, inp = A.inputs;
@@ -1502,9 +1529,10 @@
     const R = A.results; if (!R) return; container.__opts = { ...(container.__opts || {}), ...opts }; opts = container.__opts; container.__A = A;
     for (const id of ids) fill(container, id, A, R, opts);
     if (ids.some((id) => STAGE2.has(id)) && !ids.includes("hero")) fill(container, "hero", A, R, opts); // строка «Этап 2 …» в шапке зависит от состояния этапа 2
+    if (!ids.includes("quick") && !opts.static) syncQuick(container, A, R); // секция не перерисовывается, но числа в ней обязаны быть текущими
     refreshStageTabs(container, A);
   }
   function destroy(container) { for (const c of Object.values(container.__charts || {})) { try { c.destroy(); } catch {} } container.__charts = {}; }
 
-  window.FBARender = { render, update, destroy, setStage, fill, annotate, annotateInputs, initTips, tips: { TIPS, KEY_TIPS, INPUT_TIPS, SIDE_TIPS, used: usedTips }, ECON_DEPENDENT, fmt: { fmtN, fmtMoney, fmtK, fmtPct, fmtDate }, VLABEL };
+  window.FBARender = { render, update, destroy, setStage, fill, annotate, annotateInputs, initTips, syncQuick, quickText, tips: { TIPS, KEY_TIPS, INPUT_TIPS, SIDE_TIPS, used: usedTips }, ECON_DEPENDENT, fmt: { fmtN, fmtMoney, fmtK, fmtPct, fmtDate }, VLABEL };
 })();
