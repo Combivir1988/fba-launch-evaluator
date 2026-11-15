@@ -431,10 +431,13 @@ $("#kw-auto").addEventListener("click", () => { autoCluster(); markDirty(); rend
 /** Что отбор предлагает сверх уже выбранного. Нужно, потому что «Автовыбор» ПЕРЕЗАПИСЫВАЕТ выбор:
  *  после spec 023 у людей есть кластеры, из которых прежнее правило выбросило нужные фразы (в живом случае —
  *  все 135, отобранные вручную), и восстанавливать их перезаписью нельзя: ручную работу не вернуть. */
-function missingFromCluster() {
-  const c = S.a.aggregates.cerebro; if (!c) return [];
+function clusterInfo() {
+  const c = S.a.aggregates.cerebro; if (!c) return null;
   const th = mergeThresholds(S.a.thresholds).traffic;
-  const info = suggestClusterInfo(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minScore: S.a.inputs.clusterMinScore ?? th.minPerfScore, want: th.clusterWant, minCompetitors: S.a.inputs.clusterMinCompetitors ?? th.minCompetitors, limit: th.clusterLimit });
+  return suggestClusterInfo(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minScore: S.a.inputs.clusterMinScore ?? th.minPerfScore, want: th.clusterWant, minCompetitors: S.a.inputs.clusterMinCompetitors ?? th.minCompetitors, limit: th.clusterLimit });
+}
+function missingFromCluster() {
+  const info = clusterInfo(); if (!info) return [];
   const have = new Set(S.a.inputs.clusterKeywords);
   return info.phrases.filter((p) => !have.has(p));
 }
@@ -510,8 +513,13 @@ function renderCluster() {
   // Подпись называет ПРАВИЛО, а не только числа: до spec 023 имя бренда искалось куском слова, марка MET
   // делала брендовыми все фразы со словом «helMET», и строка «скрыто брендовых 6909» читалась как исправная работа фильтра.
   const miss = missingFromCluster().length;
+  // Планка смысловой близости видна при ЛЮБОМ формате выгрузки: это ответ на вопрос, почему в кластере
+  // нет (или есть) фраз вроде «capacete bike» при ключе «bike helmet». Блок про Competitor Performance Score
+  // для выгрузки по одному конкуренту скрыт целиком, и прятать планку вместе с ним нельзя.
+  const ci = clusterInfo();
+  const near = ci ? ` · близость: ${ci.closenessLabel}${ci.closenessSteppedDown ? " (по главному слову набралось мало — планка смягчена)" : ""}` : "";
   $("#kw-stats").textContent = `всего ${total.toLocaleString("ru-RU")} · скрыто ASIN ${asins}, брендовых ${branded} (имя бренда — отдельным словом) · показано ${Math.min(list.length, 400)}${multi ? " · multi-ASIN" : ""}`
-    + (miss ? ` · отбор предлагает ещё ${miss} фраз сверх выбранного` : "");
+    + near + (miss ? ` · отбор предлагает ещё ${miss} фраз сверх выбранного` : "");
 }
 function renderBrandChips() {
   const det = $("#det-brands"); const comp = S.a.results?.competition;

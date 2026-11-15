@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCerebro, suggestCluster, isCerebroHeaders, competitorStats, suggestClusterInfo, hasPerfScore, effectiveScore, brandMatcher, annotateKeywords } from "../shared/parse-cerebro.js";
+import { parseCerebro, suggestCluster, isCerebroHeaders, competitorStats, suggestClusterInfo, hasPerfScore, effectiveScore, brandMatcher, annotateKeywords, tokens } from "../shared/parse-cerebro.js";
 import { readCsv, CEREBRO } from "./helpers.js";
 
 const rows = readCsv(CEREBRO);
@@ -92,11 +92,13 @@ test("кластер по Competitor Performance Score: берём фразы, �
   assert.equal(info.byScore, true); assert.equal(info.score, 10); assert.equal(info.steppedDown, false);
   assert.equal(info.phrases.length, 20, "фраза со score 2 не попала"); assert.ok(!info.phrases.includes("mus"));
 
-  // в узкой нише десятки почти нет — порог смягчается сам
-  const narrow = [kw("a", 10, 900), ...[...Array(18)].map((_, i) => kw("b" + i, 6, 300 + i)), kw("c", 2, 800)];
-  const soft = suggestClusterInfo(narrow, { coreKeyword: "a b c", minSv: 100, minScore: 10, want: 15 });
+  // в узкой нише десятки почти нет — порог смягчается сам.
+  // Фразы содержат главное слово ключа: иначе проверка меряла бы не порог score, а планку близости (spec 023).
+  const narrow = [kw("mat", 10, 900), ...[...Array(18)].map((_, i) => kw("mat " + i, 6, 300 + i)), kw("mat c", 2, 800)];
+  const soft = suggestClusterInfo(narrow, { coreKeyword: "mat", minSv: 100, minScore: 10, want: 15 });
   assert.equal(soft.steppedDown, true); assert.equal(soft.score, 6, "ступень 10 → 8 → 6");
-  assert.equal(soft.phrases.length, 19); assert.ok(!soft.phrases.includes("c"), "score 2 всё равно за бортом");
+  assert.equal(soft.closeness, "head", "близость не смягчалась — все фразы с главным словом");
+  assert.equal(soft.phrases.length, 19); assert.ok(!soft.phrases.includes("mat c"), "score 2 всё равно за бортом");
 
   // старая выгрузка без колонки score — прежнее правило по числу конкурентов
   const old = [{ phrase: "x", sv: 900, rankingCompetitors: 9, relevance: 1, isAsin: false, isBranded: false, isCore: false },
@@ -168,4 +170,68 @@ test("spec 023: разбор файла и переразметка дают о�
   const again = annotateKeywords(c.keywords, { coreKeyword: core, brands });
   const diff = c.keywords.filter((k, i) => k.isBranded !== again[i].isBranded);
   assert.equal(diff.length, 0, "разбор и переразметка разошлись: " + diff.slice(0, 3).map((k) => k.phrase).join(", "));
+});
+
+// ============ spec 023, US4: одна планка смысловой близости ============
+// Прежде строгость отбора зависела не от ниши, а от ФОРМАТА выгрузки: при выгрузке по нескольким
+// конкурентам фразе хватало ОДНОГО слова ключа, при выгрузке по одному требовались ВСЕ. Для ключа
+// «bike helmet» одного слова «bike» хватало, и в кластер текла вся категория: самокаты, скейтборды,
+// электровелосипеды. Замер: 2 385 фраз из 3 050 в кластерах (78 %) не содержали всех слов ключа.
+//
+// Планка теперь одна — ГЛАВНОЕ слово ключа (последний значимый токен). «Все слова» измеренно неверно:
+// медиана 9 фраз на нишу, и в нише шлемов это выбросило бы `helmet`, `kids helmet`, `adult helmet` — сам товар.
+// relevance считается ЧЕСТНО, как это делает разбор выгрузки: доля слов ключа, встретившихся во фразе.
+// Если задать её единицей всем подряд, проверка «планка одна при любом формате» становится пустой —
+// обе ветки прежнего правила принимают всё, и тест проходит даже на неисправленном коде.
+const kwOf = (phrase, core, extra = {}) => {
+  const ct = tokens(core || ""), t = tokens(phrase);
+  const rel = ct.length ? ct.filter((x) => t.includes(x)).length / ct.length : 0;
+  return { phrase, sv: 500, isAsin: false, isBranded: false, isCore: false,
+    relevance: rel, performanceScore: 10, rankingCompetitors: 9, ...extra };
+};
+
+test("SC-023-004: планка близости — главное слово ключа, а не любое", () => {
+  const core = "Bike Helmet";
+  const keep = ["helmet", "kids helmet", "bike helmet adult men", "e bike helmet"];
+  const drop = ["bike gear for men", "capacete bike", "mens blue bike", "black bmx bike"];
+  // ступень не должна смягчиться: годных по главному слову хватает
+  const pad = [...Array(14)].map((_, i) => "helmet " + i);
+  const kws = [...keep, ...pad, ...drop].map((p) => kwOf(p, core));
+
+  const info = suggestClusterInfo(kws, { coreKeyword: core, minSv: 100, minScore: 8, want: 15 });
+  assert.equal(info.closeness, "head", "ступень не смягчалась");
+  for (const p of keep) assert.ok(info.phrases.includes(p), "оставить: " + p);
+  for (const p of drop) assert.ok(!info.phrases.includes(p), "отсечь: " + p);
+});
+
+test("SC-023-005: планка одна при любом формате выгрузки", () => {
+  const core = "bike helmet";
+  const phrases = ["helmet", "kids helmet", "bike helmet adult men", "e bike helmet", "capacete bike", "mens blue bike",
+    ...[...Array(14)].map((_, i) => "helmet " + i)];
+  // выгрузка по нескольким конкурентам: есть и score, и число ранжирующихся
+  const multi = phrases.map((p) => kwOf(p, core));
+  // выгрузка по одному конкуренту: ни того, ни другого
+  const single = phrases.map((p) => kwOf(p, core, { performanceScore: null, rankingCompetitors: null }));
+
+  const a = suggestClusterInfo(multi, { coreKeyword: core, minSv: 100, minScore: 8, want: 15 });
+  const b = suggestClusterInfo(single, { coreKeyword: core, minSv: 100, minScore: 8, want: 15 });
+  assert.deepEqual(b.phrases, a.phrases, "один и тот же набор фраз — одно и то же предложение");
+  assert.equal(b.closeness, a.closeness);
+});
+
+test("spec 023: ступени смягчения близости — главное слово → половина слов → любое", () => {
+  const core = "sound deadening mat"; // главное слово «mat»
+  // по главному слову проходит мало, по половине слов — достаточно
+  const kws = [kwOf("sound deadening mat", core), kwOf("sound deadening", core), kwOf("sound deadening material", core),
+    ...[...Array(16)].map((_, i) => kwOf("sound deadening sheet " + i, core))];
+  const info = suggestClusterInfo(kws, { coreKeyword: core, minSv: 100, minScore: 8, want: 15 });
+  assert.equal(info.closeness, "half", "смягчилось до половины слов");
+  assert.equal(info.closenessSteppedDown, true);
+  assert.ok(info.phrases.includes("sound deadening"), "фраза без главного слова взята после смягчения");
+
+  // совсем мало общего — доходим до «любое слово» и не падаем в пустоту
+  const far = [kwOf("sound barrier", core), kwOf("noise blocker", core), kwOf("sound proofing foam", core)];
+  const soft = suggestClusterInfo(far, { coreKeyword: core, minSv: 100, minScore: 8, want: 15 });
+  assert.equal(soft.closeness, "any");
+  assert.ok(soft.phrases.length > 0, "кластер не остаётся пустым");
 });

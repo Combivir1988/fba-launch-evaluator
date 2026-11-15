@@ -217,25 +217,60 @@ export function defaultMinCompetitors(cerebro, fallback = 3) {
  * Single-ASIN: релевантность ≥ 2/3 токенов core-ключа (для core из 1–2 слов — все).
  * Всегда: не ASIN, не бренд, SV ≥ minSv. Возвращает фразы (≤ limit) по убыванию SV.
  */
+/** Ступени смысловой близости, от строгой к мягкой. Порядок — часть правила, а не оформление. */
+export const CLOSENESS_STEPS = ["head", "half", "any"];
+export const CLOSENESS_LABEL = {
+  head: "главное слово ключа",
+  half: "не меньше половины слов ключа",
+  any: "хотя бы одно слово ключа",
+};
+
+/** Проверка близости фразы к нише на заданной ступени. Главное слово — последний значимый токен
+ *  той же токенизации, по которой уже считаются группы ключей в traffic.js. */
+export function closenessTest(coreKeyword, step) {
+  const ct = tokens(coreKeyword || "");
+  if (!ct.length) return () => true; // ключа нет — близость не ограничивает
+  const head = ct[ct.length - 1];
+  if (step === "head") return (phrase) => tokens(phrase).includes(head);
+  if (step === "half") return (phrase) => { const t = tokens(phrase); return ct.filter((x) => t.includes(x)).length / ct.length >= 0.5 - 1e-9; };
+  return (phrase) => { const t = tokens(phrase); return ct.some((x) => t.includes(x)); };
+}
+
 export function suggestClusterInfo(keywords, opts = {}) {
   const minSv = opts.minSv ?? 100;
   const limit = opts.limit ?? 40;
-  const coreLen = tokens(opts.coreKeyword || "").length;
-  const minRel = coreLen <= 2 ? 0.999 : 2 / 3 - 1e-9;
+  const want = opts.want ?? 15;
   const multi = isMultiAsin(keywords);
   const byScore = multi && hasPerfScore(keywords);
-  const eff = byScore ? effectiveScore(keywords, { minScore: opts.minScore ?? 8, minSv, want: opts.want ?? 15 }) : null;
-  const relevant = (k) => (byScore
-    ? (k.performanceScore ?? 0) >= eff.score && (coreLen === 0 || k.relevance > 0)
+  const eff = byScore ? effectiveScore(keywords, { minScore: opts.minScore ?? 8, minSv, want }) : null;
+  // Сила конкурентов — отдельный вопрос от смысловой близости, и зависит от формата выгрузки законно:
+  // в выгрузке по одному конкуренту этих колонок просто нет.
+  const strongEnough = (k) => (byScore
+    ? (k.performanceScore ?? 0) >= eff.score
     : multi
-      ? (k.rankingCompetitors ?? 0) >= (opts.minCompetitors ?? 3) && (coreLen === 0 || k.relevance > 0)
-      : k.relevance >= minRel);
+      ? (k.rankingCompetitors ?? 0) >= (opts.minCompetitors ?? 3)
+      : true);
+  const base = keywords.filter((k) => !k.isAsin && !k.isBranded && k.sv >= minSv && (k.isCore || strongEnough(k)));
+
+  // Близость — ОДНА планка на любой формат. Прежде при выгрузке по нескольким конкурентам хватало одного
+  // слова ключа, а при выгрузке по одному требовались все: строгость зависела от формата файла, а не от ниши.
+  // Для ключа «bike helmet» одного слова «bike» хватало, и в кластер текла вся категория — самокаты и скейтборды.
+  // «Все слова» измеренно неверно: медиана 9 фраз на нишу, и в нише шлемов это выбросило бы сам товар
+  // (`helmet`, `kids helmet`, `adult helmet`). Главное слово оставляет 430 фраз из 437 и отсекает ровно мусор,
+  // но голодает (меньше `want`) в 17 нишах из 67 — поэтому ступени, и применённая ступень называется человеку.
+  let closeness = CLOSENESS_STEPS[CLOSENESS_STEPS.length - 1], closenessFits = 0;
+  for (const step of CLOSENESS_STEPS) {
+    const ok = closenessTest(opts.coreKeyword, step);
+    const n = base.filter((k) => k.isCore || ok(k.phrase)).length;
+    if (step === CLOSENESS_STEPS[0]) closenessFits = n;
+    if (n >= want) { closeness = step; closenessFits = n; break; }
+    closeness = step; closenessFits = n; // последняя ступень остаётся, даже если и её мало — пустого кластера не отдаём
+  }
+  const close = closenessTest(opts.coreKeyword, closeness);
   const cap = multi ? Math.max(limit, 60) : limit;
-  const phrases = keywords
-    .filter((k) => !k.isAsin && !k.isBranded && k.sv >= minSv && (k.isCore || relevant(k)))
-    .slice(0, cap)
-    .map((k) => k.phrase);
-  return { phrases, byScore, score: eff?.score ?? null, steppedDown: Boolean(eff?.steppedDown), fits: eff?.fits ?? null, cap };
+  const phrases = base.filter((k) => k.isCore || close(k.phrase)).slice(0, cap).map((k) => k.phrase);
+  return { phrases, byScore, score: eff?.score ?? null, steppedDown: Boolean(eff?.steppedDown), fits: eff?.fits ?? null, cap,
+    closeness, closenessFits, closenessSteppedDown: closeness !== CLOSENESS_STEPS[0], closenessLabel: CLOSENESS_LABEL[closeness] };
 }
 
 export function suggestCluster(keywords, opts = {}) {
