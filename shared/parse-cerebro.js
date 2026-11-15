@@ -65,16 +65,33 @@ const normBrand = (b) => String(b ?? "").toLowerCase().replace(/['’`]/g, "").r
  * «Ling's moment» → «lings moment», «Melorca&Guilla» → «melorca guilla») или — отдельным словом — его «голову»: первое слово
  * двухсловного бренда либо основу притяжательного («Mandy's» → «mandy»), если голова не короче 5 букв, не общее слово и не слово core-ключа.
  */
-export function brandMatcher(brands = [], coreKeyword = "") {
-  const core = new Set(normBrand(coreKeyword).split(" ").filter(Boolean));
+export function brandMatcher(brands = [], coreKeyword = "", { heads: useHeads = true } = {}) {
+  const coreFull = normBrand(coreKeyword);
+  const core = new Set(coreFull.split(" ").filter(Boolean));
   const full = new Set(), heads = new Set();
   for (const raw of brands || []) {
-    const n = normBrand(raw); if (!n || n.length < 3 || BRAND_STOP.has(n)) continue; full.add(n);
+    const n = normBrand(raw); if (!n || n.length < 3 || BRAND_STOP.has(n)) continue;
+    // Имя анализа неприкосновенно: однословное имя, совпадающее со словом ключа, для разметки не используется.
+    // Правило уже действовало для «голов» двухсловных имён; spec 023 распространяет его на полные имена.
+    if (!n.includes(" ") && core.has(n)) continue;
+    full.add(n);
     const first = String(raw).trim().split(/\s+/)[0] || ""; const head = normBrand(first);
     const possessive = /['’]s$/i.test(first);
-    if ((n.includes(" ") || possessive) && head) { const h = possessive ? head.replace(/s$/, "") : head; if (h.length >= 5 && !BRAND_STOP.has(h) && !core.has(h)) heads.add(h); }
+    if (useHeads && (n.includes(" ") || possessive) && head) { const h = possessive ? head.replace(/s$/, "") : head; if (h.length >= 5 && !BRAND_STOP.has(h) && !core.has(h)) heads.add(h); }
   }
-  return (phrase) => { const p = normBrand(phrase); if (!p) return false; for (const f of full) if (p.includes(f)) return true; const padded = " " + p + " "; for (const h of heads) if (padded.includes(" " + h + " ")) return true; return false; };
+  return (phrase) => {
+    const p = normBrand(phrase); if (!p) return false;
+    if (coreFull && p === coreFull) return false; // ключ анализа не может быть брендовым запросом ни при каком списке имён
+    const padded = " " + p + " ";
+    // spec 023: имя считается найденным, только когда стоит ОТДЕЛЬНЫМ словом (или цепочкой слов целиком).
+    // Прежде здесь была подстрока, и трёхбуквенная марка MET делала брендовыми все фразы со словом «helMET» —
+    // 6 909 из 6 938 в нише шлемов, включая сам ключ анализа; отобранные человеком фразы выбрасывались из кластера
+    // при каждом открытии. Замер на живых данных: граница слова снимает 4 873 ложных пометки из 10 886 и не
+    // добавляет НИ ОДНОЙ новой — новое правило строго уже прежнего, и это проверяется на всех живых анализах.
+    for (const f of full) if (padded.includes(" " + f + " ")) return true;
+    for (const h of heads) if (padded.includes(" " + h + " ")) return true;
+    return false;
+  };
 }
 /** Все известные бренды анализа: Xray, POE (в т. ч. объединённый) и список исключённых брендов. */
 export function knownBrands({ xray, poe, excludedBrands } = {}) {

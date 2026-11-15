@@ -428,6 +428,23 @@ $("#kw-minsv").addEventListener("change", (e) => { S.a.inputs.clusterMinSv = Num
 $("#kw-mincomp").addEventListener("change", (e) => { const c = S.a.aggregates.cerebro; const byScore = hasPerfScore(c?.keywords || []); const v = Number(e.target.value); if (byScore) S.a.inputs.clusterMinScore = Math.min(10, Math.max(0, Number.isFinite(v) ? v : 8)); else S.a.inputs.clusterMinCompetitors = Math.max(1, v || 3); autoCluster(); markDirty(); renderAll(); });
 $("#kw-sort").addEventListener("change", renderCluster);
 $("#kw-auto").addEventListener("click", () => { autoCluster(); markDirty(); renderAll(); });
+/** Что отбор предлагает сверх уже выбранного. Нужно, потому что «Автовыбор» ПЕРЕЗАПИСЫВАЕТ выбор:
+ *  после spec 023 у людей есть кластеры, из которых прежнее правило выбросило нужные фразы (в живом случае —
+ *  все 135, отобранные вручную), и восстанавливать их перезаписью нельзя: ручную работу не вернуть. */
+function missingFromCluster() {
+  const c = S.a.aggregates.cerebro; if (!c) return [];
+  const th = mergeThresholds(S.a.thresholds).traffic;
+  const info = suggestClusterInfo(c.keywords, { coreKeyword: S.a.coreKeyword, minSv: S.a.inputs.clusterMinSv ?? th.minSv, minScore: S.a.inputs.clusterMinScore ?? th.minPerfScore, want: th.clusterWant, minCompetitors: S.a.inputs.clusterMinCompetitors ?? th.minCompetitors, limit: th.clusterLimit });
+  const have = new Set(S.a.inputs.clusterKeywords);
+  return info.phrases.filter((p) => !have.has(p));
+}
+$("#kw-add").addEventListener("click", () => {
+  const add = missingFromCluster();
+  if (!add.length) { toast("Отбор не предлагает ничего сверх того, что уже выбрано", 4000); return; }
+  S.a.inputs.clusterKeywords = [...S.a.inputs.clusterKeywords, ...add];
+  toast(`Добавлено фраз: ${add.length}. Снято не было ничего; шаг отменяется через «🕘 Версии»`, 6000);
+  markDirty(); renderAll();
+});
 $("#kw-none").addEventListener("click", () => { S.a.inputs.clusterKeywords = []; markDirty(); renderAll(); });
 // ---------- несколько ниш POE в одном анализе (spec 007) ----------
 // aggregates.poe — всегда ОДИН объект, по которому идёт расчёт (одна ниша как есть или объединение); aggregates.poeParts хранит ниши по отдельности, только когда их больше одной.
@@ -490,7 +507,11 @@ function renderCluster() {
   $("#kwlist").innerHTML = list.map((k) => `<label><input type="checkbox" data-kw="${esc(k.phrase)}" ${sel.has(k.phrase) ? "checked" : ""}><span>${esc(k.phrase)}${k.isCore ? " ★" : ""}${k.isBranded ? ' <span class="chip warn">бренд</span>' : ""}${k.isAsin ? ' <span class="chip na">ASIN</span>' : ""}${k.sv < minSv ? ' <span class="chip na" title="ниже порога SV">low</span>' : ""}</span><span class="sv" title="SV${k.keywordSales != null ? " · продаж " + k.keywordSales : ""}${multi ? " · конкурентов " + (k.rankingCompetitors ?? "—") : ""}">${k.sv.toLocaleString("ru-RU")}${multi && k.rankingCompetitors != null ? ` <small>· ${k.rankingCompetitors}👥</small>` : ""}${k.keywordSales != null ? ` <small>· ${k.keywordSales}🛒</small>` : ""}</span></label>`).join("");
   $("#cluster-count").textContent = `(${sel.size})`;
   const total = c.keywords.length, shown = c.keywords.filter((k) => !k.isAsin && !k.isBranded).length, asins = c.keywords.filter((k) => k.isAsin).length, branded = c.keywords.filter((k) => k.isBranded).length;
-  $("#kw-stats").textContent = `всего ${total.toLocaleString("ru-RU")} · скрыто ASIN ${asins}, брендовых ${branded} · показано ${Math.min(list.length, 400)}${multi ? " · multi-ASIN" : ""}`;
+  // Подпись называет ПРАВИЛО, а не только числа: до spec 023 имя бренда искалось куском слова, марка MET
+  // делала брендовыми все фразы со словом «helMET», и строка «скрыто брендовых 6909» читалась как исправная работа фильтра.
+  const miss = missingFromCluster().length;
+  $("#kw-stats").textContent = `всего ${total.toLocaleString("ru-RU")} · скрыто ASIN ${asins}, брендовых ${branded} (имя бренда — отдельным словом) · показано ${Math.min(list.length, 400)}${multi ? " · multi-ASIN" : ""}`
+    + (miss ? ` · отбор предлагает ещё ${miss} фраз сверх выбранного` : "");
 }
 function renderBrandChips() {
   const det = $("#det-brands"); const comp = S.a.results?.competition;

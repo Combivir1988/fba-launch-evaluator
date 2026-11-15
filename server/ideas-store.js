@@ -8,6 +8,10 @@
 //    выглядела бы в ленте пустотой.
 import { randomUUID } from "node:crypto";
 
+// ОДИН источник «сегодня» на весь раздел. Прежде дата бралась дважды: здесь — по UTC, а в запросах — через
+// current_date самой базы. В часы, когда эти два «сегодня» расходятся (а для любого часового пояса восточнее UTC
+// это каждый вечер), суточный обход считал, что уже сходил, и раздел молча оставался вчерашним.
+// Это тот же класс ошибки, что уже ловили в spec 021 с датой из базы, только утёкший в другую сторону.
 const today = (now = new Date()) => now.toISOString().slice(0, 10);
 
 const SOURCE_COLS = "id, platform, handle, title, market, active, paused_reason, threshold_mult, fails_in_row, created_by, created_at";
@@ -114,7 +118,7 @@ export function createIdeasStore(db) {
 
   /** Чужие тексты не хранятся дольше необходимого. */
   const cleanupItems = async (keepDays) =>
-    (await db.query("DELETE FROM idea_item WHERE run_date < (current_date - $1::integer)", [keepDays])).rowCount ?? 0;
+    (await db.query("DELETE FROM idea_item WHERE run_date < ($2::date - $1::integer)", [keepDays, today()])).rowCount ?? 0;
 
   // ---------- кандидаты ----------
 
@@ -140,9 +144,9 @@ export function createIdeasStore(db) {
   const feed = async ({ sinceDays = 7, decision = null } = {}) => (await db.query(
     `SELECT ${CAND_COLS_C}, s.title AS source_title, s.handle AS source_handle
        FROM idea_candidate c LEFT JOIN idea_source s ON s.id = c.source_id
-      WHERE c.last_seen_on >= (current_date - $1::integer)
+      WHERE c.last_seen_on >= ($3::date - $1::integer)
         AND ($2::text IS NULL OR c.decision = $2)
-      ORDER BY c.last_seen_on DESC, c.ratio DESC`, [sinceDays, decision])).rows;
+      ORDER BY c.last_seen_on DESC, c.ratio DESC`, [sinceDays, decision, today()])).rows;
 
   const dismissed = async () => (await db.query(
     `SELECT ${CAND_COLS_C}, s.title AS source_title FROM idea_candidate c LEFT JOIN idea_source s ON s.id = c.source_id

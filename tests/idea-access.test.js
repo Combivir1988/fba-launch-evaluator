@@ -110,8 +110,8 @@ test("ВОРОТА SC-009: связь идеи с анализом не трог
   const cid = crypto.randomUUID();
   await T.db.query(
     `INSERT INTO idea_candidate (id, source_id, platform, external_id, title, url, first_seen_on, last_seen_on, metric, background, ratio)
-     VALUES ($1, $2, 'video', 'x1', 'Что-то взлетело', 'https://example.invalid/x1', current_date, current_date, 100, 10, 10)`,
-    [cid, src]);
+     VALUES ($1, $2, 'video', 'x1', 'Что-то взлетело', 'https://example.invalid/x1', $3::date, $3::date, 100, 10, 10)`,
+    [cid, src, new Date().toISOString().slice(0, 10)]); // то же UTC-сегодня, которым живёт раздел
 
   const r = await T.call("POST", `/api/ideas/candidates/${cid}/analysis`, anna.headers, { analysisId: id });
   assert.equal(r.status, 200);

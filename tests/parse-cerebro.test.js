@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCerebro, suggestCluster, isCerebroHeaders, competitorStats, suggestClusterInfo, hasPerfScore, effectiveScore } from "../shared/parse-cerebro.js";
+import { parseCerebro, suggestCluster, isCerebroHeaders, competitorStats, suggestClusterInfo, hasPerfScore, effectiveScore, brandMatcher, annotateKeywords } from "../shared/parse-cerebro.js";
 import { readCsv, CEREBRO } from "./helpers.js";
 
 const rows = readCsv(CEREBRO);
@@ -103,4 +103,69 @@ test("кластер по Competitor Performance Score: берём фразы, �
                { phrase: "y", sv: 900, rankingCompetitors: 2, relevance: 1, isAsin: false, isBranded: false, isCore: false }];
   const legacy = suggestClusterInfo(old, { coreKeyword: "x y", minSv: 100, minCompetitors: 8 });
   assert.equal(legacy.byScore, false); assert.deepEqual(legacy.phrases, ["x"]);
+});
+
+// ============ spec 023: бренд против куска слова ============
+// Живой случай 2026-11-14: среди конкурентов ниши велосипедных шлемов есть марка MET (настоящий
+// итальянский производитель). Подстрочное совпадение делало брендовыми 6 909 фраз со словом helmet
+// из 6 938 — то есть всю нишу, включая сам ключ анализа. Человек отобрал 135 фраз вручную,
+// и при КАЖДОМ открытии анализа все 135 выбрасывались из кластера (замер: «сохранено 135 → остаётся 0»).
+
+// ВОРОТА SC-001. Реализация, которая ищет имя бренда внутри слова, обязана ронять этот тест —
+// и ронять ИМЕННО на пунктах про helmet, а не на пунктах про «met helmet»: если падает везде,
+// затронуто больше, чем задумано.
+test("SC-023-001: имя бренда совпадает отдельным словом, а не куском слова", () => {
+  const m = brandMatcher(["MET", "Giro", "Bell"], "bike helmet");
+
+  // ради чего всё делается: буквы «met» внутри слова брендом не являются
+  assert.equal(m("bike helmet"), false, "ключ ниши не брендовый запрос");
+  assert.equal(m("helmets for adults"), false);
+  assert.equal(m("kids helmet"), false);
+  assert.equal(m("geometry set"), false, "«met» внутри geometry");
+
+  // а настоящие брендовые запросы ловятся по-прежнему
+  assert.equal(m("met helmet"), true, "имя отдельным словом");
+  assert.equal(m("casco met"), true, "имя последним словом");
+  assert.equal(m("giro bike helmet"), true);
+  assert.equal(m("bell helmet"), true);
+});
+
+// ВОРОТА SC-002. Ключ анализа — это заявление человека о том, что он изучает.
+// Приложение не вправе его отменить. На живых данных таких случаев было 2 из 67.
+test("SC-023-002: ключ анализа никогда не брендовый", () => {
+  // имя совпадает со словом ключа целиком
+  const m1 = brandMatcher(["Helmet", "Giro"], "bike helmet");
+  assert.equal(m1("bike helmet"), false, "слово ключа не может быть именем бренда");
+  assert.equal(m1("helmet"), false);
+  assert.equal(m1("giro helmet"), true, "другое имя по-прежнему ловится");
+
+  // имя совпадает со всем ключом
+  const m2 = brandMatcher(["Bike Helmet"], "bike helmet");
+  assert.equal(m2("bike helmet"), false, "фраза, равная ключу, не брендовая ни при каком списке");
+});
+
+// ИЗВЕСТНЫЙ ПРОБЕЛ, оставленный осознанно. Многословное имя, написанное человеком СЛИТНО
+// («amazonbasics» вместо «amazon basics»), не ловится — ни прежним правилом, ни новым.
+// Замер на живых данных: таких фраз 83, из них действующее правило помечает брендовыми 24
+// (их ловит «голова» имени), а 59 не помечает вовсе. Ловить их — отдельное улучшение:
+// оно ДОБАВИЛО бы признак 59 фразам, а эта работа обязана быть строго сужающей (инвариант SC-023-003).
+// Тест закрепляет пробел числом, чтобы его не «починили» молча вместе с чем-нибудь другим.
+test("spec 023: слитная запись многословного имени не ловится — известный пробел, не регрессия", () => {
+  const m = brandMatcher(["Amazon Basics", "Ling's moment"], "bike helmet");
+  assert.equal(m("amazon basics air conditioner"), true, "цепочкой слов — ловится");
+  assert.equal(m("lings moment pillow"), true);
+  assert.equal(m("amazonbasics air conditioner"), false, "слитно — не ловится, и это осознанно");
+  // «голова» двухсловного имени по-прежнему работает, если она длиннее четырёх букв
+  const h = brandMatcher(["Melorca Guilla"], "bike helmet");
+  assert.equal(h("melorca pillow"), true, "голова имени отдельным словом");
+});
+
+// Разметка ставится в двух местах — при разборе файла и при смене ключа или списка имён.
+// Оба обязаны идти через один матчер, иначе при следующей правке они разойдутся.
+test("spec 023: разбор файла и переразметка дают одинаковый признак брендовой", () => {
+  const brands = ["MET", "Giro"], core = "bike helmet";
+  const c = parseCerebro(rows, { coreKeyword: core, brands });
+  const again = annotateKeywords(c.keywords, { coreKeyword: core, brands });
+  const diff = c.keywords.filter((k, i) => k.isBranded !== again[i].isBranded);
+  assert.equal(diff.length, 0, "разбор и переразметка разошлись: " + diff.slice(0, 3).map((k) => k.phrase).join(", "));
 });

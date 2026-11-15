@@ -33,6 +33,10 @@ beforeEach(async () => {
   calls = [];
 });
 
+/** «Сегодня» раздела — то же UTC-сегодня, которым живёт server/ideas-store.js.
+ *  Брать здесь current_date базы нельзя: это второй календарь, и тест начинает падать от часового пояса. */
+const utcDay = (shift = 0) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + shift); return d.toISOString().slice(0, 10); };
+
 const addSource = (title, handle = "тема") => store.createSource({ platform: "video", handle, title });
 
 test("повторный обход в те же сутки невозможен — и расход не вырос", async () => {
@@ -110,7 +114,7 @@ test("уборка: элементы старше срока удаляются,
   assert.ok(before > 0, "непрошедшие элементы сохранены — чтобы подвинуть порог и сразу увидеть результат");
 
   // Состариваем всё на день больше срока хранения.
-  await db.query("UPDATE idea_item SET run_date = current_date - ($1::integer + 1)", [keep]);
+  await db.query("UPDATE idea_item SET run_date = $2::date - ($1::integer + 1)", [keep, utcDay()]);
   const removed = await store.cleanupItems(keep);
   assert.equal(removed, before, "чужие тексты не хранятся дольше необходимого");
   assert.ok((await db.query("SELECT count(*)::int AS n FROM idea_candidate")).rows[0].n > 0, "а кандидаты остаются");
@@ -124,8 +128,8 @@ test("повторное появление поднимает счётчик с
   assert.ok(first > 0);
 
   // Следующие сутки, тот же ответ площадки.
-  await db.query("UPDATE idea_run SET run_date = current_date - 1");
-  await db.query("UPDATE idea_candidate SET first_seen_on = current_date - 1, last_seen_on = current_date - 1");
+  await db.query("UPDATE idea_run SET run_date = $1::date", [utcDay(-1)]);
+  await db.query("UPDATE idea_candidate SET first_seen_on = $1::date, last_seen_on = $1::date", [utcDay(-1)]);
   await ideas.sweepAll();
 
   assert.equal((await db.query("SELECT count(*)::int AS n FROM idea_candidate")).rows[0].n, first, "вторых строк не появилось");

@@ -18,7 +18,7 @@ export function challenger(p) {
   {
     const u = user["3"];
     let it = { title: "Лояльность к бренду", status: "na", kind: "unknown", value: null, note: "нет данных: нужен SV «бренд + ключ» (Cerebro/Magnet)" };
-    const bl = brandLoyalty(cerebro, comp?.topBrand, tr?.svCore);
+    const bl = brandLoyalty(cerebro, comp?.topBrand, tr?.svCore, inputs.coreKeyword || "");
     if (bl) it = { ...it, status: bl.ratio < t.loyaltyOk ? "ok" : bl.ratio > t.loyaltyFail ? "fail" : "warn", kind: "confirmed", value: bl.ratio, note: `SV с «${comp.topBrand}» ${bl.brandedSv.toLocaleString("ru-RU")} / SV core ${tr.svCore.toLocaleString("ru-RU")} = ${(bl.ratio * 100).toFixed(1)} % (по фразам Cerebro)` };
     items["3"] = applyUser(it, u);
   }

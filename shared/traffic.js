@@ -1,6 +1,6 @@
 // Распределение трафика, Adj. SV (SKILL), концентрация кликов POE.
 import { sum, safeDiv, median } from "./num.js";
-import { tokens } from "./parse-cerebro.js";
+import { tokens, brandMatcher } from "./parse-cerebro.js";
 
 export function traffic(p) {
   const { cerebro, poe, inputs, thresholds: th } = p;
@@ -71,10 +71,19 @@ export function traffic(p) {
   return out;
 }
 
-/** Критерий 3: Brand Loyalty = SV(бренд + core) / SV(core). */
-export function brandLoyalty(cerebro, brand, svCore) {
+/** Критерий 3: Brand Loyalty = SV(бренд + core) / SV(core).
+ *  spec 023: имя бренда ищется ОБЩИМ матчером — тем же, что размечает брендовые запросы.
+ *  Прежде здесь стояла своя подстрочная проверка, то есть второе правило «что такое брендовый запрос»
+ *  в том же приложении; две копии одного правила расходятся при первой же правке (урок спек 020 и 022).
+ *  Замер двумя отдельными процессами: вердикт не меняется ни у одного из 69 анализов,
+ *  число зелёных в Критерии 5 — тоже, статус подпункта меняется у одного (warn → ok). */
+export function brandLoyalty(cerebro, brand, svCore, coreKeyword = "") {
   if (!cerebro?.keywords?.length || !brand || !svCore) return null;
-  const b = brand.toLowerCase();
-  const brandedSv = sum(cerebro.keywords.filter((k) => !k.isAsin && k.phrase.toLowerCase().includes(b)).map((k) => k.sv));
+  // «Голова» двухсловного имени здесь ВЫКЛЮЧЕНА намеренно. Она нужна, чтобы ОТСЕИВАТЬ фразы из кластера,
+  // где лишняя строгость дёшева. В измеряемой доле она даёт чушь: у лидера «Fresh Products» голова «fresh»
+  // затянула бы «fresh wave odor removing gel» (чужая марка) и «lemon fresh» (просто слово) — замер дал 397,8 %
+  // при прежних 5,5 %. Доля с именем бренда обязана считаться по ИМЕНИ, а не по его первому слову.
+  const isBrand = brandMatcher([brand], coreKeyword, { heads: false });
+  const brandedSv = sum(cerebro.keywords.filter((k) => !k.isAsin && isBrand(k.phrase)).map((k) => k.sv));
   return { brandedSv, ratio: brandedSv / svCore };
 }
