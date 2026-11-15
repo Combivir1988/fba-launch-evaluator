@@ -82,6 +82,10 @@ body.booting #boot { display: flex; position: fixed; inset: 0; align-items: cent
 .side summary::-webkit-details-marker { display: none; }
 .side summary::after { content: "▸"; color: var(--muted); transition: transform .15s; }
 .side details[open] summary::after { transform: rotate(90deg); }
+/* Длинное пояснение внутри раздела панели: сворачивается той же стрелкой, но читается как сноска,
+   а не как ещё один раздел — иначе в узкой панели остаётся стена текста поверх органов управления. */
+.side details.hint { border-top: none; padding: .2rem 0 0; }
+.side details.hint > summary { font-weight: 400; font-size: .8rem; color: var(--muted); }
 .side .body { padding: .3rem 0 .2rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .4rem; padding: .6rem 0 .2rem; position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); }
 .main { min-width: 0; }
