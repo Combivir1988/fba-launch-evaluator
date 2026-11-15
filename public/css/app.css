@@ -86,6 +86,16 @@ body.booting #boot { display: flex; position: fixed; inset: 0; align-items: cent
    а не как ещё один раздел — иначе в узкой панели остаётся стена текста поверх органов управления. */
 .side details.hint { border-top: none; padding: .2rem 0 0; }
 .side details.hint > summary { font-weight: 400; font-size: .8rem; color: var(--muted); }
+/* Плавное раскрытие разделов панели. Нативный <details> меняет высоту скачком, и на тяжёлой странице
+   это читается как «задержка, потом дёрнулось». Анимируем высоту содержимого там, где браузер умеет;
+   где не умеет — остаётся прежнее мгновенное поведение, ничего не ломается.
+   prefers-reduced-motion отключает это общим правилом ниже вместе со всеми переходами. */
+@supports (interpolate-size: allow-keywords) and (selector(::details-content)) {
+  .side { interpolate-size: allow-keywords; }
+  .side details::details-content { block-size: 0; overflow: clip;
+    transition: block-size .18s ease-out, content-visibility .18s allow-discrete; }
+  .side details[open]::details-content { block-size: auto; }
+}
 .side .body { padding: .3rem 0 .2rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .4rem; padding: .6rem 0 .2rem; position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); }
 .main { min-width: 0; }
@@ -96,7 +106,7 @@ body.booting #boot { display: flex; position: fixed; inset: 0; align-items: cent
 /* Двигаем только transform и opacity; колонки сетки не анимируются (см. setSide в app.js). */
 .side { transition: transform .18s ease-out, opacity .18s ease-out; will-change: transform; }
 .side.side-leaving { transform: translateX(-110%); opacity: 0; pointer-events: none; }
-.side.side-pinned { position: absolute; z-index: 5; margin: 0; max-height: none; }
+.side.side-pinned { position: fixed; z-index: 5; margin: 0; max-height: none; }
 .layout.side-animating { position: relative; overflow-x: clip; }
 /* Места в сетке заданы явно: пока панель «приколота» (вне потока), дашборд не должен перескочить в её колонку. */
 @media (min-width: 981px) { #tab-analysis > .side { grid-column: 1; } #tab-analysis > .main { grid-column: 2; } }

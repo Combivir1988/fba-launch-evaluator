@@ -51,8 +51,15 @@ function setSide(collapsed, instant = false) {
   if (layout.classList.contains("side-collapsed") === collapsed) { $("#side-open").classList.toggle("hidden", !collapsed); return; }
   if (instant || layout.classList.contains("hidden") || innerWidth <= 980 || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
   const from = dash.getBoundingClientRect().left;
-  if (collapsed) { const r = side.getBoundingClientRect(), lr = layout.getBoundingClientRect(); // панель остаётся на месте, пока раскладка под ней меняется
-    side.style.left = r.left - lr.left + "px"; side.style.top = r.top - lr.top + "px"; side.style.width = r.width + "px"; side.style.height = r.height + "px"; side.classList.add("side-pinned"); }
+  if (collapsed) { // панель остаётся на месте, пока раскладка под ней меняется
+    // Пришпиливаем в координатах ЭКРАНА (position: fixed). Прежде было position: absolute со смещениями,
+    // посчитанными от раскладки, и они не сходились: absolute отсчитывается от поля предка, а измеряем мы
+    // внешний край, плюс сам предок сдвигается в тот же кадр. Замер в браузере: панель прыгала вправо
+    // на 30 px и только потом уезжала влево — движение читалось как рывок. В экранных координатах
+    // промахнуться нечем: куда панель видна сейчас, там и остаётся на время движения.
+    const r = side.getBoundingClientRect();
+    side.style.left = r.left + "px"; side.style.top = r.top + "px";
+    side.style.width = r.width + "px"; side.style.height = r.height + "px"; side.classList.add("side-pinned"); }
   else side.classList.add("side-leaving"); // панель ждёт за краем экрана
   layout.classList.add("side-animating"); apply();
   const dx = from - dash.getBoundingClientRect().left;
