@@ -468,15 +468,74 @@
       ${isNum(cp.myPrice) ? `<div class="tile ${hot("myPrice")}"><div class="k">Ваша цена</div><div class="v">${fmtMoney(cp.myPrice, 2)}</div><div class="s">${gap(cp.myPriceGap)} к цене по кликам</div></div>` : ""}
     </div>${warn.length ? `<div class="notice" style="margin-bottom:.7rem">${esc(warn.join("; "))}.</div>` : ""}<p class="muted" style="font-size:.8rem;margin-top:-.3rem">Цены POE — средние за 360 дней, а не сегодняшние. Порог расхождения ${fmtPct(cp.gapLimit)}.</p>`;
   }
+  /** spec 024: деньги по коридорам цен. Отвечает на вопрос, на который сегменты Entry/Mid/Premium не отвечают:
+   *  те нарезаны по третям КОЛИЧЕСТВА товаров и по построению содержат примерно по трети листингов каждый. */
+  function distBlock(R) {
+    const d = R.priceDistribution; if (!d) return "";
+    if (!d.bins.length) return `<h4>Деньги по коридорам цен</h4><p class="muted">Диаграммы нет: ${esc(d.reason || "нет данных")}.</p>`;
+    const band = bandOf(R);
+    const mark = band ? `<br>Ваш ценовой диапазон отмечен на диаграмме; сама она построена по всем листингам выгрузки.` : "";
+    // Самый толстый коридор называется ВСЕГДА — это факт о рынке, а не поломка. Оговорка «дальше не
+    // разбирается» появляется только за порогом (замер: 70 % — 3 ниши из 67, на 50–60 % это был бы шум).
+    const top = d.top ? `Больше всего денег в коридоре <b>${fmtMoney(d.top.min, 0)}–${fmtMoney(d.top.max, 0)}</b> — ${fmtPct(d.top.share)} выручки ниши (${fmtN(d.top.items)} листингов).` : "";
+    const deg = d.degenerate ? ` <b>На этом шаге распределение дальше не разбирается</b>: почти все деньги в одном коридоре.` : "";
+    const edges = d.bins.filter((b) => b.edge);
+    const sweep = edges.length
+      ? `<br>${edges.map((b) => `${b === d.bins[0] ? "«и дешевле»" : "«и дороже»"}: сведено ${fmtN(b.edgeItems)} листингов на ${fmtMoney(b.edgeRevenue)}`).join("; ")} — границы под выбросы не растягиваются.`
+      : "";
+    return `<h4>Деньги по коридорам цен</h4><div class="chartbox short"><canvas id="ch-dist"></canvas></div>
+      <p class="muted" style="font-size:.8rem">${top}${deg} Шаг ${fmtMoney(d.step, 0)}, ${fmtN(d.items)} листингов выгрузки Xray, без сужения по цене.${sweep}${mark}</p>`;
+  }
+
+  /** spec 024: четыре числа, без которых верная цена выглядит опиской. Живой случай: средние цены по
+   *  каждой характеристике $41–74, а цена конфигурации $29,99 — и ни одного объясняющего числа рядом.
+   *  Все четыре БЕЗУСЛОВНЫ: сосредоточенность денег это норма («три аналога держат больше 30 %» —
+   *  17 ниш из 18), и условное сообщение здесь не различало бы ничего. */
+  function priceWhy(pc) {
+    const parts = [];
+    parts.push(`${fmtN(pc.analogs)} аналогов, совпадает ${esc(pc.matchWords || "—")} характеристик`);
+    parts.push("медиана, <b>взвешенная выручкой</b> — не средняя цена");
+    const c = pc.concentration;
+    if (c) parts.push(`деньги группы сосредоточены: самый тяжёлый аналог держит ${fmtPct(c.topShare)} выручки и стоит ${fmtMoney(c.topPrice, 2)}` +
+      (c.top3Count > 1 ? `, ${fmtN(c.top3Count)} самых тяжёлых — ${fmtPct(c.top3Share)}` : ""));
+    if (pc.fallback) parts.push("аналогов под это сочетание не нашлось — цена взята по всем листингам области");
+    return parts.join(" · ");
+  }
+
   function secPricing(A, R, o) {
     const ps = R.priceSegments; if (!ps) return R.clickPrice ? `<h2>Цена ниши</h2>${clickPriceBlock(R)}` : "";
     const pick = (sg) => (o?.static ? "" : ` <button type="button" class="seg-pick noprint" data-band-min="${sg.min}" data-band-max="${sg.max}" title="Считать конкурентов только в этом ценовом сегменте">выбрать</button>`);
     return `<h2>Ценовые сегменты${bandChip(R, "whole")}</h2>${clickPriceBlock(R)}<div class="two"><div class="chartbox short"><canvas id="ch-price"></canvas></div>
       <div class="tablewrap"><table><thead><tr><th>Сегмент</th><th class="num">Диапазон</th><th class="num">Доля товаров</th><th class="num">Доля ${ps.weightLabel === "revenue" ? "выручки" : "кликов"}</th></tr></thead><tbody>
       ${ps.segments.map((s) => `<tr class="${s.selected ? "seg-selected" : ""}"><td>${s.name}${s.selected ? ' <span class="chip band">выбран</span>' : ""}${pick(s)}</td><td class="num">${fmtMoney(s.min, 0)}–${fmtMoney(s.max, 0)}</td><td class="num">${fmtPct(s.itemsShare)}</td><td class="num">${fmtPct(s.weightShare)}</td></tr>`).join("")}</tbody></table>
+      ${distBlock(R)}
       <p class="muted" style="font-size:.8rem">Сегмент с большой долей ${ps.weightLabel === "revenue" ? "выручки" : "кликов"} при малой доле товаров — недообслужен; проверяйте концентрацию бренда ВНУТРИ сегмента перед выбором цены${o?.static ? "" : " — кнопка «выбрать» сузит анализ конкурентов до этого сегмента"}.</p></div></div>`;
   }
+  /** spec 024: выручка и число листингов по коридорам цен. Две оси намеренно: «много денег в коридоре»
+   *  и «много товаров в коридоре» — разные вещи, и расхождение между ними и есть полезный сигнал. */
+  function drawDistribution(container, R) {
+    const d = R.priceDistribution; if (!d || !d.bins.length) return;
+    const [s1, s2] = series();
+    const band = bandOf(R);
+    // Коридор анализа ОТМЕЧАЕТСЯ там, где он есть на самом деле: границы коридоров под него не подгоняются,
+    // а диаграмма остаётся построенной по всей нише — фильтрация убрала бы ровно то, ради чего она делается.
+    const inBand = (b) => Boolean(band) && (band.max === null || b.min < band.max) && (band.min === null || b.max > band.min);
+    const label = (b, i) => (b.edge ? (i === 0 ? fmtMoney(b.max, 0) + " и дешевле" : fmtMoney(b.min, 0) + " и дороже") : fmtMoney(b.min, 0) + "–" + fmtMoney(b.max, 0));
+    mkChart(container, "ch-dist", { type: "bar",
+      desc: "Что это: сколько выручки ниши и сколько листингов приходится на каждый коридор цен. Шаг одинаковый, крайние коридоры вбирают хвосты. Если задан ценовой диапазон анализа, его коридоры выделены.",
+      data: { labels: d.bins.map(label), datasets: [
+        { label: "Выручка, $", data: d.bins.map((b) => b.revenue), backgroundColor: d.bins.map((b) => (inBand(b) ? s2 : s1)), borderRadius: 4, yAxisID: "y" },
+        { label: "Листингов", data: d.bins.map((b) => b.items), type: "line", borderColor: s2, backgroundColor: s2, borderWidth: 2, pointRadius: 3, yAxisID: "y1" }] },
+      options: { plugins: { tooltip: { callbacks: { label: (c) => (c.datasetIndex === 0
+          ? "Выручка: " + fmtMoney(c.parsed.y) + (d.total ? " (" + fmtPct(c.parsed.y / d.total) + ")" : "")
+          : "Листингов: " + fmtN(c.parsed.y)) } } },
+        scales: { x: { grid: { display: false } },
+          y: { grid, ticks: { callback: (v) => fmtMoney(v, 0) } },
+          y1: { position: "right", grid: { display: false }, ticks: { precision: 0 } } } } });
+  }
+
   function drawPricing(container, R) {
+    drawDistribution(container, R); // spec 024: рядом с сегментами, не вместо них
     const ps = R.priceSegments; if (!ps) return; const [s1, s2] = series();
     mkChart(container, "ch-price", { type: "bar", desc: "Что это: ценовые сегменты ниши — доля товаров и доля выручки (или кликов) в каждом коридоре цен, в %. Доля выручки выше доли товаров — сегмент недообслужен.", data: { labels: ps.segments.map((s) => `${s.name} (${fmtMoney(s.min)}–${fmtMoney(s.max)})`), datasets: [
       { label: "Доля товаров", data: ps.segments.map((s) => s.itemsShare * 100), backgroundColor: s1, borderRadius: 4 },
@@ -921,7 +980,7 @@
     const sel = pc.fields.map((f) => `<label class="pf"><span>${esc(f.name)}${f.unit ? ` <small class="muted">${esc(f.unit)}</small>` : ""}</span><select data-price-field="${esc(f.id)}" ${o.static ? "disabled" : ""}><option value="" ${f.value === null ? "selected" : ""}>— не важно —</option>${f.values.map((v) => `<option value="${esc(String(v.value))}" ${f.value !== null && String(v.value) === String(f.value) ? "selected" : ""}>${esc(v.label)}${v.premium ? " ★" : ""}${f.dominant !== null && String(v.value) === String(f.dominant) ? " · доминанта" : ""} · ${fmtPct(v.share)}</option>`).join("")}</select></label>`).join("");
     const tierTxt = pc.fallback === "scope" ? "аналогов нет — цена по всем листингам области" : pc.tier === null ? "" : pc.tier === 1 ? "совпали все выбранные поля" : `совпало ≥ ${Math.round(pc.tier * 100)} % полей`;
     const cards = pc.market === null ? `<div class="notice" style="margin-top:.5rem">${esc(pc.warn || "выберите значения полей — и появится цена")}</div>` : `<div class="cards" style="margin-top:.5rem">
-      <div class="card"><h4>Рыночная цена</h4><div class="big">${fmtMoney(pc.market, 2)}</div><div class="muted">медиана ${fmtN(pc.analogs)} аналогов, вес — выручка · ${esc(tierTxt)}</div></div>
+      <div class="card"><h4>Рыночная цена</h4><div class="big">${fmtMoney(pc.market, 2)}</div><div class="muted">${priceWhy(pc)}</div></div>
       <div class="card"><h4>Вход / потолок</h4><div class="big">${fmtMoney(pc.entry, 2)} – ${fmtMoney(pc.ceiling, 2)}</div><div class="muted">P25 — для нового листинга без отзывов · P75 — верх</div></div>
       <div class="card"><h4>С учётом купонов</h4><div class="big">${fmtMoney(pc.marketEff, 2)}</div><div class="muted">${isNum(pc.marketEff) && isNum(pc.market) && pc.marketEff < pc.market - 0.005 ? "аналоги дают купоны — реальная цена ниже тега" : "купонов у аналогов нет (или промо ещё не загружены)"}</div></div>
       ${pc.economicsHidden ? `<div class="card"><h4>Ориентир себестоимости</h4><div class="big">—</div><div class="muted">${HIDDEN_NOTE}</div></div>` : `<div class="card"><h4>Ориентир себестоимости</h4><div class="big">${pc.cogsCeiling > 0 ? "≤ " + fmtMoney(pc.cogsCeiling, 2) : "не сходится"}</div><div class="muted">${pc.cogsCeilingAfterAds
@@ -1043,6 +1102,7 @@
     // секции
     "Обзор": "Главные цифры ниши одним взглядом. Цвет плитки — статус показателя по порогам методики.",
     "Критерий 1 — Рыночный контекст": "Восемь рыночных показателей ниши (1a–1h). Нужно минимум 6 чётких «OK»; пограничные значения в счёт не идут.",
+    "Деньги по коридорам цен": "Сколько выручки ниши и сколько листингов в каждом коридоре цен. Шаг круглый, границы по 2-му и 98-му процентилю, хвосты сведены в крайние коридоры и помечены — иначе один дорогой листинг растянул бы шкалу. По ВСЕЙ нише из Xray; ценовой диапазон анализа не фильтрует её, а отмечается на ней.",
     "Живая экономика": "Ползунки для быстрых «а что, если»: меняете цену, себестоимость, CPC, конверсию или цель продаж — все расчёты обновляются сразу, без AI.",
     "Экономика — Gate 1 / Gate 2": "Два обязательных теста юнит-экономики: Gate 1 — прибыль без рекламы, Gate 2 — выживает ли прибыль после расходов на рекламу.",
     "Экономика": "Юнит-экономика товара. Считается только из чисел менеджера: без цены и себестоимости от поставщика раздел пуст.",

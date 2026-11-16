@@ -1,0 +1,633 @@
+{
+ "takenAt": "2026-11-16",
+ "note": "базовый замер ДО правок spec 024; без названий ниш; чтение без единой записи",
+ "totals": {
+  "analyses": 69,
+  "withXrayPrices": 67,
+  "withPriceConfig": 18,
+  "failed": 0
+ },
+ "rows": [
+  {
+   "verdict": "rework",
+   "gate": "Gate 0",
+   "hash": "f0ef040ef6e247ce",
+   "pricedListings": 0,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Стоп-вопросы",
+   "hash": "3a7a5b998465f497",
+   "pricedListings": 229,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "646654c2ee65b9ac",
+   "pricedListings": 292,
+   "priceConfig": true,
+   "analogs": 9,
+   "tier": 0.6
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "b9f2a61a22ad57a4",
+   "pricedListings": 52,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "9fd036d45e09da59",
+   "pricedListings": 446,
+   "priceConfig": true,
+   "analogs": 26,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "b766ff17c0b70c23",
+   "pricedListings": 105,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "go",
+   "gate": "все гейты пройдены",
+   "hash": "c51d95a380e40fb9",
+   "pricedListings": 357,
+   "priceConfig": true,
+   "analogs": 60,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "ba660bfbe991fab7",
+   "pricedListings": 162,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 8",
+   "hash": "72bfb7926b0aff04",
+   "pricedListings": 70,
+   "priceConfig": true,
+   "analogs": 6,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "483c6f541d2607ce",
+   "pricedListings": 201,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "6becd913537d411e",
+   "pricedListings": 99,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "8ceb8c63fc32c869",
+   "pricedListings": 78,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "6ebe0f361e4f60fd",
+   "pricedListings": 354,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "429ed299423c25da",
+   "pricedListings": 339,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "7bdcd4f133774391",
+   "pricedListings": 206,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "fbaf25164beb1f9c",
+   "pricedListings": 85,
+   "priceConfig": true,
+   "analogs": 8,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "2fde21ad93c57315",
+   "pricedListings": 660,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "66c51549d014a52e",
+   "pricedListings": 159,
+   "priceConfig": true,
+   "analogs": 25,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "10cdf154f69d9b47",
+   "pricedListings": 341,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "ffe24130d293cfab",
+   "pricedListings": 258,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Стоп-вопросы",
+   "hash": "a3a9c54b900c0228",
+   "pricedListings": 62,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Стоп-вопросы",
+   "hash": "f921326a2d9db14f",
+   "pricedListings": 34,
+   "priceConfig": true,
+   "analogs": 5,
+   "tier": 0.6
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "68e5981d9c93469e",
+   "pricedListings": 185,
+   "priceConfig": true,
+   "analogs": 1,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "1cf5fb89d41301c8",
+   "pricedListings": 513,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "b20ed6b30c96d4a9",
+   "pricedListings": 739,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "1668c9dabe31ba35",
+   "pricedListings": 137,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "e178914f7891bc75",
+   "pricedListings": 218,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "5c8bd1804050ef1b",
+   "pricedListings": 380,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "2a6df83530a948c5",
+   "pricedListings": 201,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "1e5969cf9c2d9678",
+   "pricedListings": 156,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "25982dc1fcddfde3",
+   "pricedListings": 103,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "66b70307ccda989f",
+   "pricedListings": 138,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "bb2805361221aa1a",
+   "pricedListings": 349,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "8e3ced22262fe900",
+   "pricedListings": 293,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "fe055354b2d1a03c",
+   "pricedListings": 196,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "bf3527eed01a04bc",
+   "pricedListings": 337,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Gate 0",
+   "hash": "f0ef040ef6e247ce",
+   "pricedListings": 0,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "1009046ad0c66814",
+   "pricedListings": 195,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "d716eee6aa21a4a8",
+   "pricedListings": 255,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "22fc1f366826d43d",
+   "pricedListings": 195,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "c4fe5a3543249382",
+   "pricedListings": 158,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "394d7402c612c8d9",
+   "pricedListings": 160,
+   "priceConfig": true,
+   "analogs": 3,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 2",
+   "hash": "dda0ada0054da1f3",
+   "pricedListings": 93,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "19baf7ccac62b7ad",
+   "pricedListings": 185,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "80ddb451624a1c8f",
+   "pricedListings": 151,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "f06619bfbd592a6b",
+   "pricedListings": 71,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "cb6bfbfc24919ba9",
+   "pricedListings": 136,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 2",
+   "hash": "bd36371b7bd0ce2f",
+   "pricedListings": 197,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "b98e31dc974fba0e",
+   "pricedListings": 384,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "41b2ec134fb3edc4",
+   "pricedListings": 279,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "a082f1e983fd4019",
+   "pricedListings": 251,
+   "priceConfig": true,
+   "analogs": 11,
+   "tier": 0.6
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 2",
+   "hash": "c264ce7b9b588ce7",
+   "pricedListings": 115,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "52580223776f2dbb",
+   "pricedListings": 372,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "8c9c4671ed85e979",
+   "pricedListings": 316,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "cc87274be9b10b2c",
+   "pricedListings": 217,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "go_conditional",
+   "gate": "Gate 1",
+   "hash": "dd1167b0e241c50b",
+   "pricedListings": 357,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "go_conditional",
+   "gate": "Gate 1",
+   "hash": "84683ecd5d0b906e",
+   "pricedListings": 674,
+   "priceConfig": true,
+   "analogs": 8,
+   "tier": 0.6
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "b83b1b432ebceed4",
+   "pricedListings": 256,
+   "priceConfig": true,
+   "analogs": 7,
+   "tier": 0.6
+  },
+  {
+   "verdict": "go_conditional",
+   "gate": "Gate 1",
+   "hash": "e0680815e543ddf0",
+   "pricedListings": 585,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "e6e3bf1849039fda",
+   "pricedListings": 287,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "1d77c9cadae787c6",
+   "pricedListings": 613,
+   "priceConfig": true,
+   "analogs": 31,
+   "tier": 0.8
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Amazon в нише",
+   "hash": "efba3b61500f8599",
+   "pricedListings": 513,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "d173faf94ef6dfbf",
+   "pricedListings": 184,
+   "priceConfig": true,
+   "analogs": 11,
+   "tier": 0.6
+  },
+  {
+   "verdict": "rework",
+   "gate": "Критерий 1",
+   "hash": "950bb87bc5de0281",
+   "pricedListings": 339,
+   "priceConfig": true,
+   "analogs": 32,
+   "tier": 0.6
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "fadd9d3cc4434070",
+   "pricedListings": 338,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 6",
+   "hash": "eef2ab9458d64ff9",
+   "pricedListings": 58,
+   "priceConfig": true,
+   "analogs": 58,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Gate 1",
+   "hash": "a0900b419fc897d4",
+   "pricedListings": 106,
+   "priceConfig": false,
+   "analogs": null,
+   "tier": null
+  },
+  {
+   "verdict": "no_go",
+   "gate": "Критерий 8",
+   "hash": "2e256dca24ae7af1",
+   "pricedListings": 179,
+   "priceConfig": true,
+   "analogs": 5,
+   "tier": 0.8
+  },
+  {
+   "verdict": "go",
+   "gate": "все гейты пройдены",
+   "hash": "c081c036b0aa5e9b",
+   "pricedListings": 788,
+   "priceConfig": true,
+   "analogs": 29,
+   "tier": 0.6
+  }
+ ]
+}

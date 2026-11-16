@@ -140,3 +140,52 @@ test("потолок себестоимости: отдельно при цен�
   assert.equal(cheap.cogsCeilingAtPrice.marginMin, 0.4, "при $20 действует повышенная планка дешёвого сегмента");
   assert.equal(cheap.cogsCeilingCheap, false, "а аналоги по $100 дешёвым сегментом не стали");
 });
+
+// ============ spec 024: цена конфигурации объясняет саму себя ============
+// Живой случай: средние цены по каждой характеристике $41–74, а кнопка предлагает «Подставить $29,99».
+// Ошибки нет — это две РАЗНЫЕ меры над РАЗНЫМИ наборами: «средняя цена значения» — простое среднее
+// по всем листингам с ОДНОЙ характеристикой (а «взрослые» это 64 % ниши), цена конфигурации — медиана,
+// ВЗВЕШЕННАЯ ВЫРУЧКОЙ, по листингам со совпадением сразу по 14 полям. Верное число выглядело опиской,
+// потому что рядом не стояло ни одного из четырёх объясняющих чисел.
+
+// ВОРОТА SC-024-002. Подстановка убирает ОДНО из четырёх — тест обязан упасть на СВОЁМ пункте.
+test("SC-024-002: цена конфигурации нигде не показывается голой", () => {
+  const { config, stats, xray, listings } = build();
+  const pc = priceByConfig({ config, stats, xray, listings, inputs: { referralPct: 0.15, fbaFee: 5 }, th: { minAnalogs: 5, marginMin: 0.3 } });
+
+  // 1. сколько взято аналогов
+  assert.equal(typeof pc.analogs, "number");
+  assert.ok(pc.analogs > 0, "число аналогов названо");
+
+  // 2. уровень совпадения словами «совпадает K характеристик из M» — БЕЗ оценочной окраски.
+  //    Ступень 0,6 на живых данных это пятнадцать ниш из восемнадцати, то есть обычный режим работы,
+  //    и подавать его как проблему нельзя (research.md, D4).
+  assert.ok(pc.matchWords, "уровень совпадения отдан словами");
+  assert.equal(typeof pc.matchFields, "number");
+  assert.equal(typeof pc.matchOf, "number");
+  assert.equal(pc.matchWords, `${pc.matchFields} из ${pc.matchOf}`);
+  assert.ok(pc.matchFields <= pc.matchOf);
+
+  // 3. мера — медиана, ВЗВЕШЕННАЯ ВЫРУЧКОЙ, а не средняя цена и не простая медиана
+  assert.equal(pc.priceMeasure, "weighted-median");
+
+  // 4. сосредоточенность денег: какая доля выручки группы у самых тяжёлых и по какой они цене.
+  //    БЕЗУСЛОВНО: «три аналога держат больше 30 %» верно в 17 нишах из 18, любой порог тут
+  //    не различает ничего — это постоянное пояснение, а не сигнал тревоги (research.md, D3).
+  assert.ok(pc.concentration, "сосредоточенность посчитана");
+  assert.equal(typeof pc.concentration.topShare, "number");
+  assert.equal(typeof pc.concentration.topPrice, "number");
+  assert.equal(typeof pc.concentration.top3Share, "number");
+  assert.ok(pc.concentration.topShare > 0 && pc.concentration.topShare <= 1);
+  assert.ok(pc.concentration.top3Share >= pc.concentration.topShare);
+});
+
+test("spec 024: контрольные значения сосредоточенности", () => {
+  const { config, stats, xray, listings } = build();
+  const pc = priceByConfig({ config, stats, xray, listings, inputs: {}, th: { minAnalogs: 5, marginMin: 0.3 } });
+  // самый тяжёлый аналог и его цена берутся из той же группы, по которой считалась цена
+  const heavy = xray.asins.filter((a) => pc.analogAsins.includes(a.asin)).sort((a, b) => b.asinRevenue - a.asinRevenue)[0];
+  assert.equal(pc.concentration.topPrice, heavy.price, "названа цена самого тяжёлого аналога");
+  const tot = xray.asins.filter((a) => pc.analogAsins.includes(a.asin)).reduce((s, a) => s + a.asinRevenue, 0);
+  assert.ok(Math.abs(pc.concentration.topShare - heavy.asinRevenue / tot) < 1e-4, "доля округлена до сотых процента — этого хватает для подписи");
+});

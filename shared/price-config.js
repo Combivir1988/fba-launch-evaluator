@@ -105,7 +105,25 @@ export function priceByConfig({ config, stats, xray, listings = {}, choice = {},
   const marginMin = atMarket?.marginMin ?? (th?.marginMin ?? 0.3);
   // Не задано — значит не вычтено: честнее сказать, что потолок завышен, чем молча считать расход нулевым.
   const cogsCeilingMissing = [!fbaKnown ? "FBA-сбор" : null, !shipKnown ? "доставка до склада Amazon" : null, !adKnown ? "реклама (нет цены клика)" : null].filter(Boolean);
+  // spec 024: четыре числа, объясняющие цену. БЕЗУСЛОВНЫЕ — замер показал, что сосредоточенность денег
+  // в группе аналогов это НОРМА (доля самого тяжёлого медиана 43 %, трёх самых тяжёлых 71 %,
+  // «три держат больше 30 %» в 17 нишах из 18), и любой порог здесь не различал бы ничего.
+  // Без них верное число выглядело опиской: средние цены характеристик $41–74 против цены $29,99.
+  const byRev = analogs.slice().sort((a, b) => (b.w || 0) - (a.w || 0));
+  const revTotal = byRev.reduce((acc, a) => acc + (a.w || 0), 0);
+  const concentration = revTotal > 0 ? {
+    topShare: round(byRev[0].w / revTotal, 4),
+    topPrice: byRev[0].price,
+    top3Share: round(byRev.slice(0, 3).reduce((acc, a) => acc + (a.w || 0), 0) / revTotal, 4),
+    top3Count: Math.min(3, byRev.length),
+  } : null;
+  // Уровень совпадения словами, БЕЗ оценочной окраски: ступень 0,6 это пятнадцать ниш из восемнадцати,
+  // то есть обычный режим работы блока, а не проблема.
+  const matchOf = selected.length;
+  const matchFields = Math.round((tier ?? 0) * matchOf);
   const leader = analogs.slice().sort((a, b) => b.w - a.w)[0] || null;
-  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, cogsCeilingCheap: cheap, cheapPrice, cogsCeilingMissing, cogsCeilingAfterAds: adBinds, adCostPerUnit: adKnown ? round(ad, 2) : null, cogsCeilingAtPrice: atOwnPrice,
+  return { fields, selectedCount: selected.length, tier, fallback, analogs: analogs.length,
+    // spec 024: мера названа явно — это медиана, ВЗВЕШЕННАЯ ВЫРУЧКОЙ, а не средняя цена и не простая медиана
+    priceMeasure: "weighted-median", matchFields, matchOf, matchWords: matchFields + " из " + matchOf, concentration, market, entry, ceiling, marketEff, leaderPrice: leader?.price ?? null, leaderAsin: leader?.asin ?? null, cogsCeiling, marginMin, cogsCeilingCheap: cheap, cheapPrice, cogsCeilingMissing, cogsCeilingAfterAds: adBinds, adCostPerUnit: adKnown ? round(ad, 2) : null, cogsCeilingAtPrice: atOwnPrice,
     cogsCeilingParts: { referral, fba, ship, ad: adKnown ? round(ad, 2) : null, cpc: adKnown ? inputs.cpc : null, cvr, ppcShare: ppc }, contributions, warn, analogAsins: analogs.map((a) => a.asin).slice(0, 50) };
 }

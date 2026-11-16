@@ -252,3 +252,24 @@ test("живая экономика: ползунок, который сейча
   // а соседний — догнал
   assert.equal(el.querySelector('[data-quick="cogs"]').value, String(a.inputs.cogs));
 });
+
+// spec 024: диаграмма «деньги по коридорам цен» — рыночные данные ниши, а не закупочная экономика автора,
+// поэтому она ОБЯЗАНА уехать со скачанным HTML и публичной ссылкой. Это противоположно спекам 018 и 021,
+// где разделы намеренно вынесены, чтобы в экспорт НЕ попадать. Проверяется СОДЕРЖИМЫМ, а не наличием кода.
+test("spec 024: распределение цен доезжает в экспорт и в публичную ссылку", () => {
+  const { w, created } = makeWindow();
+  const a = fullAnalysis();
+  assert.ok(a.results.priceDistribution?.bins.length, "распределение посчитано в ядре");
+  const el = w.document.getElementById("d");
+
+  for (const mode of [{ static: true }, { static: true, noEconomics: true }]) {
+    created.length = 0;
+    w.FBARender.render(el, a, mode);
+    assert.match(el.textContent, /Деньги по коридорам цен/, "блок есть при " + JSON.stringify(mode));
+    assert.ok(el.querySelector("#ch-dist"), "холст диаграммы есть");
+    assert.ok(created.some((c) => (c.data?.datasets || []).some((d) => d.label === "Выручка, $")),
+      "диаграмма НАРИСОВАНА, а не оставила пустое место");
+  }
+  // самый толстый коридор называется всегда — это факт о рынке
+  assert.match(el.textContent, /Больше всего денег в коридоре/);
+});

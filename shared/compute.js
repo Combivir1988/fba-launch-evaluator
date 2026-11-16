@@ -1,6 +1,7 @@
 // Оркестратор: Analysis → Results. Чистая функция, одинаковая в браузере и тестах.
 import { mergeThresholds } from "./thresholds.js";
 import { competition, effectiveReviewBarrier, priceSegments } from "./competition.js";
+import { priceDistribution } from "./price-distribution.js";
 import { traffic } from "./traffic.js";
 import { criterion1, summarizeCriterion1 } from "./criterion1.js";
 import { applyPriceBand, wholeNicheRef } from "./price-band.js";
@@ -107,7 +108,13 @@ export function compute(analysis) {
   const g0 = gate0(whole);
   const results = {
     gate0: g0, criterion1: p.criterion1, economics: p.economics, budget: p.budget, traffic: p.traffic, competition: p.competition,
-    priceSegments: priceSegments({ ...whole, priceBand: band }), priceBand: band, challenger: p.challenger, scorecard: p.scorecard, launchPlan: p.launchPlan, marketStructure: p.marketStructure,
+    priceSegments: priceSegments({ ...whole, priceBand: band }),
+    // spec 024: по ВСЕЙ нише — ценовой коридор анализа диаграмму НЕ фильтрует, он на ней отмечается.
+    // Поле дописано в ЯВНЫЙ перечень ключей намеренно: `compute()` собирает результат перечислением,
+    // и поле, которого здесь нет, молча не доедет до интерфейса, а НИ ОДИН тест не упадёт.
+    // Так уже было дважды — `launchPlan` в spec 020 и `reviewBarrierEffective` в spec 022.
+    priceDistribution: priceDistribution(whole.xray?.asins || []),
+    priceBand: band, challenger: p.challenger, scorecard: p.scorecard, launchPlan: p.launchPlan, marketStructure: p.marketStructure,
     // spec 022: результат собирается ЯВНЫМ перечнем ключей — поле, посчитанное в конвейере, но не
     // перечисленное здесь, до интерфейса не доедет и ни один тест не упадёт. Ровно это случилось
     // с launchPlan в spec 020 и повторилось здесь.
