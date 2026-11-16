@@ -51,6 +51,9 @@ test("FR-008: осиротевших пояснений нет — каждое 
   const sqp = fixtureAnalysis(); sqp.sources.sqp = { fileName: "sqp.csv", rows: 3 }; variants.push(sqp);
   const ownSqp = withConfig(entryFixture()); ownSqp.aggregates.sqp = { rows: [{ query: "dog bowl", volume: 1200, impressions: 800, clicks: 90, purchases: 11 }] }; ownSqp.results = compute(ownSqp); variants.push(ownSqp); // этап 3: аудит своего листинга, SQP загружен
   variants.push(withConfig(entryFixture())); const band = withConfig(entryFixture()); band.inputs.priceMin = 10; band.inputs.priceMax = 40; band.results = compute(band); variants.push(band); // этап 2: конфигурация, диапазон и ТЗ
+  // spec 025: предлагаемая линейка показывает таблицы только там, где в выгрузке РАЗМЕЧЕНЫ вариации.
+  // В entryFixture каждый товар стоит в своей карточке, поэтому для словаря линейки нужен этот вариант.
+  const line = withConfig(fixtureAnalysis()); line.results = compute(line); variants.push(line);
   for (const a of variants) { const el = draw(a); tips = el.__w.FBARender.tips; for (const k of tips.used) used.add(k); }
   const RARE = new Set(["Конкуренты", "Цена ниши", "SQP", "ПРОКСИ POE", "Срок"]); // показываются только в редких состояниях (нет ни одного отчёта и т. п.)
   const orphans = [...Object.keys(tips.TIPS), ...Object.keys(tips.KEY_TIPS)].filter((k) => !used.has(k) && !RARE.has(k));

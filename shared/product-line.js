@@ -203,7 +203,10 @@ export function productLine({ xray, config, stats = null, cerebro = null, brands
 
   const priceFor = (value) => {
     if (!stats) return { price: null, note: "характеристики извлечены не полностью — цену аналогов для этого сочетания не посчитать" };
-    const pc = priceByConfig({ config, stats, xray, listings, choice: { ...choice, [chosen.field.id]: value }, inputs, th });
+    // Значение оси обязано совпасть точно: иначе аналогами варианта «3 шт» становятся листинги с 1 шт
+    // (ступени смягчения спускаются до «2 из 4», и сама ось в совпавшие не входит), и все варианты
+    // линейки получают одну цену. На живых нишах это было 8 ниш из 18.
+    const pc = priceByConfig({ config, stats, xray, listings, choice: { ...choice, [chosen.field.id]: value }, inputs, th, requireFields: [chosen.field.id] });
     if (!pc || !isNum(pc.market)) return { price: null, note: "аналогов с таким сочетанием характеристик в нише нет — цена не выдумывается" };
     return { price: { market: pc.market, entry: pc.entry, ceiling: pc.ceiling, analogs: pc.analogs, matchWords: pc.matchWords, fallback: Boolean(pc.fallback) }, note: null };
   };

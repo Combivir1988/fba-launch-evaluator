@@ -1085,6 +1085,18 @@
     "config|Покрытие": "Доля листингов, где значение поля найдено в тексте (тайтл, буллеты, характеристики). Ниже 70 % — смотрите таблицу и правьте вручную.",
     "config|ASIN": "Листинг из Xray. Ссылка открывает страницу Amazon. Строки отсортированы по выручке.",
     "ТЗ производителю": "Техническое задание, собранное AI из фактов этапов 1–2: доминирующая конфигурация, отзывы, регуляторика, патенты, цены. Числа — только из расчётов; текст можно править и скачать DOCX.",
+    "Предлагаемая товарная линейка": "Не один товар, а набор: главный плюс варианты по той характеристике, по которой варианты делают в этой нише. 88,6 % выручки ниши (медиана) принадлежит карточкам из нескольких вариаций — а весь остальной этап 2 описывает один товар.",
+    "productLine|Характеристика": "Поле схемы, значения которого различаются МЕЖДУ вариациями одной карточки. Это и есть ось линейки. Поле, одинаковое внутри карточки, — свойство товара, а не ось.",
+    "productLine|Меняется в карточках": "В скольких карточках с несколькими вариациями у этого поля встречаются разные значения. Поле, меняющееся в нуле карточек, делит рынок, а не линейку: марки делают либо одно, либо другое.",
+    "productLine|Доля": "Та же величина в процентах. Ось берётся, только если она меняется не меньше чем в 20 % карточек — порог выбран замером на 67 живых нишах.",
+    "productLine|Весомых значений": "Сколько значений этого поля держат не меньше 10 % выручки поля. Ось годится только при двух и больше: иначе предлагать вариант не из чего.",
+    "productLine|Всего значений": "Сколько разных значений встретилось. Сотни значений при высокой частоте смены — признак свободного текста (аромат, уникальные фичи), а не оси линейки.",
+    "productLine|Роль": "Главный товар — ваш выбор в «Цене вашей конфигурации» (по умолчанию доминирующая конфигурация). Варианты отличаются от него ровно по одной характеристике.",
+    "productLine|Значение": "Значение оси у этого товара. Взято из таблицы характеристик этапа 2, а не из ключевых слов: слово из ключей вариант породить не может.",
+    "productLine|Доля выручки поля": "Какая доля выручки по этой характеристике приходится на это значение. Считается только по листингам, где поле заполнено, — иначе пустые клетки искажали бы картину.",
+    "productLine|Листингов": "Сколько листингов ниши имеют это значение. «Много денег» и «много товаров» — разные вещи, и расхождение между ними само по себе сигнал.",
+    "productLine|Цена аналогов": "Медиана цен листингов с таким же сочетанием характеристик, взвешенная выручкой — тот же расчёт, что в «Цене вашей конфигурации». Рядом — на скольких аналогах посчитано и сколько характеристик совпало.",
+    "productLine|Спрос в ключах": "Суммарный объём поиска фраз со словом этого значения. У размерных и числовых значений не ищется: «12» или «20x20x1» со словом запроса не сопоставить. «Не найдено» — это не нулевой спрос.",
     "tz|Раздел": "Группа требований: конструкция, материалы, комплектация, размеры и вес, функции, упаковка, качество, сертификация, отличия от конкурентов.",
     "tz|Параметр": "Что задаём производителю: узел, материал, функция, элемент комплектации.",
     "tz|Требование": "Измеримая формулировка для производителя. Правится прямо в таблице.",
@@ -1472,9 +1484,55 @@
       <div class="tablewrap" style="max-height:520px;overflow:auto"><table><thead><tr><th>Ключ</th><th class="num">Объём/мес</th><th class="num">Продажи/мес</th><th class="num">Конверсия ниши</th><th class="num">Доля кликов</th><th class="num">В тайтле</th><th class="num">В буллетах</th><th class="num">В характеристиках</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
+  // ---------- этап 2: предлагаемая товарная линейка (spec 025) ----------
+  // Весь этап 2 отвечает на вопрос «какой ОДИН товар делать», а 88,6 % денег ниши (медиана по 67 живым
+  // нишам) принадлежат карточкам из нескольких вариаций. Иерархию семей приложение разбирало и не читало.
+  const PL_CHIP = { ok: "ok", no_stage2: "warn", no_repeating: "na", no_differences: "na", no_variations: "na", no_xray: "na" };
+
+  /** Отклонённые оси: отказ обязан быть виден, иначе поле с максимальной частотой просто исчезает без объяснения. */
+  function plRejected(P) {
+    if (!P.axisRejected?.length) return "";
+    const li = P.axisRejected.slice(0, 6).map((a) =>
+      `<li><b>${esc(a.name)}</b> — меняется в ${fmtPct(a.rate, 0)} карточек, но значений ${fmtN(a.distinct)} и ни одно не повторяется настолько, чтобы на нём строить вариант</li>`).join("");
+    return `<details style="margin-top:.6rem"><summary class="muted" style="font-size:.85rem;cursor:pointer">Характеристики, которые меняются часто, но осью не стали (${fmtN(P.axisRejected.length)})</summary><ul style="font-size:.85rem;margin:.4rem 0">${li}</ul></details>`;
+  }
+
+  function plDemand(it) {
+    if (!it.demand.checked) return `<span class="muted" title="${esc(it.demandNote || "")}">не проверялся</span>`;
+    if (!isNum(it.demand.sv)) return `<span class="muted" title="${esc(it.demandNote || "")}">не найдено</span>`;
+    return fmtN(it.demand.sv) + ' <small class="muted">/мес</small>';
+  }
+
+  function secProductLine(A, R, o) {
+    const P = R.productLine;
+    if (!P) return ""; // наружу линейка не уходит (spec 025, FR-018): в ссылке и автономном HTML поля просто нет
+    const f = P.families;
+    const head = `<h2>Предлагаемая товарная линейка <span class="chip ${PL_CHIP[P.status] || "na"}">${P.status === "ok" ? fmtN(P.items.length) + " ASIN" : "не предлагается"}</span></h2>`;
+    const fam = f && f.total ? `<p class="muted" style="font-size:.85rem">В нише ${fmtN(f.total)} карточек, из них ${fmtN(f.multi)} с несколькими вариациями — у них ${fmtPct(f.revenueShare, 1)} выручки ниши. Медианная карточка — ${fmtN(f.medianSize)} ASIN.</p>` : "";
+    if (P.status !== "ok") return head + fam + `<div class="empty">${esc(P.note)}</div>` + plRejected(P);
+
+    const chosen = P.axes.find((a) => a.chosen);
+    const axes = P.axes.map((a) =>
+      `<tr class="${a.chosen ? "leader" : ""}"><td>${esc(a.name)}${a.chosen ? ' <span class="chip ok">линейка по ней</span>' : ""}</td><td class="num">${fmtN(a.variesIn)} из ${fmtN(a.ofFamilies)}</td><td class="num">${fmtPct(a.rate, 0)}</td><td class="num">${fmtN(a.heavyValues)}</td><td class="num">${fmtN(a.distinct)}</td></tr>`).join("");
+
+    const items = P.items.map((it) => {
+      const price = it.price
+        ? `${fmtMoney(it.price.market, 2)} <small class="muted">${fmtN(it.price.analogs)} анал., совпадает ${esc(it.price.matchWords || "—")}${it.price.fallback ? ", по всей области" : ""}</small>`
+        : `<span class="muted">${esc(it.priceNote || "—")}</span>`;
+      return `<tr class="${it.role === "main" ? "leader" : ""}"><td>${it.role === "main" ? "<b>главный</b>" : "вариант"}</td><td>${esc(it.label)}${it.premium ? ' <span class="chip ok" title="доля выручки выше доли листингов при цене выше медианы поля">★ премия</span>' : ""}</td><td class="num">${fmtPct(it.share, 1)}</td><td class="num">${fmtN(it.listings)}</td><td class="num">${price}</td><td class="num">${plDemand(it)}</td></tr>`;
+    }).join("");
+
+    return head + fam + `<p>${esc(P.note)}</p>
+      <div class="tablewrap" style="margin-top:.6rem"><table><thead><tr><th>Характеристика</th><th class="num">Меняется в карточках</th><th class="num">Доля</th><th class="num">Весомых значений</th><th class="num">Всего значений</th></tr></thead><tbody>${axes}</tbody></table></div>
+      ${plRejected(P)}
+      <h3 style="margin-top:1rem">Что запускать: ${esc(chosen ? chosen.name : "")}</h3>
+      <div class="tablewrap"><table><thead><tr><th>Роль</th><th>Значение</th><th class="num">Доля выручки поля</th><th class="num">Листингов</th><th class="num">Цена аналогов</th><th class="num">Спрос в ключах</th></tr></thead><tbody>${items}</tbody></table></div>
+      <p class="muted" style="font-size:.8rem">Вариант отличается от главного ровно по одной характеристике: сочетание двух сразу дало бы цену, посчитанную на одном-двух аналогах. Главный товар — ваш выбор в «Цене вашей конфигурации». Ось берётся, только если меняется не меньше чем в ${fmtPct(P.thresholds.axisRate, 0)} карточек и внутри неё есть хотя бы ${fmtN(P.thresholds.minHeavyValues)} значения с долей от ${fmtPct(P.thresholds.valueShare, 0)} выручки поля. В публичную ссылку и в скачанный HTML линейка не попадает.</p>`;
+  }
+
   // ---------- две вкладки дашборда: этап 1 (оценка ниши) и этап 2 (конфигурация продукта и ТЗ) ----------
   // Живут внутри контейнера, поэтому есть и в приложении, и в публичной ссылке, и в автономном HTML. Состояние — container.__opts.stage.
-  const STAGE2 = new Set(["config", "tz"]);
+  const STAGE2 = new Set(["config", "tz", "productLine"]);
   // Этап 3 (spec 017): существует только внутри приложения — в снимке публичной ссылки и в автономном HTML вкладки нет вовсе.
   const STAGE3 = new Set(["keywords"]);
   const hasStage3 = (A, o) => !o?.static && Boolean(A.results?.stage3?.keywords?.items?.length);
@@ -1512,7 +1570,7 @@
     ["hero", secHero], ["overview", secOverview], ["criterion1", secCriterion1], ["quick", secQuick], ["economics", secEconomics, drawEconomics], ["budget", secBudget], ["cashflow", secCashflow, drawCashflow],
     ["traffic", secTraffic, drawTraffic], ["entry", secEntry], ["competitors", secCompetitors, drawCompetitors], ["pricing", secPricing, drawPricing],
     ["trend", secTrend, (c, R, A) => drawTrend(c, A)], ["structure", secStructure], ["reviews", secReviews, (c, R, A) => drawReviews(c, A)], ["config", secConfig, drawConfig],
-    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["launchPlan", secLaunchPlan], ["tz", secTz], ["keywords", secKeywords], ["conclusion", secConclusion], ["ai", secAi],
+    ["patents", secPatents], ["challenger", secChallenger], ["scorecard", secScorecard, drawScorecard], ["reconciliation", secReconciliation], ["borderline", secBorderline], ["checklist", secChecklist], ["launchPlan", secLaunchPlan], ["tz", secTz], ["productLine", secProductLine], ["keywords", secKeywords], ["conclusion", secConclusion], ["ai", secAi],
   ];
   // ---------- сворачивание секций ----------
   // Открытыми остаются только основные показатели и гейты; остальное разворачивается стрелкой.

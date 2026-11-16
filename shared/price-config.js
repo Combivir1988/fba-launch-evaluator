@@ -42,7 +42,7 @@ const same = (field, a, b) => {
  * Потолок себестоимости: COGS ≤ цена × (1 − referral − маржа) − FBA − доставка до склада − реклама на единицу,
  * и одновременно не выше порога Gate 1 (там маржа считается без рекламы, а в дешёвом сегменте планка выше).
  */
-export function priceByConfig({ config, stats, xray, listings = {}, choice = {}, inputs = {}, th = {} } = {}) {
+export function priceByConfig({ config, stats, xray, listings = {}, choice = {}, inputs = {}, th = {}, requireFields = [] } = {}) {
   const rows = Object.entries(config?.table?.rows || {}); if (!stats || !rows.length) return null;
   const byAsin = new Map((xray?.asins || []).map((a) => [a.asin, a]));
   const fields = (config.schema?.fields || []).filter((f) => f.type !== "text").map((f) => {
@@ -53,7 +53,13 @@ export function priceByConfig({ config, stats, xray, listings = {}, choice = {},
     return { id: f.id, name: f.name, type: f.type, unit: f.unit || null, value, label: value === null ? null : valueLabel(f, value), dominant: st?.dominant?.value ?? null, dominantLabel: st?.dominant?.label ?? null, values: values.map((v) => ({ value: v.value, label: v.label, share: v.share, avgPrice: v.avgPrice, premium: v.premium })), field: f };
   });
   const selected = fields.filter((f) => f.value !== null); if (!selected.length) return { fields, selectedCount: 0, tier: null, analogs: 0, market: null, entry: null, ceiling: null, marketEff: null, cogsCeiling: null, contributions: [], warn: "выберите хотя бы одно значение" };
-  const scored = rows.map(([asin, r]) => { const x = byAsin.get(asin); const hits = selected.filter((f) => same(f.field, r.values?.[f.id]?.value, f.value)).length; const price = isNum(x?.price) ? x.price : null; return { asin, hits, ratio: hits / selected.length, price, eff: effectivePrice(price, listings[asin]?.promo), w: x ? revenueOf(x) : 0 }; }).filter((s) => s.price !== null);
+  // spec 025: поля из requireFields обязаны совпасть ТОЧНО. Без этого аналогами варианта «3 шт в упаковке»
+  // становились листинги с 1 шт: ступени смягчения (1 / 0,8 / 0,6) спускались до «совпадает 2 из 4»,
+  // и значение самой оси в число совпавших не входило. На живых нишах из-за этого у 8 ниш из 18 ВСЕ варианты
+  // линейки получали одну и ту же цену (медианный разброс 3,7 %) — цена переставала отвечать на свой вопрос.
+  const req = new Set(requireFields);
+  const scored = rows.map(([asin, r]) => { const x = byAsin.get(asin); const hits = selected.filter((f) => same(f.field, r.values?.[f.id]?.value, f.value)).length;
+    const keep = selected.every((f) => !req.has(f.id) || same(f.field, r.values?.[f.id]?.value, f.value)); const price = isNum(x?.price) ? x.price : null; return { asin, hits, keep, ratio: hits / selected.length, price, eff: effectivePrice(price, listings[asin]?.promo), w: x ? revenueOf(x) : 0 }; }).filter((s) => s.price !== null && s.keep);
   const minAnalogs = th?.minAnalogs ?? 5;
   let tier = null, analogs = [];
   for (const t of TIERS) { const a = scored.filter((s) => s.ratio >= t - 1e-9); if (a.length >= minAnalogs) { tier = t; analogs = a; break; } }
