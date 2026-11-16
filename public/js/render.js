@@ -1626,7 +1626,7 @@
     chartDefaults(); initTips(); container.__opts = { ...(container.__opts || {}), ...opts };
     const R = A.results; if (!R) { container.innerHTML = '<div class="panel section empty">Нет результатов — загрузите файлы или введите данные.</div>'; return; }
     container.classList.add("dash"); container.__A = A; container.dataset.stage = String(stageOf(A, container.__opts));
-    container.innerHTML = stageTabsHtml(A, container.__opts) + SECTIONS.map(([id]) => `<section class="panel section" data-section="${id}" id="sec-${id}"></section>`).join("");
+    container.innerHTML = stageTabsHtml(A, container.__opts) + SECTIONS.map(([id]) => `<section class="panel section" data-section="${id}" data-sec-stage="${STAGE3.has(id) ? 3 : STAGE2.has(id) ? 2 : 1}" id="sec-${id}"></section>`).join("");
     for (const [id] of SECTIONS) fill(container, id, A, R, container.__opts);
     bindStageTabs(container); bindCollapse(container);
   }
