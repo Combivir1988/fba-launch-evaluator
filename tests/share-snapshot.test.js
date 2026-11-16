@@ -27,6 +27,7 @@ test("полный режим: без сырых ключей Cerebro и вну�
   assert.equal(s.analysis.aggregates.cerebro.keywords, undefined); assert.equal(s.analysis.aggregates.cerebro.keywordCount, a.aggregates.cerebro.keywords.length);
   assert.notEqual(s.analysis.id, a.id);
   { const want = JSON.parse(JSON.stringify(a.results)); delete want.stage3; // этап 3 наружу не отдаётся (spec 017)
+    delete want.productLine; // предлагаемая линейка — замысел своего товара, наружу не отдаётся (spec 025, FR-018)
     assert.deepEqual(s.analysis.results, want); assert.equal(s.analysis.results.stage3, undefined); } assert.deepEqual(s.analysis.inputs, JSON.parse(JSON.stringify(a.inputs))); assert.deepEqual(s.analysis.ai, JSON.parse(JSON.stringify(a.ai)));
   assert.ok(s.analysis.aggregates.poe && s.analysis.aggregates.xray.asins.length > 50);
   const kb = JSON.stringify(s).length / 1024; assert.ok(kb < 250, `снимок ${kb.toFixed(0)} KB`);

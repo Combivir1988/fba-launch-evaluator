@@ -127,6 +127,7 @@ export function buildSnapshot(analysis, { mode = "full", preparedBy = "", snapsh
   if (a.aggregates?.listings) delete a.aggregates.listings; // кэш страниц этапа 2 диаграммам не нужен
   if (a.config?.tz) { a.config = { ...a.config }; delete a.config.tz; } // ТЗ производителю в публичную ссылку не попадает (spec 010, FR-006)
   stripStage3(a); // этап 3 целиком внутренний (spec 017, FR-011)
+  stripProductLine(a); // предлагаемая линейка — замысел своего товара (spec 025, FR-018)
   a.id = "share"; delete a.status;
   let redactions = 0; const hidden = [];
   if (mode === "no_economics") { redactions = redactEconomics(a, analysis); hidden.push("economics", "budget", "cashflow"); }
@@ -141,6 +142,37 @@ export function stripStage3(a) {
   delete a.listing;
   if (a.results) { a.results = { ...a.results }; delete a.results.stage3; }
   return a;
+}
+
+/** Предлагаемая товарная линейка (spec 025) наружу не отдаётся: это замысел СВОЕГО товара,
+ *  как ТЗ производителю и этап 3, а не рыночные данные вроде диаграмм этапа 2.
+ *  ОТДЕЛЬНАЯ функция, а не дописка в stripStage3: та описывает этап 3, и смешивать в ней
+ *  правило этапа 2 значит через год не понять, почему функция про листинг удаляет линейку.
+ *  Нужна обоим путям — и публичной ссылке, и автономному HTML (он кладёт в файл весь документ). */
+export function stripProductLine(a) {
+  if (!a || typeof a !== "object") return a;
+  if (a.results) { a.results = { ...a.results }; delete a.results.productLine; }
+  return a;
+}
+
+/** Ловушка на утечку линейки: ищем поле, имена осей и значения предложенных товаров (spec 025, SC-005). */
+export function findProductLineLeaks(snapshot, sourceAnalysis) {
+  const out = [];
+  const a = snapshot?.analysis || snapshot || {};
+  if (a.results?.productLine) out.push("results.productLine");
+  const text = JSON.stringify(snapshot || {});
+  const pl = sourceAnalysis?.results?.productLine || null;
+  if (!pl) return out;
+  if (pl.note && pl.note.length > 12 && text.includes(pl.note)) out.push("productLine.note");
+  for (const ax of pl.axes || []) {
+    // имя оси может законно встречаться как имя характеристики этапа 2 — ищем связку «ось + её числа»
+    if (ax.name && text.includes(`"${ax.name}"`) && text.includes(`"variesIn":${ax.variesIn}`)) out.push("axis:" + ax.name);
+  }
+  for (const it of (pl.items || []).slice(0, 5)) {
+    if (it.priceNote && it.priceNote.length > 12 && text.includes(it.priceNote)) out.push("item.priceNote");
+    if (it.demandNote && it.demandNote.length > 12 && text.includes(it.demandNote)) out.push("item.demandNote");
+  }
+  return [...new Set(out)];
 }
 
 /** Ловушка на утечку этапа 3: ищем в снимке документ листинга, его расчёт и характерные тексты (spec 017, SC-007). */

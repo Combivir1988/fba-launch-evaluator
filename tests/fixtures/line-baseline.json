@@ -1,0 +1,2097 @@
+{
+ "takenAt": "2026-11-16",
+ "note": "Базовый замер ДО spec 025. Названий ниш нет намеренно: фикстура уходит в публичный репозиторий.",
+ "total": 69,
+ "computed": 67,
+ "empty": 2,
+ "failed": 0,
+ "verdicts": {
+  "no_go": 46,
+  "rework": 16,
+  "go": 2,
+  "go_conditional": 3
+ },
+ "c1pass": 9,
+ "withXray": 67,
+ "withStage2": 19,
+ "withCerebro": 67,
+ "items": [
+  {
+   "hash": "3a7a5b998465f497",
+   "verdict": "no_go",
+   "decisiveGate": "Стоп-вопросы",
+   "c1ok": 7,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 64.75,
+    "band": "go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 4,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "646654c2ee65b9ac",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 42.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": 3.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "b9f2a61a22ad57a4",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 57.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 8.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "9fd036d45e09da59",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "na"
+   },
+   "sc": {
+    "total": 54.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 6.5,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "b766ff17c0b70c23",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 47.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": 5.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "c51d95a380e40fb9",
+   "verdict": "go",
+   "decisiveGate": "все гейты пройдены",
+   "c1ok": 7,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 68.5,
+    "band": "go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 4,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "ba660bfbe991fab7",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "warn",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 37.5,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 1,
+    "economics": 1,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "72bfb7926b0aff04",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 8",
+   "c1ok": 7,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 67,
+    "band": "go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 4,
+    "economics": 10,
+    "brandFit": 5,
+    "opRisk": 4
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "483c6f541d2607ce",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "fail"
+   },
+   "sc": {
+    "total": 39.25,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 6.4,
+    "competition": 0,
+    "economics": 3.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "6becd913537d411e",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 46.66666666666667,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "8ceb8c63fc32c869",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 57.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "6ebe0f361e4f60fd",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 50,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 2,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "429ed299423c25da",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 50.75,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 9,
+    "competition": 0,
+    "economics": 5.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "7bdcd4f133774391",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 35,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "fbaf25164beb1f9c",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "na",
+    "1h": "na"
+   },
+   "sc": {
+    "total": 52.666666666666664,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 10,
+    "competition": 0,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "2fde21ad93c57315",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "warn",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 36.25,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 6.2,
+    "competition": 0,
+    "economics": 2.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "66c51549d014a52e",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 57.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "10cdf154f69d9b47",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 57,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "ffe24130d293cfab",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 35,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "a3a9c54b900c0228",
+   "verdict": "no_go",
+   "decisiveGate": "Стоп-вопросы",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "fail",
+    "1b": "ok",
+    "1c": "warn",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 37.333333333333336,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 4.4,
+    "competition": 1,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "f921326a2d9db14f",
+   "verdict": "no_go",
+   "decisiveGate": "Стоп-вопросы",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "fail",
+    "1b": "ok",
+    "1c": "warn",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 48.99999999999999,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 4.4,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "68e5981d9c93469e",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "ok",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 55.75,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 9,
+    "competition": 0,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "1cf5fb89d41301c8",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 40,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 2,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "b20ed6b30c96d4a9",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 42.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": 3.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "1668c9dabe31ba35",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "fail",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "fail"
+   },
+   "sc": {
+    "total": 45.75,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 4.6,
+    "competition": 0,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "e178914f7891bc75",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "warn",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 50,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 1,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "5c8bd1804050ef1b",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 48.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 4,
+    "economics": 1,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "2a6df83530a948c5",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 39.75,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 6.2,
+    "competition": 0,
+    "economics": 3.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "1e5969cf9c2d9678",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 1,
+   "c1pass": false,
+   "c1": {
+    "1a": "fail",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 41.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 4.4,
+    "competition": 0,
+    "economics": 6,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "25982dc1fcddfde3",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "fail",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 41.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 5.4,
+    "competition": 0,
+    "economics": 5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "66b70307ccda989f",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 6,
+   "c1pass": true,
+   "c1": {
+    "1a": "warn",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 38.5,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 1,
+    "economics": 1,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "bb2805361221aa1a",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "warn",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 38.5,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 2,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "8e3ced22262fe900",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 35,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "fe055354b2d1a03c",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "na",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 44.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 6.5,
+    "competition": 0,
+    "economics": 5.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "bf3527eed01a04bc",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 53.75,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "1009046ad0c66814",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 35,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "d716eee6aa21a4a8",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 43.33333333333333,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "22fc1f366826d43d",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 57,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "c4fe5a3543249382",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "warn",
+    "1h": "fail"
+   },
+   "sc": {
+    "total": 33.75,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": 0.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "394d7402c612c8d9",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "warn",
+    "1h": "fail"
+   },
+   "sc": {
+    "total": 53.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 6.2,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "dda0ada0054da1f3",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 2",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "fail",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 40.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 5.4,
+    "competition": 0,
+    "economics": 5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "19baf7ccac62b7ad",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 46.66666666666667,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "80ddb451624a1c8f",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 38.25,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 9,
+    "competition": 0,
+    "economics": 0.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "f06619bfbd592a6b",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "fail",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "warn",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 30,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 6.2,
+    "competition": 0,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "cb6bfbfc24919ba9",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 52.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "bd36371b7bd0ce2f",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 2",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 41.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": 3.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "b98e31dc974fba0e",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 37.5,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 1,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "41b2ec134fb3edc4",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 58.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 9,
+    "competition": 1,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "a082f1e983fd4019",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 7,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 54.66666666666666,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 2,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "c264ce7b9b588ce7",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "na"
+   },
+   "sc": {
+    "total": 41.00000000000001,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 6.5,
+    "competition": 0,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "52580223776f2dbb",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 49.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 9,
+    "competition": 0,
+    "economics": 5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "8c9c4671ed85e979",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 41.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 3,
+    "economics": 0.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "cc87274be9b10b2c",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "fail"
+   },
+   "sc": {
+    "total": 49.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 5.4,
+    "competition": 0,
+    "economics": 8.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "dd1167b0e241c50b",
+   "verdict": "go_conditional",
+   "decisiveGate": "Gate 1",
+   "c1ok": 6,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 53.75,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 1,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "84683ecd5d0b906e",
+   "verdict": "go_conditional",
+   "decisiveGate": "Gate 1",
+   "c1ok": 7,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 57.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 1,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "b83b1b432ebceed4",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "warn",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 62.25,
+    "band": "go"
+   },
+   "scAxes": {
+    "market": 6.2,
+    "competition": 4,
+    "economics": 8.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "e0680815e543ddf0",
+   "verdict": "go_conditional",
+   "decisiveGate": "Gate 1",
+   "c1ok": 6,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 62.25,
+    "band": "go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 3,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "e6e3bf1849039fda",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "warn",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "warn",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 36.25,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 5.2,
+    "competition": 0,
+    "economics": 3.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "1d77c9cadae787c6",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "fail",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 36,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 8.2,
+    "competition": 0,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "efba3b61500f8599",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 31.999999999999996,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 1,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 4
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "d173faf94ef6dfbf",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "warn",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 55.5,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7,
+    "competition": 0,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "950bb87bc5de0281",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "warn",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "ok",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "warn",
+    "1h": "warn"
+   },
+   "sc": {
+    "total": 49.25,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 6,
+    "competition": 0,
+    "economics": 7.5,
+    "brandFit": 5,
+    "opRisk": 8
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "fadd9d3cc4434070",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 5,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 38,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 6.4,
+    "competition": 3,
+    "economics": 0,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "eef2ab9458d64ff9",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6",
+   "c1ok": 3,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "fail",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 53.75,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 0,
+    "economics": 8.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "a0900b419fc897d4",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1",
+   "c1ok": 2,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "fail",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "warn",
+    "1g": "fail",
+    "1h": "na"
+   },
+   "sc": {
+    "total": 35.125,
+    "band": "no_go"
+   },
+   "scAxes": {
+    "market": 7.75,
+    "competition": 0,
+    "economics": 0.5,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": false,
+   "hasCerebro": true
+  },
+  {
+   "hash": "2e256dca24ae7af1",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 8",
+   "c1ok": 4,
+   "c1pass": false,
+   "c1": {
+    "1a": "ok",
+    "1b": "warn",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "fail",
+    "1f": "ok",
+    "1g": "fail",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 46,
+    "band": "rework"
+   },
+   "scAxes": {
+    "market": 7.2,
+    "competition": 2,
+    "economics": null,
+    "brandFit": 5,
+    "opRisk": 4
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  },
+  {
+   "hash": "c081c036b0aa5e9b",
+   "verdict": "go",
+   "decisiveGate": "все гейты пройдены",
+   "c1ok": 6,
+   "c1pass": true,
+   "c1": {
+    "1a": "ok",
+    "1b": "ok",
+    "1c": "ok",
+    "1d": "warn",
+    "1e": "ok",
+    "1f": "ok",
+    "1g": "warn",
+    "1h": "ok"
+   },
+   "sc": {
+    "total": 69.5,
+    "band": "go"
+   },
+   "scAxes": {
+    "market": 9,
+    "competition": 4,
+    "economics": 9,
+    "brandFit": 5,
+    "opRisk": 7
+   },
+   "hasXray": true,
+   "hasStage2": true,
+   "hasCerebro": true
+  }
+ ]
+}

@@ -27,6 +27,7 @@ import { coverage as listingCoverage } from "./listing-coverage.js";
 import { scoreListing, listingBans } from "./listing-score.js";
 import { launchPlan } from "./launch-plan.js";
 import { marketStructure } from "./market-structure.js";
+import { productLine } from "./product-line.js";
 
 export function compute(analysis) {
   const th = mergeThresholds(analysis.thresholds);
@@ -133,6 +134,14 @@ export function compute(analysis) {
   results.config = configStats(analysis.config, whole.xray, { band, th: th.config }); // этап 2 (spec 010): null, пока таблица характеристик не извлечена
   if (results.config) { results.config.promo = promo; results.priceConfig = priceByConfig({ config: analysis.config, stats: results.config.whole, xray: whole.xray, listings: agg.listings || {}, choice: analysis.config.priceChoice || {}, inputs: { ...inputs, cpc, price }, th: { minAnalogs: th.config.minAnalogs, marginMin: th.economics.marginMin, cheapPrice: th.economics.cheapPrice, cheapMarginMin: th.economics.cheapMarginMin } }); } else results.priceConfig = null; // spec 013/014
   if (whole.xray?.asins?.length) { const sc = configScope(analysis, th); results.configScope = { count: sc.asins.length, total: sc.total, excluded: sc.excluded, capped: sc.capped }; } else results.configScope = null;
+  // Предлагаемая товарная линейка (spec 025). Поле дописывается в результат ОТДЕЛЬНОЙ строкой и это
+  // не формальность: `compute()` собирает результат явным перечнем ключей, и поле, которого там нет,
+  // молча не доедет до интерфейса, а НИ ОДИН тест не упадёт. Случалось дважды — `launchPlan` (spec 020)
+  // и `reviewBarrierEffective` (spec 022). Работа чисто добавочная: на вердикт ничего не влияет.
+  results.productLine = productLine({ xray: whole.xray, config: analysis.config, stats: results.config?.whole || null,
+    cerebro: whole.cerebro, brands: (compAll.brands || []).map((x) => x.brand), listings: agg.listings || {},
+    inputs: { ...inputs, cpc, price },
+    th: { minAnalogs: th.config.minAnalogs, marginMin: th.economics.marginMin, cheapPrice: th.economics.cheapPrice, cheapMarginMin: th.economics.cheapMarginMin } });
   // Этап 3 (spec 017): целевые ключи и покрытие считаем всегда — это дёшево и нужно сразу при открытии вкладки.
   // Оценка текста появляется, только когда черновик листинга есть. Своё покрытие (аудит) сюда НЕ подмешивается — см. spec 017, FR-008.
   {

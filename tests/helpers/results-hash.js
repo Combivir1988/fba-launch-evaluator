@@ -28,9 +28,10 @@ export function stripNew(results) {
   for (const s of r.priceSegments?.segments || []) delete s.selected;
   delete r.budget; delete r.verdict;
   // priceDistribution — spec 024, ДОБАВОЧНОЕ: распределение цен по коридорам ничего не решает, оно объясняет.
-  // Исключается ДО того, как поле появилось в расчёте: иначе первый же прогон уронит отпечаток,
+  // productLine — spec 025, ДОБАВОЧНОЕ: предлагаемая товарная линейка ни на что не влияет (ворота SC-003).
+  // Оба исключены ДО того, как поле появилось в расчёте: иначе первый же прогон уронит отпечаток,
   // и причину («задето лишнее» или «просто добавилось поле») пришлось бы выяснять задним числом.
-  for (const k of ["entry", "cashflow", "clickPrice", "borderline", "regulatory", "dataNotes", "config", "configScope", "amazon", "priceConfig", "sourceOverlap", "hero", "patentsToChecklist", "stage3", "launchPlan", "marketStructure", "priceDistribution"]) delete r[k]; // launchPlan — spec 020, добавочный
+  for (const k of ["entry", "cashflow", "clickPrice", "borderline", "regulatory", "dataNotes", "config", "configScope", "amazon", "priceConfig", "sourceOverlap", "hero", "patentsToChecklist", "stage3", "launchPlan", "marketStructure", "priceDistribution", "productLine"]) delete r[k]; // launchPlan — spec 020, добавочный
   if (r.economics) { // spec 020: добавочные поля возвратов — на прежний расчёт не влияют
     delete r.economics.returnRate; delete r.economics.returnSource; delete r.economics.returnCost;
     delete r.economics.netGross; delete r.economics.returnsCounted; delete r.economics.returnRateSuspicious; }
