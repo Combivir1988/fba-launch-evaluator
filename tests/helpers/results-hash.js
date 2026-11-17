@@ -19,6 +19,14 @@
 //    Исключаются только ДОБАВОЧНЫЕ поля — действующий уровень барьера с его основанием и источник доли
 //    с отзывом (сама доля живёт в entry и cashflow, а они исключены целиком строкой ниже). Там, где медиана и среднее дают ОДИН статус,
 //    отпечаток обязан остаться прежним — это ворота SC-003.
+//  • spec 026 (сезонность по длительности): НАМЕРЕННО меняет подпункт 1g — он мерил отношение лучшей недели
+//    к худшей (зелёный в 1 нише из 66) и стал мерить ДОЛЮ ИСТОРИИ В ПРОСАДКАХ. Значение и статус 1g и
+//    зависящий от них okCount Критерия 1 из отпечатка НЕ исключаются: изменение намеренное, и отпечаток
+//    обязан его показать. Исключаются только ДОБАВОЧНЫЕ поля в extra подпункта — downShare, depth, months,
+//    dips, longest, lowOf: без этого отпечаток сдвинулся бы и у ниш, где статус не изменился.
+//    ЗДЕСЬ ВОРОТА ИНОГО РОДА, ЧЕМ В ПРЕЖНИХ СПЕКАХ: там отпечаток обязан был НЕ сдвинуться, здесь он
+//    сдвинуться ОБЯЗАН, поэтому привычная формулировка ничего не доказала бы. Контроль сужен до
+//    поимённого перечня полей, которым двигаться разрешено; всё остальное сверяется как раньше.
 // Новые поля и метки времени в отпечаток не входят. Контрольные значения сняты на коде ДО spec 005 (коммит 06ec78a).
 import { createHash } from "node:crypto";
 
@@ -41,6 +49,8 @@ export function stripNew(results) {
   // Без исключения отпечаток сдвинулся бы у всех ниш, включая те, где статус не изменился,
   // и ворота SC-003 перестали бы что-либо доказывать.
   for (const it of Object.values(r.criterion1?.items || {})) delete it.decidedBy;
+  // spec 026: ДОБАВОЧНЫЕ поля сезонности. Перечень поимённый — extra есть и у 1f (spec 019), и его трогать нельзя.
+  for (const k of ["downShare", "depth", "months", "monthsLabel", "dips", "longest", "lowOf", "downWeeks", "normal", "weeks"]) delete r.criterion1?.items?.["1g"]?.extra?.[k];
   if (r.competition) { delete r.competition.amazonAsins; delete r.competition.amazonListings; delete r.competition.amazonRevenueShare; delete r.competition.own; delete r.competition.incumbent;
     // spec 019: добавочные поля — концентрация, поясняющие числа и летаргия. На то, что ядро считало раньше, они не влияют.
     delete r.competition.hhi; delete r.competition.top5ListingShare; delete r.competition.listingCount; delete r.competition.lethargyRevenueShare;

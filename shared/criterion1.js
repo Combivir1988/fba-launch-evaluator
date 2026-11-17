@@ -2,9 +2,22 @@
 // В счёт «N из 8» идут только чёткие OK; warn (в т.ч. пограничная цена) не засчитывается.
 import { sum, median, relDelta, safeDiv } from "./num.js";
 import { poeRevenueProxy } from "./parse-poe.js";
+import { seasonality } from "./seasonality.js";
 
 const item = (o) => ({ value: null, unit: "", threshold: "", status: "na", source: null, note: "", ...o });
 const triage = (v, okFn, failFn) => (v === null || v === undefined || Number.isNaN(v) ? "na" : okFn(v) ? "ok" : failFn(v) ? "fail" : "warn");
+
+/** Человеческая фраза о сезонности: сколько времени внизу, насколько глубоко и когда.
+ *  Без просадок месяц НЕ выдумывается — это отдельное требование (FR-009). */
+function seasonNote(s) {
+  if (!s.dips) return `${s.weeks} нед.: просадок ниже обычного спроса нет (обычный уровень ${Math.round(s.normal).toLocaleString("ru-RU")})`;
+  const pct = Math.round(s.downShare * 100);
+  const deep = Math.round(s.depth * 100);
+  const head = `${s.downWeeks} нед. из ${s.weeks} (${pct} % истории) ниже обычного спроса, в среднем на ${deep} % ниже`;
+  const when = s.monthsLabel ? `; самая длинная просадка ${s.longest} нед. — ${s.monthsLabel}` : "";
+  const many = s.dips > 1 ? `; просадок ${s.dips}` : "";
+  return head + when + many;
+}
 
 export function criterion1(p) {
   const { xray, cerebro, poe, inputs, thresholds: th, competition: comp, traffic: tr } = p;
@@ -100,17 +113,22 @@ export function criterion1(p) {
     }
     items["1f"] = finalize(it, mo["1f"], (v) => v < t.hhiOk, (v) => v >= t.hhiFail);
   }
-  // 1g — Сезонность (просадка SV по неделям)
+  // 1g — Сезонность: ДОЛЯ ИСТОРИИ, которую ниша провела ниже обычного спроса (spec 026).
+  // Прежняя мера «лучшая неделя против худшей» брала неделю Чёрной пятницы за норму и объявляла
+  // остальной год просадкой: ok 1 · warn 14 · fail 51 на 66 живых нишах.
   {
-    const it = item({ unit: "%", threshold: `просадка < ${Math.round(t.seasonOk * 100)} % OK · > ${Math.round(t.seasonFail * 100)} % НЕ OK`, pct: true });
-    const pts = (poe?.trends || []).filter((x) => x.sv !== null).slice(-52);
-    if (pts.length >= t.minTrendWeeks) {
-      const svs = pts.map((x) => x.sv); const peak = Math.max(...svs), trough = Math.min(...svs);
-      it.value = peak ? (peak - trough) / peak : null; it.source = "poe";
-      const pk = pts[svs.indexOf(peak)], tg = pts[svs.indexOf(trough)];
-      it.note = `${pts.length} нед.: пик ${peak.toLocaleString("ru-RU")} (${pk.date}), минимум ${trough.toLocaleString("ru-RU")} (${tg.date})`;
-    } else if (poe) { it.note = "недостаточно истории трендов (< 8 недель) — не «НЕ OK»"; }
-    items["1g"] = finalize(it, mo["1g"], (v) => v < t.seasonOk, (v) => v > t.seasonFail);
+    const it = item({ unit: "%", threshold: `ниже обычного спроса < ${Math.round(t.seasonDownOk * 100)} % года OK · > ${Math.round(t.seasonDownFail * 100)} % НЕ OK`, pct: true });
+    if (poe) {
+      const s = seasonality(poe.trends, { lowOf: t.seasonLowOf, minRun: t.seasonMinRun, minWeeks: t.minTrendWeeks });
+      if (s.reason === "short_history") it.note = `недостаточно истории трендов (меньше ${t.minTrendWeeks} недель) — это не «НЕ OK»`;
+      else if (s.reason === "no_demand") it.note = "в ряду нет ненулевого спроса — сезонность считать не по чему";
+      else {
+        it.value = s.downShare; it.source = "poe";
+        it.extra = { downShare: s.downShare, downWeeks: s.downWeeks, weeks: s.weeks, dips: s.dips, longest: s.longest, depth: s.depth, months: s.months, monthsLabel: s.monthsLabel, normal: s.normal, lowOf: s.lowOf };
+        it.note = seasonNote(s);
+      }
+    }
+    items["1g"] = finalize(it, mo["1g"], (v) => v < t.seasonDownOk, (v) => v > t.seasonDownFail);
   }
   // 1h — Успешность запусков + рост SV
   {

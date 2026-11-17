@@ -72,5 +72,5 @@ test("диапазон живёт в общей истории; старый д�
   assert.equal(opened.inputs.priceMin, 20); assert.equal(opened.inputs.priceMax, 60);
   assert.equal(compute(opened).priceBand.inCount, a.results.priceBand.inCount);
   const legacy = JSON.parse(JSON.stringify(fixtureAnalysis())); delete legacy.inputs.priceMin; delete legacy.inputs.priceMax; delete legacy.results;
-  const m = migrate(legacy); assert.equal(m.inputs.priceMin, null); assert.equal(resultsHash(compute(m)), "6504858a594ed7d8");
+  const m = migrate(legacy); assert.equal(m.inputs.priceMin, null); assert.equal(resultsHash(compute(m)), "2372b7df37369979");
 });

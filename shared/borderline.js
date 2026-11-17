@@ -29,8 +29,11 @@ function candidates(R, th) {
   // уже есть (ею пользуются 1c и 1d), новую заводить не нужно; направление «меньше — лучше» не меняется.
   add({ id: "1f", label: "1f — концентрация ниши", value: v1("1f"), threshold: t1.hhiOk, unit: "num", better: "lower", fail: "погранично" });
   add({ id: "1f-high", label: "1f — концентрация ниши (верхняя граница)", value: v1("1f"), threshold: t1.hhiFail, unit: "num", better: "lower", pass: "погранично" });
-  add({ id: "1g", label: "1g — сезонная просадка", value: v1("1g"), threshold: t1.seasonOk, unit: "pct", better: "lower", fail: "погранично" });
-  add({ id: "1g-high", label: "1g — сезонная просадка (верхняя граница)", value: v1("1g"), threshold: t1.seasonFail, unit: "pct", better: "lower", pass: "погранично" });
+  // spec 026: подпункт 1g меряет ДОЛЮ ИСТОРИИ В ПРОСАДКАХ, а не размах между лучшей и худшей неделей.
+  // Оставить здесь прежние пороги значило бы считать «почти прошло» от величины, по которой статус
+  // больше не выносится, — две меры одной сезонности в одном отчёте (чинилось для 1d в spec 022).
+  add({ id: "1g", label: "1g — доля года ниже обычного спроса", value: v1("1g"), threshold: t1.seasonDownOk, unit: "pct", better: "lower", fail: "погранично" });
+  add({ id: "1g-high", label: "1g — доля года ниже обычного спроса (верхняя граница)", value: v1("1g"), threshold: t1.seasonDownFail, unit: "pct", better: "lower", pass: "погранично" });
   add({ id: "1h", label: "1h — успешность запусков", value: v1("1h"), threshold: t1.launchOk, unit: "pct", better: "higher", fail: "погранично" });
   if (e && !e.pending) {
     add({ id: "g1-margin", label: "Gate 1 — маржа без рекламы", value: e.gate1?.margin0, threshold: e.cheapSegment ? te.cheapMarginMin : te.marginMin, unit: "pct", better: "higher", pass: "условие выполнено", fail: "условие не выполнено", economic: true });

@@ -55,15 +55,22 @@ test("applyPriceBand: счётчики, выручка и доля, исходн
 // Отпечатки обновлены в spec 020: возвраты НАМЕРЕННО меняют прибыль там, где они есть
 // (в этих фикстурах доля возвратов 0,32 % из отчёта POE). Отпечаток ниши БЕЗ возвратов не сдвинулся —
 // это проверяется воротами SC-002 в tests/returns.test.js.
+// Отпечатки обновлены в spec 026: подпункт 1g НАМЕРЕННО сменил меру — с «лучшая неделя против худшей»
+// (ok 1 · warn 14 · fail 51 на 66 живых нишах) на ДОЛЮ ИСТОРИИ В ПРОСАДКАХ (ok 47 · warn 7 · fail 12).
+// Добавочные поля сезонности из отпечатка исключены поимённо, поэтому сдвиг объясняется именно сменой
+// меры. Проверено на 68 живых анализах ДВУМЯ отдельными процессами (старый и новый код): «узкий
+// отпечаток» — всё, кроме 1g, Scorecard, вердикта и пересказов прохождения Критерия 1 — совпал у ВСЕХ.
+// У пустого анализа 1g остался na, и сдвиг там объясняется ТОЛЬКО текстом порога: «просадка < 30 % OK»
+// стало «ниже обычного спроса < 8 % года OK». Это подпись меры, она видна человеку и обязана быть в отпечатке.
 // Отпечатки обновлены в spec 019: подпункт 1f НАМЕРЕННО сменил меру — с доли топ-5 брендов на концентрацию ниши.
 // Добавочные поля концентрации и летаргии из отпечатка исключены (tests/helpers/results-hash.js), поэтому
 // изменение отпечатка целиком объясняется именно сменой меры в 1f, а не появлением новых величин.
 test("SC-002 совместимость: без диапазона результаты те же, что до появления фильтра", () => {
-  assert.equal(resultsHash(fixtureAnalysis().results), "6504858a594ed7d8");
+  assert.equal(resultsHash(fixtureAnalysis().results), "2372b7df37369979");
   const poeOnly = newAnalysis({ niche: "u", coreKeyword: "urinal screen deodorizer" }); poeOnly.aggregates = { poe: parsePoe(readJson(POE)) }; Object.assign(poeOnly.inputs, { price: 24.99, cogs: 4.37 });
-  assert.equal(resultsHash(compute(poeOnly)), "73440b427310f50b");
-  assert.equal(resultsHash(compute(newAnalysis({ niche: "e" }))), "f0ef040ef6e247ce");
-  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "6504858a594ed7d8", "некорректный диапазон не применяется");
+  assert.equal(resultsHash(compute(poeOnly)), "f4b6073d99c1a1d5");
+  assert.equal(resultsHash(compute(newAnalysis({ niche: "e" }))), "728057bbf5b0d60b");
+  const bad = withBand(60, 20); assert.equal(resultsHash(bad.results), "2372b7df37369979", "некорректный диапазон не применяется");
   assert.equal(bad.results.priceBand.valid, false); assert.equal(bad.results.priceBand.active, false);
   const old = migrate({ schemaVersion: 1, id: "x", niche: "старый", inputs: { cogs: 3 } }); assert.equal(old.inputs.priceMin, null); assert.equal(old.inputs.priceMax, null);
 });

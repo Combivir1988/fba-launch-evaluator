@@ -1,0 +1,1111 @@
+{
+ "takenAt": "2026-11-17",
+ "note": "Базовый замер ДО spec 026 (сезонность по длительности). Названий ниш нет намеренно: фикстура уходит в публичный репозиторий.",
+ "total": 70,
+ "computed": 68,
+ "empty": 2,
+ "failed": 0,
+ "g1Status": {
+  "fail": 51,
+  "warn": 14,
+  "na": 2,
+  "ok": 1
+ },
+ "verdicts": {
+  "no_go": 46,
+  "rework": 17,
+  "go": 2,
+  "go_conditional": 3
+ },
+ "c1pass": 9,
+ "items": [
+  {
+   "hash": "3a7a5b998465f497",
+   "g": {
+    "value": 0.7404084753706125,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 7,
+   "c1pass": true,
+   "market": 8.2,
+   "scTotal": 64.75,
+   "scBand": "go",
+   "verdict": "no_go",
+   "decisiveGate": "Стоп-вопросы"
+  },
+  {
+   "hash": "646654c2ee65b9ac",
+   "g": {
+    "value": 0.6328740157480315,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 42.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "b9f2a61a22ad57a4",
+   "g": {
+    "value": 0.9254260003829217,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 57.25,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "9fd036d45e09da59",
+   "g": {
+    "value": 0.5494269340974212,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 6.5,
+   "scTotal": 54.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "b766ff17c0b70c23",
+   "g": {
+    "value": 0.8670689339915889,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 47.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "c51d95a380e40fb9",
+   "g": {
+    "value": 0.6558496114261709,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 7,
+   "c1pass": true,
+   "market": 8.2,
+   "scTotal": 68.5,
+   "scBand": "go",
+   "verdict": "go",
+   "decisiveGate": "все гейты пройдены"
+  },
+  {
+   "hash": "ba660bfbe991fab7",
+   "g": {
+    "value": 0.5238784370477568,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 37.5,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "72bfb7926b0aff04",
+   "g": {
+    "value": 0.5238784370477568,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 7,
+   "c1pass": true,
+   "market": 8.2,
+   "scTotal": 67,
+   "scBand": "go",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 8"
+  },
+  {
+   "hash": "483c6f541d2607ce",
+   "g": {
+    "value": 0.6901035926823892,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 6.4,
+   "scTotal": 39.25,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "6becd913537d411e",
+   "g": {
+    "value": 0.6857309486780715,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 46.66666666666667,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "8ceb8c63fc32c869",
+   "g": {
+    "value": 0.5210367718694067,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 57.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "6ebe0f361e4f60fd",
+   "g": {
+    "value": 0.7298323853436384,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 50,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "429ed299423c25da",
+   "g": {
+    "value": 0.49304141525471223,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 9,
+   "scTotal": 50.75,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "7bdcd4f133774391",
+   "g": {
+    "value": 0.5665537012170428,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 35,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "fbaf25164beb1f9c",
+   "g": {
+    "value": null,
+    "status": "na",
+    "source": null
+   },
+   "weeks": 0,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 10,
+   "scTotal": 52.666666666666664,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "2fde21ad93c57315",
+   "g": {
+    "value": 0.9076789548216162,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 6.2,
+   "scTotal": 36.25,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "66c51549d014a52e",
+   "g": {
+    "value": 0.6798949406644811,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 57.5,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "10cdf154f69d9b47",
+   "g": {
+    "value": 0.4641867006345931,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8,
+   "scTotal": 57,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "ffe24130d293cfab",
+   "g": {
+    "value": 0.5205487694807148,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 35,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "a3a9c54b900c0228",
+   "g": {
+    "value": 0.7057401812688822,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 4.4,
+   "scTotal": 37.333333333333336,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Стоп-вопросы"
+  },
+  {
+   "hash": "f921326a2d9db14f",
+   "g": {
+    "value": 0.7057401812688822,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 4.4,
+   "scTotal": 48.99999999999999,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Стоп-вопросы"
+  },
+  {
+   "hash": "68e5981d9c93469e",
+   "g": {
+    "value": 0.2760286689692348,
+    "status": "ok",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 9,
+   "scTotal": 55.75,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "1cf5fb89d41301c8",
+   "g": {
+    "value": 0.7467938214153066,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 40,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "b20ed6b30c96d4a9",
+   "g": {
+    "value": 0.6128094733906994,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 42.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "1668c9dabe31ba35",
+   "g": {
+    "value": 0.8672048672048672,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 4.6,
+   "scTotal": 45.75,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "e178914f7891bc75",
+   "g": {
+    "value": 0.5936666666666667,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 50,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "5c8bd1804050ef1b",
+   "g": {
+    "value": 0.9730588367015619,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 48.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "2a6df83530a948c5",
+   "g": {
+    "value": 0.6354792560801145,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 6.2,
+   "scTotal": 39.75,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "1e5969cf9c2d9678",
+   "g": {
+    "value": 0.8795069337442218,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 44,
+   "c1ok": 1,
+   "c1pass": false,
+   "market": 4.4,
+   "scTotal": 41.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "25982dc1fcddfde3",
+   "g": {
+    "value": 0.822569058969503,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 5.4,
+   "scTotal": 41.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "66b70307ccda989f",
+   "g": {
+    "value": 0.7968552778679361,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 6,
+   "c1pass": true,
+   "market": 7.2,
+   "scTotal": 38.5,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "bb2805361221aa1a",
+   "g": {
+    "value": 0.9315704534631462,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 38.5,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "8e3ced22262fe900",
+   "g": {
+    "value": 0.8774644579228782,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 35,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "fe055354b2d1a03c",
+   "g": {
+    "value": null,
+    "status": "na",
+    "source": null
+   },
+   "weeks": 5,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 6.5,
+   "scTotal": 44.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "bf3527eed01a04bc",
+   "g": {
+    "value": 0.5614741621508781,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 53.75,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "1009046ad0c66814",
+   "g": {
+    "value": 0.9432700679087584,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 35,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "d716eee6aa21a4a8",
+   "g": {
+    "value": 0.7614463735648278,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 43.33333333333333,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "22fc1f366826d43d",
+   "g": {
+    "value": 0.35451064848049774,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8,
+   "scTotal": 57,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "c4fe5a3543249382",
+   "g": {
+    "value": 0.39287149170636515,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 33.75,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "394d7402c612c8d9",
+   "g": {
+    "value": 0.3358138658628485,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 11,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 6.2,
+   "scTotal": 53.5,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "dda0ada0054da1f3",
+   "g": {
+    "value": 0.5814190336086907,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 5.4,
+   "scTotal": 40.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 2"
+  },
+  {
+   "hash": "19baf7ccac62b7ad",
+   "g": {
+    "value": 0.5458773210224379,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 46.66666666666667,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "80ddb451624a1c8f",
+   "g": {
+    "value": 0.45228388385056995,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 9,
+   "scTotal": 38.25,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "f06619bfbd592a6b",
+   "g": {
+    "value": 0.4326556543837357,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 33,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 6.2,
+   "scTotal": 30,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "cb6bfbfc24919ba9",
+   "g": {
+    "value": 0.6776145582109186,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 52.25,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "bd36371b7bd0ce2f",
+   "g": {
+    "value": 0.7811329588014981,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 41.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 2"
+  },
+  {
+   "hash": "b98e31dc974fba0e",
+   "g": {
+    "value": 0.7368552578968413,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 37.5,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "41b2ec134fb3edc4",
+   "g": {
+    "value": 0.3904545691769741,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 9,
+   "scTotal": 58.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "a082f1e983fd4019",
+   "g": {
+    "value": 0.8000126895501555,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 7,
+   "c1pass": true,
+   "market": 8.2,
+   "scTotal": 54.66666666666666,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "c264ce7b9b588ce7",
+   "g": {
+    "value": 0.6470823982045527,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 6.5,
+   "scTotal": 41.00000000000001,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  },
+  {
+   "hash": "52580223776f2dbb",
+   "g": {
+    "value": 0.3899083337991169,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 9,
+   "scTotal": 49.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "8c9c4671ed85e979",
+   "g": {
+    "value": 0.3546877771864467,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 41.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "cc87274be9b10b2c",
+   "g": {
+    "value": 0.6357574817801209,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 5.4,
+   "scTotal": 49.25,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "dd1167b0e241c50b",
+   "g": {
+    "value": 0.949288256227758,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 12,
+   "c1ok": 6,
+   "c1pass": true,
+   "market": 7.2,
+   "scTotal": 53.75,
+   "scBand": "rework",
+   "verdict": "go_conditional",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "84683ecd5d0b906e",
+   "g": {
+    "value": 0.5402050960252325,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 7,
+   "c1pass": true,
+   "market": 8.2,
+   "scTotal": 57.25,
+   "scBand": "rework",
+   "verdict": "go_conditional",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "b83b1b432ebceed4",
+   "g": {
+    "value": 0.9537226507161971,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 6.2,
+   "scTotal": 62.25,
+   "scBand": "go",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "e0680815e543ddf0",
+   "g": {
+    "value": 0.9151613771789139,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 6,
+   "c1pass": true,
+   "market": 8.2,
+   "scTotal": 62.25,
+   "scBand": "go",
+   "verdict": "go_conditional",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "e6e3bf1849039fda",
+   "g": {
+    "value": 0.6921156646557104,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 5.2,
+   "scTotal": 36.25,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "1d77c9cadae787c6",
+   "g": {
+    "value": 0.9484156634841566,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 8.2,
+   "scTotal": 36,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "efba3b61500f8599",
+   "g": {
+    "value": 0.8617124539522903,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 31.999999999999996,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Amazon в нише"
+  },
+  {
+   "hash": "d173faf94ef6dfbf",
+   "g": {
+    "value": 0.4192136775331592,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 28,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 7,
+   "scTotal": 55.5,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "950bb87bc5de0281",
+   "g": {
+    "value": 0.4286309358511525,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 16,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 6,
+   "scTotal": 49.25,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 1"
+  },
+  {
+   "hash": "fadd9d3cc4434070",
+   "g": {
+    "value": 0.5144302325922752,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 5,
+   "c1pass": false,
+   "market": 6.4,
+   "scTotal": 38,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "eef2ab9458d64ff9",
+   "g": {
+    "value": 0.5456154652381507,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 3,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 53.75,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 6"
+  },
+  {
+   "hash": "a0900b419fc897d4",
+   "g": {
+    "value": 0.6146496815286624,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 2,
+   "c1pass": false,
+   "market": 7.75,
+   "scTotal": 35.125,
+   "scBand": "no_go",
+   "verdict": "no_go",
+   "decisiveGate": "Gate 1"
+  },
+  {
+   "hash": "2e256dca24ae7af1",
+   "g": {
+    "value": 0.5581428673783765,
+    "status": "fail",
+    "source": "poe"
+   },
+   "weeks": 52,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 7.2,
+   "scTotal": 46,
+   "scBand": "rework",
+   "verdict": "no_go",
+   "decisiveGate": "Критерий 8"
+  },
+  {
+   "hash": "c081c036b0aa5e9b",
+   "g": {
+    "value": 0.3967734619667561,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 19,
+   "c1ok": 6,
+   "c1pass": true,
+   "market": 9,
+   "scTotal": 69.5,
+   "scBand": "go",
+   "verdict": "go",
+   "decisiveGate": "все гейты пройдены"
+  },
+  {
+   "hash": "fbc16f860acbfe2c",
+   "g": {
+    "value": 0.35537342524364157,
+    "status": "warn",
+    "source": "poe"
+   },
+   "weeks": 13,
+   "c1ok": 4,
+   "c1pass": false,
+   "market": 5.2,
+   "scTotal": 50,
+   "scBand": "rework",
+   "verdict": "rework",
+   "decisiveGate": "Критерий 2"
+  }
+ ]
+}

@@ -61,7 +61,9 @@ test("Критерий 1 только по POE: прокси-пометки, с�
   assert.equal(c["1b"].source, "poe");
   assert.equal(c["1b"].status, "ok", "$31.57 ≥ $30");
   assert.equal(c["1g"].source, "poe");
-  assert.ok(c["1g"].value > 0 && c["1g"].value < 1);
+  // spec 026: 1g меряет ДОЛЮ ИСТОРИИ В ПРОСАДКАХ, а не размах между крайностями. У ровной ниши это честный ноль.
+  assert.ok(c["1g"].value >= 0 && c["1g"].value <= 1);
+  assert.ok(Number.isFinite(c["1g"].extra?.downWeeks) && Number.isFinite(c["1g"].extra?.weeks), "рядом с долей обязаны быть недели, из которых она посчитана");
   assert.equal(c["1h"].source, "poe");
   assert.ok(Math.abs(c["1h"].value - 9 / 24) < 1e-9);
   assert.equal(c["1h"].status, "ok", "37.5 % ≥ 30 %");
@@ -82,7 +84,10 @@ test("Критерий 1 только по POE: прокси-пометки, с�
 
 test("Ручное переопределение метрики побеждает и помечается", () => {
   const a = fullAnalysis();
-  a.inputs.manualOverrides = { "1g": { value: 0.2, note: "по скрину Cerebro" } };
+  // spec 026: шкала подпункта сменилась. Прежние 0.2 значили «просадка между крайностями 20 % — это норма»,
+  // теперь 0.2 значит «пятая часть года в просадках», то есть ровно порог «не ок». Ради этого пороги и
+  // переименованы: одно имя с двумя смыслами применилось бы молча (research.md D9).
+  a.inputs.manualOverrides = { "1g": { value: 0.02, note: "по скрину Cerebro" } };
   const R = compute(a);
   assert.equal(R.criterion1.items["1g"].source, "manual");
   assert.equal(R.criterion1.items["1g"].status, "ok");
