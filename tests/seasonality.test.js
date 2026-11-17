@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { seasonality, monthsLabel } from "../shared/seasonality.js";
 import { criterion1 } from "../shared/criterion1.js";
-import { DEFAULT_THRESHOLDS, mergeThresholds } from "../shared/thresholds.js";
+import { DEFAULT_THRESHOLDS, mergeThresholds, thresholdOverrides } from "../shared/thresholds.js";
 
 // ---------- вспомогательное ----------
 
@@ -189,4 +189,31 @@ test("пороги читаются из набора, а не зашиты в �
   assert.equal(statusOf(trends), "warn", "при умолчаниях 15,4 % — погранично");
   const strict = mergeThresholds({ criterion1: { seasonDownFail: 0.10 } });
   assert.equal(statusOf(trends, strict), "fail", "с более строгим порогом те же данные дают «не ок»");
+});
+
+// ---------- D9: старый личный набор не применяется с НОВЫМ смыслом ----------
+
+test("spec 026 D9: старый ключ seasonOk не переносится и не подменяет смысл нового порога", () => {
+  // Переименование порогов — ЗАЩИТА, а не косметика. Оставь мы имя `seasonOk`, личный набор
+  // с `seasonOk: 0.25` («размах между крайностями 25 % — норма») молча начал бы означать
+  // «четверть года в просадках — это нормально»: то же имя при другом смысле.
+  // Проверка T036 делалась вручную и сторожа после себя не оставила — вот он.
+  const old = { criterion1: { seasonOk: 0.25, seasonFail: 0.6, seasonDownOk: 0.05 } };
+
+  // 1. Сохранение набора выбрасывает ключ, которого нет в умолчаниях (`thresholds.js`: dv === undefined → continue).
+  const saved = thresholdOverrides(old);
+  assert.deepEqual(saved, { criterion1: { seasonDownOk: 0.05 } },
+    "в наборе обязан остаться только известный ключ; старые имена выбрасываются при сохранении");
+
+  // 2. Загрузка набора, где ТОЛЬКО старые ключи, не трогает новые пороги — они из умолчаний.
+  const onlyOld = { criterion1: { seasonOk: 0.25, seasonFail: 0.6 } };
+  assert.deepEqual(thresholdOverrides(onlyOld), {}, "набор из одних старых имён сохраняется пустым");
+  const t = mergeThresholds(onlyOld);
+  assert.equal(t.criterion1.seasonDownOk, DEFAULT_THRESHOLDS.criterion1.seasonDownOk);
+  assert.equal(t.criterion1.seasonDownFail, DEFAULT_THRESHOLDS.criterion1.seasonDownFail,
+    "подкрутка старой величины не смеет применяться к новой — величины несопоставимы");
+
+  // 3. И решение подпункта от старого набора не зависит: 8 недель из 52 — это 15,4 %, то есть «погранично»
+  //    при умолчаниях. Если бы seasonFail: 0.6 как-то дотянулся, статус был бы «ок».
+  assert.equal(statusOf(weeks([...flat(44), ...flat(8, 200)]), t), "warn");
 });
