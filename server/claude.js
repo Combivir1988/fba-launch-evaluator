@@ -34,6 +34,10 @@ export function configFromEnv(env = process.env) {
     effort: env.CLAUDE_EFFORT || "high",
     fallbacks: env.CLAUDE_FALLBACKS !== "0",
     mock: env.MOCK_AI === "1" || env.MOCK_AI === "true",
+    // Пауза внутри mock-страницы. ТОЛЬКО шов для тестов и только при mock: без неё работа в mock-режиме
+    // целиком укладывается в микрозадачи и завершается РАНЬШЕ, чем сервер возьмёт следующий запрос, —
+    // то есть одновременность через HTTP нечем наблюдать (spec 027, обнаружено на воротах SC-001).
+    mockDelayMs: Number(env.MOCK_DELAY_MS) || 0,
     databaseUrl: env.DATABASE_URL || "",
     production: env.NODE_ENV === "production",
     dbMemory: env.DB_MEMORY === "1",

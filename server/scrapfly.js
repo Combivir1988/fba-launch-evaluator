@@ -39,7 +39,7 @@ export function classifyScrapfly(status, text = "") {
 
 /** Один листинг. Ошибка страницы возвращается записью с error (не бросает), ошибка ключа/кредитов — бросает {code}. */
 export async function fetchListing(asin, cfg, { fetchImpl = fetch, signal, retries = 2 } = {}) {
-  if (cfg.mock) return mockListing(asin, cfg.mockTitles?.[asin]);
+  if (cfg.mock) { if (cfg.mockDelayMs > 0) await sleep(cfg.mockDelayMs); return mockListing(asin, cfg.mockTitles?.[asin]); }
   if (!cfg.scrapflyKey) throw Object.assign(new Error("Scrapfly не настроен"), { code: "auth", retryable: false });
   let last = null;
   for (let attempt = 0; attempt <= retries; attempt++) {

@@ -1,3 +1,5 @@
+// Spec 027: analysisId едет в теле КАЖДОГО запуска — по паре «анализ + вид операции» сервер узнаёт,
+// что двое запускают одно и то же, и заводит работу один раз. Без него правило нереализуемо.
 // AI-анализ и патентный скан как фоновые задачи сервера: POST → { jobId } → EventSource /api/jobs/:id/events
 // (replay событий + автопереподключение). Результат не теряется при обрыве сети или перезагрузке страницы.
 import { buildAiPayload } from "/shared/ai-payload.js";
@@ -15,7 +17,7 @@ async function startJob(url, body) {
   try {
     const j = await api("POST", url, body);
     if (!j?.jobId) throw new Error("Сервер не вернул jobId");
-    return j.jobId;
+    return j; // { jobId, joined? } — joined означает, что работа ЧУЖАЯ и уже идёт (spec 027)
   } catch (e) {
     if (e.status === 401) throw Object.assign(new Error("Сеанс истёк — войдите заново"), { code: "auth" });
     if (e.code === "rate_limited") throw Object.assign(new Error(`Лимит запросов: повторите через ${e.retryAfter || 60} с`), { code: "rate_limited" });
@@ -60,11 +62,12 @@ export function waitJob(jobId, handlers = {}) {
 }
 
 /** Запуск AI-анализа (или продолжение уже запущенной задачи, если передан resumeJobId). */
-export async function runAi(analysis, { onThinking, onProgress, onMeta, onReconnect, effort, model, resumeJobId } = {}) {
+export async function runAi(analysis, { onThinking, onProgress, onMeta, onReconnect, onJoined, effort, model, resumeJobId } = {}) {
   let jobId = resumeJobId;
   if (!jobId) {
     const payload = buildAiPayload(analysis);
-    jobId = await startJob("/api/analyze", { niche: analysis.niche, coreKeyword: analysis.coreKeyword, locale: "ru", payload, options: { ...(effort ? { effort } : {}), ...(model ? { model } : {}) } });
+    const r = await startJob("/api/analyze", { analysisId: analysis.id, niche: analysis.niche, coreKeyword: analysis.coreKeyword, locale: "ru", payload, options: { ...(effort ? { effort } : {}), ...(model ? { model } : {}) } });
+    jobId = r.jobId; if (r.joined) onJoined?.(r.joined);
     pendingJob.set(analysis.id, "analyze", { jobId, startedAt: Date.now() });
   }
   try {
@@ -75,17 +78,17 @@ export async function runAi(analysis, { onThinking, onProgress, onMeta, onReconn
 }
 
 /** Патентный скан как задача. */
-export async function runPatentScan(analysis, body, { onStage, onReconnect, resumeJobId } = {}) {
+export async function runPatentScan(analysis, body, { onStage, onReconnect, onJoined, resumeJobId } = {}) {
   let jobId = resumeJobId;
-  if (!jobId) { jobId = await startJob("/api/patents/scan", body); pendingJob.set(analysis.id, "patents", { jobId, startedAt: Date.now() }); }
+  if (!jobId) { const r = await startJob("/api/patents/scan", { ...body, analysisId: analysis.id }); jobId = r.jobId; if (r.joined) onJoined?.(r.joined); pendingJob.set(analysis.id, "patents", { jobId, startedAt: Date.now() }); }
   try { const done = await waitJob(jobId, { onStage, onReconnect }); return done.scan; }
   finally { pendingJob.clear(analysis.id, "patents"); }
 }
 
 /** Задачи этапа 2 (spec 010): схема полей / извлечение характеристик / ТЗ. type: config_schema | config_extract | config_tz. Возвращает данные события done. */
-export async function runConfigJob(analysis, type, url, body, { onStage, onReconnect, resumeJobId } = {}) {
+export async function runConfigJob(analysis, type, url, body, { onStage, onReconnect, onJoined, resumeJobId } = {}) {
   let jobId = resumeJobId;
-  if (!jobId) { jobId = await startJob(url, body); pendingJob.set(analysis.id, type, { jobId, startedAt: Date.now() }); }
+  if (!jobId) { const r = await startJob(url, { ...body, analysisId: analysis.id }); jobId = r.jobId; if (r.joined) onJoined?.(r.joined); pendingJob.set(analysis.id, type, { jobId, startedAt: Date.now() }); }
   try { return await waitJob(jobId, { onStage, onReconnect }); }
   finally { pendingJob.clear(analysis.id, type); }
 }

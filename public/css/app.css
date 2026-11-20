@@ -394,3 +394,6 @@ td.promo .chip { font-size: .72rem; padding: 0 .4rem; }
 #stats-blind ul { margin: .4rem 0 0; padding-left: 1.1rem; }
 #stats-blind li { margin-bottom: .3rem; }
 @media (max-width: 760px) { .stgrid { grid-template-columns: 1fr; } }
+
+/* spec 027: чужой прогон. Надпись держится до конца работы — её не затирают сообщения о ходе работ. */
+.joined-note { margin: .4rem 0; padding: .45rem .6rem; border-left: 3px solid var(--warn, #c88); background: rgba(200,136,136,.08); font-size: .85rem; line-height: 1.35; }

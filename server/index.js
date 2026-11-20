@@ -21,6 +21,7 @@ import { schemaStream, extractStream, tzStream, promoStream } from "./config-job
 import { buildTzDocx, tzFileName } from "./tz-docx.js";
 import { buildPatentsDocx, patentsFileName } from "./patents-docx.js";
 import { startJob, getJob, subscribe, cancelJob, runningCount } from "./jobs.js";
+import { jobKey, paramsOf, diffParams } from "./job-params.js";
 import { log } from "./log.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -288,29 +289,47 @@ export function createApp(cfg = configFromEnv(), deps = {}) {
   const limiter = rateLimiter({ limit: cfg.rateLimitPerHour, windowMs: 60 * 60 * 1000, key: (req) => req.user?.id || req.ip });
   const sseHeaders = (res) => { res.status(200).set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" }); res.flushHeaders?.(); };
 
+  // Spec 027: одна операция одного анализа выполняется один раз. Ключ строится ЗДЕСЬ, потому что
+  // только здесь известно тело запроса; дальше всё решает реестр в jobs.js. Вкладка, открытая до
+  // обновления, идентификатора не присылает — правило к ней не применяется, и это НЕ молча (FR-014).
+  const keyOf = (type, body, req) => {
+    const key = jobKey({ type, analysisId: body.analysisId });
+    if (!key) log("info", "job start without analysisId", { type, user: req.user.login, note: "правило «одна операция за раз» к этому запросу не применяется — вкладка открыта до обновления" });
+    return key;
+  };
+  /** Ответ на запуск. При присоединении — тот же код 202 и тот же jobId (путь подписки в клиенте не меняется),
+   *  плюс блок joined: кто запустил, когда и ЧЕМ его параметры отличаются от моих. Молчаливое присоединение
+   *  хуже отказа: человек решил бы, что прогон его, и не понял, почему таблица заполнена не по его схеме. */
+  const launched = (res, req, type, body, { job, joined }) => {
+    if (!joined) return res.status(202).json({ jobId: job.id });
+    const differs = diffParams(paramsOf(type, body), joined.params);
+    log("info", "job joined", { id: job.id, type, user: req.user.login, startedBy: joined.startedBy, differs: differs.length });
+    return res.status(202).json({ jobId: job.id, joined: { startedBy: joined.startedBy, startedAt: joined.startedAt, differs } });
+  };
+
   // Запуск AI-анализа как фоновой задачи → { jobId }. Поток событий — GET /api/jobs/:id/events.
   app.post("/api/analyze", authed, limiter, jsonMid, (req, res) => {
     const body = req.body || {};
     if (!body.payload || typeof body.payload !== "object") return res.status(400).json({ error: "bad_request", message: "payload обязателен" });
-    const job = startJob("analyze", (signal) => analyzeStream(body, cfg, { signal }), { niche: String(body.niche || "").slice(0, 60), userId: req.user.id, userName: req.user.name });
-    log("info", "analyze job start", { id: job.id, user: req.user.login, niche: job.meta.niche, payloadChars: JSON.stringify(body.payload).length, provider: cfg.mock ? "mock" : cfg.provider, model: body.options?.model || (cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model) });
-    res.status(202).json({ jobId: job.id });
+    const started = startJob("analyze", (signal) => analyzeStream(body, cfg, { signal }), { niche: String(body.niche || "").slice(0, 60), userId: req.user.id, userName: req.user.name }, { key: keyOf("analyze", body, req), params: paramsOf("analyze", body) });
+    const job = started.job; if (!started.joined) log("info", "analyze job start", { id: job.id, user: req.user.login, niche: job.meta.niche, payloadChars: JSON.stringify(body.payload).length, provider: cfg.mock ? "mock" : cfg.provider, model: body.options?.model || (cfg.provider === "openrouter" ? cfg.openrouterModel : cfg.model) });
+    return launched(res, req, "analyze", body, started);
   });
   app.post("/api/patents/scan", authed, limiter, jsonMid, (req, res) => {
     const body = req.body || {};
     if (!body.coreKeyword && !body.niche) return res.status(400).json({ error: "bad_request", message: "niche/coreKeyword обязателен" });
     if (!cfg.mock && cfg.provider !== "openrouter") return res.status(400).json({ error: "bad_request", message: "Патентный скан требует AI_PROVIDER=openrouter" });
-    const job = startJob("patents", (signal) => patentScanStream(body, cfg, { signal }), { niche: String(body.niche || body.coreKeyword || "").slice(0, 60), userId: req.user.id, userName: req.user.name });
-    log("info", "patent scan job start", { id: job.id, user: req.user.login, niche: job.meta.niche });
-    res.status(202).json({ jobId: job.id });
+    const started = startJob("patents", (signal) => patentScanStream(body, cfg, { signal }), { niche: String(body.niche || body.coreKeyword || "").slice(0, 60), userId: req.user.id, userName: req.user.name }, { key: keyOf("patents", body, req), params: paramsOf("patents", body) });
+    const job = started.job; if (!started.joined) log("info", "patent scan job start", { id: job.id, user: req.user.login, niche: job.meta.niche });
+    return launched(res, req, "patents", body, started);
   });
   // Этап 2 (spec 010): схема полей → извлечение характеристик → ТЗ. Страницы грузит сервер через Scrapfly (ключ только здесь).
   const scrapflyReady = (req, res, next) => (cfg.mock || cfg.scrapflyKey ? next() : res.status(400).json({ error: "bad_request", message: "Scrapfly не настроен: задайте SCRAPFLY_API_KEY на сервере" }));
   const configJob = (type, stream, check) => (req, res) => {
     const body = req.body || {}; const bad = check(body); if (bad) return res.status(400).json({ error: "bad_request", message: bad });
-    const job = startJob(type, (signal) => stream(body, cfg, { signal }), { niche: String(body.niche || body.coreKeyword || "").slice(0, 60), userId: req.user.id, userName: req.user.name });
-    log("info", type + " job start", { id: job.id, user: req.user.login, niche: job.meta.niche, asins: Array.isArray(body.asins) ? body.asins.length : 0 });
-    res.status(202).json({ jobId: job.id });
+    const started = startJob(type, (signal) => stream(body, cfg, { signal }), { niche: String(body.niche || body.coreKeyword || "").slice(0, 60), userId: req.user.id, userName: req.user.name }, { key: keyOf(type, body, req), params: paramsOf(type, body) });
+    const job = started.job; if (!started.joined) log("info", type + " job start", { id: job.id, user: req.user.login, niche: job.meta.niche, asins: Array.isArray(body.asins) ? body.asins.length : 0 });
+    return launched(res, req, type, body, started);
   };
   app.post("/api/config/schema", authed, limiter, scrapflyReady, jsonBig, configJob("config_schema", schemaStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : null)));
   app.post("/api/config/extract", authed, limiter, scrapflyReady, jsonBig, configJob("config_extract", extractStream, (b) => (!Array.isArray(b.asins) || !b.asins.length ? "asins обязательны" : !b.schema?.fields?.length ? "schema обязательна" : null)));

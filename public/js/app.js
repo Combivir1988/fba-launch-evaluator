@@ -8,6 +8,7 @@ import { mergePoe, upsertPoePart, poePartKey } from "/shared/merge-poe.js";
 import { detectAndParse } from "./files.js";
 import { history, localHistory } from "./history.js";
 import { runAi, runPatentScan, runConfigJob, pendingJob } from "./ai.js";
+import { joinedNote } from "./joined-note.js";
 import { configScope, topForSchema, freshListings } from "/shared/config-scope.js";
 import { sanitizeSchema, setCell, renameOption, unlistedValues, fillFromText, coverage } from "/shared/config-extract.js";
 import { buildTzPayload } from "/shared/tz-payload.js";
@@ -558,13 +559,14 @@ $("#btn-ai").addEventListener("click", () => startAi());
 async function startAi(resumeJobId = null) {
   if (S.aiBusy) return;
   if (!S.a.results) renderAll();
-  S.aiBusy = true; $("#btn-ai").disabled = true;
+  S.aiBusy = true; $("#btn-ai").disabled = true; clearJoined();
   const chosen = modelAi();
   if (S.a.ai) R().update(dash, S.a, renderOpts(), ["ai"]); // прежний результат затемняем, пока идёт новый
   const prog = $("#ai-progress"), status = $("#ai-status");
   if (prog) { prog.classList.remove("hidden"); prog.textContent = ""; } if (status) status.textContent = resumeJobId ? "продолжаю задачу после перезагрузки…" : `запрос… (${chosen || "модель по умолчанию"})`;
   try {
     const ai = await runAi(S.a, { model: chosen || undefined, resumeJobId,
+      onJoined: (j) => showJoined("#ai-status", j),
       onMeta: (m) => { if (status) status.textContent = `модель ${m.model}…`; },
       onThinking: (t) => { if (prog) { prog.textContent += t; prog.scrollTop = prog.scrollHeight; } },
       onProgress: (n) => { if (status) status.textContent = `формирую ответ… ${n} симв.`; },
@@ -583,7 +585,7 @@ async function startPatentScan(resumeJobId = null) {
   if (S.patBusy) return;
   if (!S.a.coreKeyword && !S.a.niche) return toast("Укажите нишу / главный ключ");
   if (!S.a.results) renderAll();
-  S.patBusy = true; $("#btn-patents").disabled = true;
+  S.patBusy = true; $("#btn-patents").disabled = true; clearJoined();
   if (S.a.patents) R().update(dash, S.a, renderOpts(), ["patents"]);
   const setStatus = (t) => { for (const el of [$("#patents-status"), $("#patents-side-status")]) if (el) el.textContent = t; };
   setStatus(resumeJobId ? "продолжаю скан после перезагрузки…" : "запуск…");
@@ -592,7 +594,7 @@ async function startPatentScan(resumeJobId = null) {
     const hypotheses = (S.a.ai?.differentiation || []).map((d) => d.hypothesis);
     const chosen = modelPatents();
     const scan = await runPatentScan(S.a, { niche: S.a.niche, coreKeyword: S.a.coreKeyword, feature: S.a.inputs.patentFeature || "", hypotheses, brands, options: chosen ? { model: chosen } : {} },
-      { resumeJobId, onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
+      { resumeJobId, onJoined: (j) => showJoined("#patents-status", j), onStage: (d) => setStatus(d.text || d.stage), onReconnect: (n) => setStatus(`связь прервалась — переподключаюсь (${n})…`) });
     S.a.patents = scan; if (S.a.ai && !S.a.ai.staleSince) S.a.ai.staleSince = new Date().toISOString(); // AI-вердикт считался без этих данных
     // Скан прошёл — отвечаем за менеджера в чеклисте «Патенты / FTO», если он там ничего не выбирал.
     if ((S.a.inputs.checklist?.patentSearch ?? "none") === "none" && ["clear", "unsure", "conflict"].includes(scan.status)) { S.a.inputs.checklist.patentSearch = scan.status; S.a.inputs.checklist.patentSearchFromScan = true; syncForm(); }
@@ -608,6 +610,19 @@ async function startPatentScan(resumeJobId = null) {
 // ---------- этап 2: конфигурация продукта и ТЗ производителю (spec 010) ----------
 const cfgTh = () => mergeThresholds(S.a.thresholds);
 const cfgStatus = (id, t) => { const el = $(id); if (el) el.textContent = t; };
+
+// ---- spec 027: операция уже идёт, и прогон ЧУЖОЙ ----
+// Молчать об этом нельзя: человек решил бы, что прогон его, и не понял бы, почему результат
+// посчитан не по его параметрам (другая модель, другая схема полей, другой охват).
+// Надпись держится на экране до конца работы — её нельзя затереть сообщением о ходе работ.
+const showJoined = (anchorId, j) => {
+  const el = $(anchorId); if (!el) return;
+  let note = $("#job-joined-note");
+  if (!note) { note = document.createElement("p"); note.id = "job-joined-note"; note.className = "joined-note"; }
+  note.textContent = joinedNote(j);
+  (el.closest(".row") || el).insertAdjacentElement("afterend", note);
+};
+const clearJoined = () => { const n = $("#job-joined-note"); if (n) n.remove(); };
 const JSON_H = { "content-type": "application/json", "x-requested-with": "fba" };
 function mergeListings(listings) { if (!listings || !Object.keys(listings).length) return; S.a.aggregates.listings = { ...(S.a.aggregates.listings || {}), ...listings }; S.aggDirty = true; }
 function ensureConfig() { if (!S.a.config) S.a.config = {}; return S.a.config; }
@@ -634,8 +649,8 @@ async function startConfigSchema(resumeJobId = null) {
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
     const chosen = modelAi();
-    const done = await runConfigJob(S.a, "config_schema", "/api/config/schema", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, asins: top, listings: freshListings(S.a.aggregates.listings, top.map((i) => i.asin), th), prevSchema: S.a.config?.schema || null, options: chosen ? { model: chosen } : {} },
-      { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
+    clearJoined(); const done = await runConfigJob(S.a, "config_schema", "/api/config/schema", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, asins: top, listings: freshListings(S.a.aggregates.listings, top.map((i) => i.asin), th), prevSchema: S.a.config?.schema || null, options: chosen ? { model: chosen } : {} },
+      { resumeJobId, onJoined: (j) => showJoined("#config-status", j), onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
     mergeListings(done.listings); ensureConfig().schema = done.schema; markDirty(); renderAll(); await persistJobResult("Схема полей");
     toast(`Схема полей: ${done.schema.fields.length} полей по ${done.schema.basedOn} листингам${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""} — проверьте и поправьте перед извлечением`, 7000);
     document.getElementById("sec-config")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -652,8 +667,8 @@ async function startConfigExtract(resumeJobId = null) {
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
     const chosen = modelAi();
-    const done = await runConfigJob(S.a, "config_extract", "/api/config/extract", { niche: S.a.niche, schema: C.schema, asins: scope.items, listings: cached, prevTable: C.table || null, batchSize: th.config.batchSize, options: chosen ? { model: chosen } : {} },
-      { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
+    clearJoined(); const done = await runConfigJob(S.a, "config_extract", "/api/config/extract", { niche: S.a.niche, schema: C.schema, asins: scope.items, listings: cached, prevTable: C.table || null, batchSize: th.config.batchSize, options: chosen ? { model: chosen } : {} },
+      { resumeJobId, onJoined: (j) => showJoined("#config-status", j), onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
     mergeListings(done.listings); C.table = done.table; markDirty(); renderAll(); await persistJobResult("Извлечение характеристик");
     const cov = Object.values(done.table.coverage || {}); const avg = cov.length ? cov.reduce((x, v) => x + v, 0) / cov.length : 0;
     toast(`Извлечено: ${Object.keys(done.table.rows).length} листингов, среднее покрытие ${Math.round(avg * 100)} %${done.table.failed?.length ? `, не загружено ${done.table.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
@@ -681,7 +696,7 @@ async function startConfigPromo(resumeJobId = null) {
   S.cfgBusy = { type: "promo", text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["config", "tz"]); cfgStatus("#config-status", S.cfgBusy.text);
   const onStage = (d) => { if (d.stage === "partial") return mergeListings(d.listings); S.cfgBusy.text = d.text || d.stage; cfgStatus("#config-status", S.cfgBusy.text); };
   try {
-    const done = await runConfigJob(S.a, "config_promo", "/api/config/promo", { niche: S.a.niche, asins }, { resumeJobId, onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
+    clearJoined(); const done = await runConfigJob(S.a, "config_promo", "/api/config/promo", { niche: S.a.niche, asins }, { resumeJobId, onJoined: (j) => showJoined("#config-status", j), onStage, onReconnect: (n) => cfgStatus("#config-status", `связь прервалась — переподключаюсь (${n})… задача продолжается на сервере`) });
     mergeListings(done.listings); markDirty(); renderAll(); await persistJobResult("Промо листингов");
     toast(`Промо обновлены: ${Object.keys(done.listings || {}).length} страниц, с промо ${done.withPromo ?? 0}${done.failed?.length ? `, не загрузилось ${done.failed.length}` : ""}${done.cost ? ` · кредитов Scrapfly: ${done.cost}` : ""}`, 8000);
   } catch (e) { console.error(e); if (S.aggDirty) { markDirty(); autosave(); } toast("Промо: " + e.message, 8000); }
@@ -705,8 +720,8 @@ async function startConfigTz(resumeJobId = null) {
   S.tzBusy = { text: resumeJobId ? "продолжаю задачу после перезагрузки…" : "запуск…" }; setStage(2); R().update(dash, S.a, renderOpts(), ["tz"]); cfgStatus("#tz-status", S.tzBusy.text);
   try {
     const chosen = modelAi();
-    const done = await runConfigJob(S.a, "config_tz", "/api/config/tz", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, payload: buildTzPayload(S.a), options: chosen ? { model: chosen } : {} },
-      { resumeJobId, onStage: (d) => cfgStatus("#tz-status", d.text || d.stage), onReconnect: (n) => cfgStatus("#tz-status", `связь прервалась — переподключаюсь (${n})…`) });
+    clearJoined(); const done = await runConfigJob(S.a, "config_tz", "/api/config/tz", { niche: S.a.niche, coreKeyword: S.a.coreKeyword, payload: buildTzPayload(S.a), options: chosen ? { model: chosen } : {} },
+      { resumeJobId, onJoined: (j) => showJoined("#config-status", j), onStage: (d) => cfgStatus("#tz-status", d.text || d.stage), onReconnect: (n) => cfgStatus("#tz-status", `связь прервалась — переподключаюсь (${n})…`) });
     C.tz = done.tz; markDirty(); R().update(dash, S.a, renderOpts(), ["tz"]); await persistJobResult("ТЗ");
     const unv = done.tz.rows.filter((r) => r.unverified).length;
     toast(`ТЗ: ${done.tz.rows.length} требований${unv ? `, проверьте числа в ${unv} строках` : ""}`, 7000);
